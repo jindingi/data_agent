@@ -1,6 +1,6 @@
 # 数据分析客户端：技术设计与验证
 
-更新日期：2026-11-06。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
+更新日期：2026-11-07。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
 
 ## 1. 技术栈与运行边界
 
@@ -27,8 +27,8 @@ flowchart LR
   Admission --> B[会话 B Agent Host / pi]
   A --> JA[A 原生 JSONL]
   B --> JB[B 原生 JSONL]
-  A --> PA[受控通用工具 + Policy]
-  B --> PB[受控通用工具 + Policy]
+  A -->|tool.request 私有通道| PA[Main ToolService + Policy / A]
+  B -->|tool.request 私有通道| PB[Main ToolService + Policy / B]
   PA --> WA[执行监督器 A]
   PB --> WB[执行监督器 B]
   WA --> RA[Python / bash 进程组 A]
@@ -51,7 +51,7 @@ flowchart LR
 
 ### Agent Host
 
-一个 Host 对应一个活跃会话，持有 createAgentSession、SessionManager、受控 ResourceLoader、工具与当前执行投影。只通过 Main 写 SQLite。停止 A 只终止 A 的进程、审批和输入队列，不触碰 B。
+一个 Host 对应一个活跃会话，持有 createAgentSession、SessionManager、受控 ResourceLoader、工具代理与当前执行投影。工具代理通过私有端口发送经过 schema 校验的 tool.request；实际文件访问、PolicyService、InteractionBroker 和 ProcessRunner 在 Main 执行。Main 从当前任务绑定 session/run/epoch/workspace/Host PID，不接受模型伪造这些上下文。Host 不直接写 SQLite。停止 A 只终止 A 的进程、审批和输入队列，不触碰 B。
 
 pi 负责会话内部的 prompt/steer/followUp、重试和压缩；应用只做输入身份关联与外部会话准入。普通输入在空闲时开始新 run；执行中的 steer/follow-up 属同一 run、不同 inputId。全局排队任务重启后不自动恢复执行，保留为未发送。
 
@@ -82,7 +82,7 @@ data_agent/
       index.ts / session-runtime.ts
       input-identity.ts / event-adapter.ts / history.ts
       model-runtime.ts / resource-loader.ts
-      tools/ / policy/
+      tools/ / tool-client.ts
     renderer/
       app/ / components/ui/ / state/ / styles/
       features/                 # sessions, chat, execution, inputs, artifacts,
@@ -93,7 +93,7 @@ data_agent/
   resources/
     skills/<name>/SKILL.md
     python/                     # 执行监督器等可信固定脚本，不含 CSV 预览/解析服务
-    fonts/ / runtime-manifest.json
+    runtime-lock.json / requirements.hashed.lock
   runtime/darwin-arm64/          # 固定版本构建资源，生成物不提交
   scripts/build/ / scripts/test/
   tests/unit/ / integration/ / e2e/ / fixtures/ / phases/
@@ -106,6 +106,10 @@ data_agent/
 Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host 通过 shared contracts 通信，不能互相 import 实现；shared 不依赖 Node/Electron/pi；node 是可复用基础设施。TypeScript 不能替代 IPC 运行时校验。依赖方向用 lint 检查。
 
 P2 的具体实现将准入/进程路由放在 `main/services/runtime.ts`，进程传输放在 `agent-process.ts`，凭证在 `credentials.ts`；Host 使用 `agent/session-runtime.ts`、`input-identity.ts`、`event-adapter.ts`、`models.ts` 和固定 `resource-loader.ts`。Renderer 的 `features/runtime/` 提供快照订阅、模型设置和 Streamdown 过程展示。SQLite migrations 当前集中在 `storage/database.ts`，无需为小型初始 schema 拆出空模块；以上目录树同时列出了后续阶段的职责位置。
+
+P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可信 `resources/python/inspect_policy.py` 做非执行式检查，`interactions.ts` 负责一次性授权和澄清。Host 的 `tool-client.ts` 只传输工具请求/输出/交互，`tool.interaction` 进入 Host 快照后沿同一 seq 通道更新 UI，避免 Main/Host 各自递增状态序号。取消先由 Host 标记 SDK 中止，再等待 Main 的实际工具进程清理；普通用户停止不误报为模型失败。
+
+`pnpm runtime:prepare` 从已校验缓存准备资源；干净机器显式运行 `pnpm runtime:prepare -- --download` 获取锁定资源，构建机需要 uv。脚本锁定 Python/rg/fd/字体哈希和 Python wheel 哈希，并生成完整运行时清单。`pnpm runtime:verify` 校验版本、每个文件哈希和符号链接；打包将运行时与辅助脚本放入 `Contents/Resources/runtime` 和 `Contents/Resources/python`，不依赖开发机 PATH 或 ASAR 内可执行路径。工具环境只含固定 PATH、工作区 HOME/cache/tmp 和受信字体配置，不继承模型 key。运行中的应用不下载或安装依赖。
 
 ## 4. 输入路径、存储和删除
 
@@ -124,7 +128,7 @@ P2 的具体实现将准入/进程路由放在 `main/services/runtime.ts`，进�
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿、审批和产物登记；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`interactions`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿和产物登记；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
 添加/提交任务时校验所选 CSV 合计 ≤100,000,000 bytes；排队到实际启动时复核存在性与大小。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
@@ -237,6 +241,7 @@ Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载�
 - 程序/规则化验证负责 SDK 接入、真实模型调用链、Electron/CDP、SQLite/打包、内置 Python、文件交付、审批机制与进程回收；不校验分析数值或结论。确定性模型响应覆盖状态和错误分支，live 用例验证真实调用与文件交付。
 - 正式产品开发把这些已验证的机制接入真实界面与生命周期，再运行产品 CDP/E2E。探针通过不是宣称所有 UI 或产品功能已完成。
 - 主 E2E 保留真实 Electron/Main/pi/工具/Python/SQLite/JSONL，只可替换外部 LLM 响应做确定性故障回归；真实 DeepSeek 路径另测。
+- P3 确定性 CDP 用本机 HTTP/SSE 模型夹具，保留真实 pi SDK 与全部副作用链路。仅 `--data-agent-automation` 可接收 `DATA_AGENT_TEST_MODEL_BASE_URL`，Host 再校验其必须为 `http://127.0.0.1`；普通启动忽略该变量。关闭/重开、退出、查询任务 Host PID 的自动化 IPC 同样只在显式测试模式注册处理，不能授予工具权限。
 - 使用独立 userData、业务根、workspace、端口。CDP 仅显式测试模式、loopback，正常启动关闭；真实密钥不进入 Renderer。
 - `connectOverCDP` 能力低于 Playwright 原生协议；本项目以实际连通/操作/截图结果为依据，不承诺所有高级功能。[Playwright](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp)
 - 离线资源测试必须证明外部连接失败仍能运行分析；临时测试环境的网络限制不成为产品执行安全策略，不把只拦 Chromium 请求当作阻断 Python/Node。

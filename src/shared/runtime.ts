@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { interactionSchema } from './tools';
 
 export const modelChoiceSchema = z.object({ provider: z.string().min(1).max(100), model: z.string().min(1).max(200) }).strict();
 export type ModelChoice = z.infer<typeof modelChoiceSchema>;
@@ -16,7 +17,7 @@ export const messageSchema = z.object({ id: z.string(), role: z.string(), blocks
 export const toolSchema = z.object({ id: z.string(), name: z.string(), arguments: z.string(), output: z.string(), status: z.enum(['running', 'completed', 'failed']) });
 export const snapshotSchema = z.object({
   schemaVersion: z.literal(1), sessionId: z.string().uuid(), runId: z.string().uuid(), hostEpoch: z.string().uuid(), seq: z.number().int().nonnegative(),
-  state: z.enum(['starting', 'queued', 'running', 'completed', 'cancelled', 'failed']),
+  state: z.enum(['starting', 'queued', 'running', 'waiting_approval', 'waiting_input', 'completed', 'cancelled', 'failed']),
   messages: z.array(messageSchema), tools: z.array(toolSchema),
   inputs: z.array(z.object({ inputId: z.string().uuid(), kind: inputSchema.shape.kind, state: z.enum(['pending', 'committed', 'unknown', 'cancelled']), entryId: z.string().optional() })),
   queuedInputs: z.array(inputSchema).optional(),
@@ -24,11 +25,12 @@ export const snapshotSchema = z.object({
   requests: z.array(z.object({ model: z.string(), toolNames: z.array(z.string()), userMessages: z.number(), toolResultHashes: z.array(z.string()), hasReasoning: z.boolean(), hasNonemptyReasoning: z.boolean(), hasInternalEnvelope: z.boolean(), thinkingEnabled: z.boolean(), reasoningEffort: z.string() })).optional(),
   usage: z.object({ input: z.number(), output: z.number(), cacheRead: z.number(), cacheWrite: z.number(), totalTokens: z.number() }).optional(),
   responseModel: z.string().optional(),
+  interactions: z.array(interactionSchema).optional(),
 }).strict();
 export type RuntimeSnapshot = z.infer<typeof snapshotSchema>;
 export type MessageView = z.infer<typeof messageSchema>;
 export type ToolView = z.infer<typeof toolSchema>;
-export function isActive(state: RuntimeSnapshot['state']) { return state === 'starting' || state === 'queued' || state === 'running'; }
+export function isActive(state: RuntimeSnapshot['state']) { return ['starting', 'queued', 'running', 'waiting_approval', 'waiting_input'].includes(state); }
 /** Cross-epoch changes are accepted only through an authoritative snapshot response. */
 export function acceptSnapshot(current: RuntimeSnapshot | null, incoming: RuntimeSnapshot, sessionId: string, authoritative = false): RuntimeSnapshot | null {
   if (incoming.sessionId !== sessionId) return current;

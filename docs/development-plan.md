@@ -194,7 +194,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P3-QUESTION | CDP 展示澄清表单并返回结构化回答；拒绝/取消路径正常收束，不当作权限批准 |
 | P3-LIVE-TOOLS | DeepSeek 实际 write 脚本、bash 使用内置 Python 执行、read 返回实际文件内容；指定结果文件存在且非空，工具子进程无 API key；不判断计算结果准确性 |
 
-**门禁：** `pnpm verify:phase -- P3`，包含 P2 核心 live 回归与打包运行时探针。危险命令只测试分类器或临时目录中的无害替身，不实际执行破坏系统的样例。
+**门禁：** `pnpm verify:phase -- P3`，当前清单包含 19 项检查（含 P2 核心 live 回归与实际 .app 运行时验证）。确定性模型使用仅测试模式启用的 loopback HTTP/SSE 响应源，真实 SDK、工具服务、文件、Python、SQLite 和 UI 均不替换。危险命令只测试分类器或临时目录中的无害替身，不实际执行破坏系统的样例。
 
 ## 10. P4 — CSV → 图表 → 报告的完整闭环
 

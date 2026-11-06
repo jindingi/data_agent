@@ -4,6 +4,8 @@ import { hostResponseSchema, type HostInput } from '../../shared/contracts/host'
 import { AppError } from '../../shared/errors';
 import type { HostStatus } from '../../shared/contracts/ipc';
 import type { RuntimeSnapshot } from '../../shared/runtime';
+import type { ToolOperation, ToolResult, Interaction } from '../../shared/tools';
+export type ToolHandler = (toolCallId: string, operation: ToolOperation, observers: { output(text: string): void; interaction(value: Interaction | null): void }) => Promise<ToolResult>;
 
 /** Owns one Host transport. Session admission will own separate instances per active session. */
 export class AgentProcess {
@@ -13,7 +15,7 @@ export class AgentProcess {
   private port: MessagePortMain | undefined;
   private pending = new Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private ready: Promise<void>;
-  constructor(entry: string, onStatus: (status: HostStatus) => void, onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {}) {
+  constructor(entry: string, onStatus: (status: HostStatus) => void, onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {}, onTool?: ToolHandler, onToolCancel?: (toolCallId: string) => void) {
     this.ready = new Promise((resolve, reject) => {
       const readyTimer = setTimeout(() => { reject(new AppError('HOST_TIMEOUT', 'Agent 进程启动超时')); this.stop(); }, 15_000);
       this.child = utilityProcess.fork(entry, [], {
@@ -30,6 +32,17 @@ export class AgentProcess {
         port1.on('message', ({ data }) => {
           const parsed = hostResponseSchema.safeParse(data);
           if (!parsed.success) return;
+          if (parsed.data.type === 'tool.cancel') { onToolCancel?.(parsed.data.toolCallId); return; }
+          if (parsed.data.type === 'tool.request') {
+            const request = parsed.data;
+            const post = (message: unknown) => { if (this.status === 'ready') this.port?.postMessage(message); };
+            const task = onTool ? onTool(request.toolCallId, request.operation, {
+              output: output => post({ type: 'tool.update', id: request.id, output }),
+              interaction: interaction => post({ type: 'tool.interaction', id: request.id, interaction }),
+            }) : Promise.resolve({ output: '该 Host 未配置工具执行器', isError: true });
+            void task.then(result => post({ type: 'tool.result', id: request.id, result })).catch(() => post({ type: 'tool.result', id: request.id, result: { output: '工具服务异常，未继续执行', isError: true } }));
+            return;
+          }
           if (parsed.data.type === 'ready') {
             clearTimeout(readyTimer); this.status = 'ready'; onStatus('ready'); resolve();
           } else if (parsed.data.type === 'runtime.event') onSnapshot(parsed.data.snapshot);

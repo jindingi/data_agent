@@ -9,6 +9,9 @@ import { FilePicker } from './services/file-picker';
 import { AgentProcess } from './services/agent-process';
 import { CredentialService } from './services/credentials';
 import { RuntimeService } from './services/runtime';
+import { ToolService } from './services/tools';
+import { InteractionBroker } from './services/interactions';
+import { getRuntimePaths } from '../node/runtime-paths';
 import type { ModelOption } from '../shared/runtime';
 import { registerHandlers } from './ipc/handlers';
 import { IPC_EVENT } from '../shared/channels';
@@ -52,12 +55,14 @@ app.whenReady().then(() => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'host.status', status });
   });
   const credentials = new CredentialService(db, safeStorage);
+  const interactions = new InteractionBroker(db);
+  const tools = new ToolService(getRuntimePaths(app.getAppPath(), process.resourcesPath, app.isPackaged), paths.logs, interactions);
   const catalogReady = host.request({ type: 'models.list' }).then(value => { credentials.setCatalog((value as { models: ModelOption[] }).models); });
   void catalogReady.catch(() => {});
   const changed = () => { if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' }); };
-  runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot) => new AgentProcess(join(here, 'agent.js'), status, snapshot), host, snapshot => {
+  runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot, tool, cancelTool) => new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool), host, snapshot => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
-  }, changed);
+  }, changed, tools, automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined);
   const info = (): SystemInfo => ({
     version: app.getVersion(), platform: process.platform, architecture: process.arch,
     electron: process.versions.electron, node: process.versions.node, abi: process.versions.modules,
@@ -65,7 +70,12 @@ app.whenReady().then(() => {
     hostStatus: host!.status, hostPid: host!.pid,
     sqliteVersion: (db!.prepare('SELECT sqlite_version() AS version').get() as { version: string }).version,
   });
-  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host, sessions, new FilePicker(() => window, automation), changed, credentials, runtime, catalogReady);
+  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host, sessions, new FilePicker(() => window, automation), changed, credentials, runtime, catalogReady, interactions, automation ? (action, sessionId) => {
+    if (action === 'host_pid') return sessionId ? runtime!.hostPid(sessionId) : null;
+    if (action === 'quit') setTimeout(() => app.quit(), 100);
+    if (action === 'close_reopen') setTimeout(() => { window?.close(); setTimeout(() => { if (!window) app.emit('activate'); }, 500); }, 100);
+    return null;
+  } : undefined);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Data Agent', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },

@@ -9,14 +9,19 @@ import type { HistoryItem } from '../../shared/models';
 import type { CredentialService } from '../services/credentials';
 import type { RuntimeService } from '../services/runtime';
 import type { MessageView } from '../../shared/runtime';
+import type { InteractionBroker } from '../services/interactions';
 
-export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void, credentials: CredentialService, runtime: RuntimeService, catalogReady: Promise<void>) {
+export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void, credentials: CredentialService, runtime: RuntimeService, catalogReady: Promise<void>, interactions: InteractionBroker, automationControl?: (action: 'close_reopen' | 'quit' | 'host_pid', sessionId?: string) => unknown) {
   ipcMain.handle(IPC_COMMAND, async (event, raw): Promise<Result> => {
     if (!trusted(event)) return { ok: false, error: { code: 'UNTRUSTED_SENDER', message: '请求来源不受信任' } };
     const parsed = commandSchema.safeParse(raw);
     if (!parsed.success) return { ok: false, error: { code: 'INVALID_COMMAND', message: '请求格式不正确或操作不受支持' } };
     try {
       switch (parsed.data.type) {
+        case 'automation.control': {
+          if (!automationControl) throw new AppError('UNSUPPORTED_COMMAND', '自动化入口未开启');
+          return { ok: true, value: automationControl(parsed.data.action, parsed.data.sessionId) };
+        }
         case 'system.info': return { ok: true, value: info() };
         case 'models.settings': await catalogReady; return { ok: true, value: credentials.settings() };
         case 'models.select': await catalogReady; return { ok: true, value: credentials.select(parsed.data.model) };
@@ -24,6 +29,11 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'runtime.submit': await catalogReady; return { ok: true, value: await runtime.submit(parsed.data.sessionId, parsed.data.input) };
         case 'runtime.snapshot': return { ok: true, value: runtime.snapshot(parsed.data.sessionId) };
         case 'runtime.cancel': await runtime.cancel(parsed.data.sessionId); return { ok: true, value: null };
+        case 'interaction.answer': {
+          const input = parsed.data;
+          interactions.answer({ id: input.interactionId, sessionId: input.sessionId, runId: input.runId, hostEpoch: input.hostEpoch, digest: input.digest }, input.answer);
+          return { ok: true, value: null };
+        }
         case 'system.ping': return { ok: true, value: await host.ping(parsed.data.text) };
         case 'sessions.list': return { ok: true, value: sessions.list(parsed.data.search, parsed.data.archived) };
         case 'sessions.create': {

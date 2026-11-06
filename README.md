@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-正式工程已实现桌面骨架、会话存储和 pi 只读模型链路：可管理会话、选择工作区、引用多个 CSV、配置内置模型与 BYOK、流式显示正文/思考/工具过程，并恢复原生 JSONL 历史。Python 执行、写入审批和图表/报告产物流程尚待 P3–P7 接入，当前不是完整分析产品。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
+正式工程已实现桌面骨架、会话存储和 pi 通用工具链路：可管理会话、选择工作区、引用多个 CSV、配置内置模型与 BYOK、流式显示正文/思考/工具过程，并恢复原生 JSONL 历史。Python 执行、写入审批和澄清已接入，P3 已通过完整验收；图表/报告产物展示与后续生命周期流程仍待 P4–P7 完成，当前不是完整分析产品。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
 
 ## 文档
 
@@ -23,6 +23,7 @@
 ```sh
 pnpm install --frozen-lockfile
 pnpm native:rebuild
+pnpm runtime:prepare -- --download  # 首次准备内置运行时；构建机需 uv
 pnpm dev
 ```
 
@@ -33,11 +34,12 @@ pnpm check
 pnpm verify:phase -- P0
 pnpm verify:phase -- P1
 pnpm verify:phase -- P2  # 包含真实 DeepSeek 请求
+pnpm verify:phase -- P3  # 工具/审批/CDP/内置运行时及真实模型
 pnpm dev:cdp
 ```
 
 阶段门禁会构建并实际启动 Electron，结果位于被忽略的 `test-results/`。`dev:cdp` 为开发助手开启独立测试实例，输出 CDP endpoint 和临时数据目录，Ctrl+C 退出；正常产品启动不开放 CDP。
 
-本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。现阶段包含桌面、会话与只读模型链路，完整 Python/分析链路将在 P3–P7 接入并验收。
+本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。打包前会校验内置运行时完整清单。现阶段含通用工具、内置 Python 与审批链路；完整产物展示和最终交付仍以阶段验收为准。
 
 P2 的真实测试可单独运行 `pnpm test:integration:live`。测试脚本从继承环境或 `~/.zshrc` 的单条字面量赋值取得 `DEEPSEEK_API_KEY`，不会 source shell；通过实际设置页保存到隔离测试实例的系统加密存储。生产应用始终由用户在设置中填写 BYOK，不读取开发者 shell 文件。

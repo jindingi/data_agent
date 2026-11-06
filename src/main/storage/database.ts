@@ -24,6 +24,12 @@ export const migrations: Migration[] = [{ version: 1, sql: `
   CREATE TABLE run_inputs (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), kind TEXT NOT NULL, state TEXT NOT NULL, entry_id TEXT
   );
+` }, { version: 4, sql: `
+  CREATE TABLE interactions (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), run_id TEXT NOT NULL REFERENCES runs(id),
+    host_epoch TEXT NOT NULL, tool_call_id TEXT NOT NULL, kind TEXT NOT NULL, details TEXT NOT NULL,
+    state TEXT NOT NULL, created_at TEXT NOT NULL, resolved_at TEXT
+  );
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');

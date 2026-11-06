@@ -6,6 +6,13 @@ directories:
 files:
   - out/**
   - package.json
+extraResources:
+  - from: runtime/darwin-arm64
+    to: runtime
+  - from: resources/python
+    to: python
+    filter:
+      - '**/*.py'
 asarUnpack:
   - '**/*.node'
 mac:

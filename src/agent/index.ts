@@ -3,6 +3,7 @@ import { readHistory } from './history';
 import { AppError } from '../shared/errors';
 import { SessionRuntime } from './session-runtime';
 import { createModelRuntime, modelCatalog } from './models';
+import { ToolClient } from './tool-client';
 
 // This entry is deliberately independent from Main and Renderer implementations.
 const parent = (process as NodeJS.Process & {
@@ -13,11 +14,13 @@ parent.on('message', ({ ports }) => {
   const port = ports[0];
   if (!port) return;
   let runtime: SessionRuntime | undefined;
+  const tools = new ToolClient(message => port.postMessage(message));
   let initializing = false;
   port.on('message', async ({ data }) => {
     const parsed = hostRequestSchema.safeParse(data);
     if (!parsed.success) return;
     const request = parsed.data;
+    if (tools.receive(request)) return;
     try {
       switch (request.type) {
         case 'ping': port.postMessage({ type: 'pong', id: request.id, text: request.text, pid: process.pid }); break;
@@ -27,7 +30,7 @@ parent.on('message', ({ ports }) => {
           if (runtime || initializing) throw new AppError('HOST_BUSY', '该 Agent 进程已有任务');
           initializing = true;
           try {
-            runtime = await SessionRuntime.create(request.config, snapshot => port.postMessage({ type: 'runtime.event', snapshot }));
+            runtime = await SessionRuntime.create(request.config, snapshot => port.postMessage({ type: 'runtime.event', snapshot }), { tools });
             await runtime.submit(request.input);
             port.postMessage({ type: 'accepted', id: request.id });
           } finally { initializing = false; }

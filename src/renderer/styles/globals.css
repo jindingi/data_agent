@@ -57,3 +57,14 @@ button { cursor: pointer; } button:disabled { cursor: default; } button,input,te
 .queued-input { background:#242b28; border:1px solid #3c4a42; border-radius:8px; padding:8px 12px; margin:6px 0; max-height:100px; overflow:auto; }
 .queued-input span,.queued-input button { font-size:10px; color:#9cb9a9; }
 .queued-input p { color:#b9c9c0; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+.interaction-card { background:#252e29; border:1px solid #587365; border-radius:12px; padding:14px 16px; margin:6px 0 10px; max-height:330px; overflow:auto; }
+.interaction-card h3 { display:flex; gap:9px; align-items:center; font-size:13px; color:#d7e9dd; margin:0 0 10px; }
+.interaction-card pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; line-height:1.7; max-height:135px; overflow:auto; color:#b5c3bb; }
+.interaction-card p { font-size:10px; color:#8ca395; margin:10px 0; }
+.interaction-actions,.question-options { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.question-options button { padding:5px 9px; border:1px solid #536f60; border-radius:6px; font-size:11px; }
+.question-options button[aria-pressed=true] { background:#496251; }
+.interaction-card textarea { width:100%; background:#18201c; color:#d6e5db; padding:10px; border:1px solid #465e50; border-radius:7px; font-size:12px; margin-top:12px; }
+.history-message>.markdown-body { color:#c7d0cb; font-size:14px; }
+.markdown-body ul { list-style:disc; }.markdown-body ol { list-style:decimal; }

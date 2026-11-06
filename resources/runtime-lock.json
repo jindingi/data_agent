@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "platform": "darwin-arm64",
+  "python": {
+    "version": "3.12.12",
+    "build": "20251028",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20251028/cpython-3.12.12%2B20251028-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "194997bc8cc08f1ed19a7e6a72544d8ce6688ef5e8969d61de2848aeb68fbf6c",
+    "executableSha256": "06002b7deb221e0e15086843b150ffa3886e6f787dcf120f9511b999d5540691"
+  },
+  "tools": [
+    { "name": "rg", "folder": "ripgrep-15.2.0-aarch64-apple-darwin", "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz", "sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4", "executableSha256": "a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e" },
+    { "name": "fd", "folder": "fd-v10.5.1-aarch64-apple-darwin", "url": "https://github.com/sharkdp/fd/releases/download/v10.5.1/fd-v10.5.1-aarch64-apple-darwin.tar.gz", "sha256": "2d336895ed27b14c5cc9fc5eb22df03b3ee842b5dce80060e99d9cdc1b1b9fc7", "executableSha256": "96eb610125107448e6e442647745ddd81ed26fed3b2936583ef7e4ebe52b880e" }
+  ],
+  "font": { "name": "NotoSansCJKsc-Regular.otf", "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf", "sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b", "licenseUrl": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/LICENSE" },
+  "libraries": { "pandas": "2.3.3", "numpy": "2.3.4", "matplotlib": "3.10.7", "seaborn": "0.13.2", "psutil": "7.1.2", "pillow": "12.0.0", "jsonschema": "4.25.1" }
+}
