@@ -1,0 +1,16 @@
+appId: local.dataagent.desktop
+productName: Data Agent
+asar: true
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - '**/*.node'
+mac:
+  identity: null
+  target: dir
+  category: public.app-category.productivity
+npmRebuild: false
+electronDist: node_modules/electron/dist

@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-目前已完成需求与技术设计，保留可复用的技术验证脚本；正式产品源码尚未开始实现。`validation/` 不是产品应用，也不是已完成的产品 E2E。
+正式工程已开始实现：P0 桌面骨架通过真实 CDP、IPC、SQLite、进程故障、隔离与打包验收。会话、模型和分析流程仍在后续阶段实现；当前不可将界面骨架当作完整分析产品。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
 
 ## 文档
 
@@ -14,4 +14,26 @@
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)
 
-正式工程采用 pnpm；当前独立 Node 验证工程各用自己的 npm lockfile。请按对应 README 安装，不要在仓库根目录直接运行尚未实现的产品命令。运行结果、旧调研和一次性实验仅保留本地，不是检出仓库的前置依赖。
+正式工程采用 pnpm；独立 Node 验证工程各用自己的 npm lockfile。正式工程按下方命令开发；尚未实现的阶段门禁会明确失败。运行结果、旧调研和一次性实验仅保留本地，不是检出仓库的前置依赖。
+
+## 正式工程开发
+
+需要 Node 22.22+、pnpm 10.14.0 和 macOS arm64。依赖与构建工具仅在开发机需要；交付应用会内置运行时。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm native:rebuild
+pnpm dev
+```
+
+`pnpm native:rebuild` 确保 better-sqlite3 对应 Electron ABI，不使用系统 Node ABI 的二进制替代。默认安装下载官方 Electron，网络受限时应修复连接或使用已核对版本/hash 的官方缓存，不修改锁文件跳过完整性验证。
+
+```sh
+pnpm check
+pnpm verify:phase -- P0
+pnpm dev:cdp
+```
+
+阶段门禁会构建并实际启动 Electron，结果位于被忽略的 `test-results/`。`dev:cdp` 为开发助手开启独立测试实例，输出 CDP endpoint 和临时数据目录，Ctrl+C 退出；正常产品启动不开放 CDP。
+
+本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。现阶段只包含 P0 已实现能力，完整 Python/分析链路将在 P3–P7 接入并验收。

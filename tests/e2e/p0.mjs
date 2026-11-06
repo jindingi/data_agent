@@ -1,0 +1,85 @@
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { startApp, until, freePort } from '../../scripts/test/harness.mjs';
+
+async function info(page) {
+  const result = await page.evaluate(() => window.dataAgent.request({ type: 'system.info' }));
+  assert.equal(result.ok, true); return result.value;
+}
+export const cases = {
+  async 'P0-CDP'({ dir }) {
+    const app = await startApp(join(dir, 'desktop'));
+    try {
+      const { page } = app;
+      await page.getByRole('textbox', { name: '分析需求' }).fill('分析地区销售变化');
+      assert.equal(await page.getByRole('textbox', { name: '分析需求' }).inputValue(), '分析地区销售变化');
+      await page.getByRole('button', { name: '切换结果面板' }).click();
+      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('heading', { name: '还没有报告' }).waitFor();
+      await page.getByRole('button', { name: '关闭结果面板' }).click();
+      await page.getByRole('button', { name: '收起侧栏' }).click();
+      assert.equal(await page.getByLabel('会话侧栏').count(), 0);
+      await page.getByRole('button', { name: '展开侧栏' }).click();
+      await page.getByRole('button', { name: '看清变化', exact: false }).click();
+      assert.match(await page.getByRole('textbox', { name: '分析需求' }).inputValue(), /最近 3 个月/);
+      await page.screenshot({ path: join(dir, 'desktop.png') });
+      assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
+      assert.deepEqual(app.errors, []);
+      return { screenshot: 'desktop.png', info: await info(page) };
+    } finally { await app.stop(); }
+  },
+  async 'P0-IPC'({ dir }) {
+    const app = await startApp(join(dir, 'ipc'));
+    try {
+      const { page } = app;
+      await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByText('应用诊断', { exact: true }).click();
+      await page.getByRole('button', { name: '检查连接' }).click();
+      await page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
+      for (const command of [{ type: 'unknown' }, { type: 'system.ping', text: 1 }, { type: 'system.info', shell: 'anything' }]) {
+        const invalid = await page.evaluate(command => window.dataAgent.request(command), command);
+        assert.equal(invalid.ok, false); assert.equal(invalid.error.code, 'INVALID_COMMAND');
+      }
+      const system = await info(page); assert.ok(system.sqliteVersion); assert.equal(system.hostStatus, 'ready');
+      process.kill(system.hostPid, 'SIGKILL');
+      await until(async () => (await info(page)).hostStatus === 'exited', 'Host crash detected');
+      await page.getByRole('button', { name: '检查连接' }).click();
+      await page.getByRole('status').filter({ hasText: 'Agent 进程已退出' }).waitFor();
+      assert.deepEqual(app.errors, []); return { schemaRejections: 3, nativeSQLite: system.sqliteVersion, hostCrashDetected: true };
+    } finally { await app.stop(); }
+  },
+  async 'P0-ISOLATION'({ dir }) {
+    const a = await startApp(join(dir, 'instance-a')); let b, normal;
+    try {
+      b = await startApp(join(dir, 'instance-b'));
+      const ai = await info(a.page), bi = await info(b.page);
+      assert.notEqual(ai.dataHome, bi.dataHome);
+      for (const instance of [a, b]) {
+        const meta = JSON.parse(readFileSync(join(instance.root, 'data/automation.json'), 'utf8'));
+        assert.equal(meta.paths.home, join(instance.root, 'data')); assert.equal(meta.userData, join(instance.root, 'userData'));
+        assert.notEqual(meta.userData, meta.paths.home);
+        assert.ok(existsSync(join(meta.paths.home, 'state.sqlite')));
+      }
+      const normalPort = await freePort(); normal = await startApp(join(dir, 'normal'), { automation: false, port: normalPort });
+      let connected = false;
+      try { await fetch(`http://127.0.0.1:${normalPort}/json/version`); connected = true; } catch { /* Must not listen. */ }
+      assert.equal(connected, false); assert.equal(existsSync(join(normal.root, 'data/automation.json')), false);
+      return { twoIsolatedInstances: true, productionDebugClosed: true };
+    } finally { await a.stop(); await b?.stop(); await normal?.stop(); }
+  },
+  async 'P0-PACKAGE'({ dir }) {
+    assert.ok(existsSync('out/main/index.js')); assert.ok(existsSync('out/main/agent.js'));
+    const app = await startApp(join(dir, 'packaged'), { packaged: true });
+    try {
+      await app.page.getByRole('button', { name: '设置', exact: true }).click();
+      await app.page.getByText('应用诊断', { exact: true }).click();
+      await app.page.getByRole('button', { name: '检查连接' }).click();
+      await app.page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
+      const system = await info(app.page);
+      assert.equal(system.packaged, true); assert.equal(system.architecture, 'arm64'); assert.ok(system.sqliteVersion);
+      await app.page.screenshot({ path: join(dir, 'packaged.png') });
+      assert.deepEqual(app.errors, []); return { info: system, screenshot: 'packaged.png' };
+    } finally { await app.stop(); }
+  },
+};

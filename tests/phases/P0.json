@@ -1,0 +1,6 @@
+{
+  "phase": "P0",
+  "required": ["P0-CHECK", "P0-CDP", "P0-IPC", "P0-ISOLATION", "P0-PACKAGE"],
+  "requiresBuild": true,
+  "requiresPackage": true
+}
