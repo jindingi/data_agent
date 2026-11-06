@@ -5,6 +5,11 @@ import { interactionAnswerSchema } from '../tools';
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('automation.control'), action: z.enum(['close_reopen', 'quit', 'host_pid']), sessionId: z.string().uuid().optional() }).strict(),
+  z.object({ ...base, type: z.literal('artifacts.list'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('artifacts.preview'), sessionId: z.string().uuid(), artifactId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('artifacts.export'), sessionId: z.string().uuid(), versionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('workspace.open'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('link.open'), url: z.string().url().max(4096) }).strict(),
   z.object({ ...base, type: z.literal('system.info') }).strict(),
   z.object({ ...base, type: z.literal('models.settings') }).strict(),
   z.object({ ...base, type: z.literal('models.select'), model: modelChoiceSchema }).strict(),
@@ -41,7 +46,7 @@ export interface SystemInfo {
   hostPid: number | null;
   sqliteVersion: string;
 }
-export type AppEvent = { type: 'host.status'; status: HostStatus } | { type: 'sessions.changed' } | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
+export type AppEvent = { type: 'artifacts.changed'; sessionId: string } | { type: 'host.status'; status: HostStatus } | { type: 'sessions.changed' } | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface DesktopAPI {
   request: (command: CommandInput) => Promise<Result>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;

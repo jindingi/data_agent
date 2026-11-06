@@ -53,9 +53,9 @@ export class ToolService {
   }
   private async perform(context: ToolContext, toolCallId: string, operation: Exclude<ToolOperation, { name: 'ask_clarification' }>, signal: AbortSignal, observers: ToolObservers, checkedPath?: string): Promise<ToolResult> {
     signal.throwIfAborted();
-    if (operation.name === 'read') { const result = await readText(context.workspace, context.protectedRoots, { ...operation, path: checkedPath! }, signal); return { ...result, isError: false }; }
+    if (operation.name === 'read') { const result = await readText(context.workingDirectory ?? context.workspace, context.protectedRoots, { ...operation, path: checkedPath! }, signal); return { ...result, isError: false }; }
     if (operation.name === 'bash') {
-      const result = await this.processes.run({ argv: ['/bin/bash', '--noprofile', '--norc', '-c', operation.command], cwd: context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, timeoutSeconds: operation.timeout, signal, onOutput: observers.output });
+      const result = await this.processes.run({ argv: ['/bin/bash', '--noprofile', '--norc', '-c', operation.command], cwd: context.workingDirectory ?? context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, timeoutSeconds: operation.timeout, signal, onOutput: observers.output });
       return { output: result.output + (result.reason !== 'exit' ? `\n[执行结束：${result.reason}]` : result.exitCode ? `\n[退出码：${result.exitCode}]` : ''), isError: result.reason !== 'exit' || result.exitCode !== 0, details: { ...result, output: undefined } };
     }
     const path = checkedPath!;
@@ -79,7 +79,7 @@ export class ToolService {
       return { output: entries.slice(0, 500).map(entry => `${entry.isDirectory() ? 'd' : entry.isSymbolicLink() ? 'l' : 'f'} ${entry.name}`).join('\n') + (entries.length > 500 ? '\n[列表已截断]' : ''), isError: false };
     }
     if (operation.name === 'find') {
-      const result = await this.processes.run({ argv: [join(this.resources.bin, 'fd'), '--max-results', '256', '--absolute-path', '--type', 'f', '--print0', '--', operation.pattern, path], cwd: context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, signal });
+      const result = await this.processes.run({ argv: [join(this.resources.bin, 'fd'), '--max-results', '256', '--absolute-path', '--type', 'f', '--print0', '--', operation.pattern, path], cwd: context.workingDirectory ?? context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, signal });
       const paths: string[] = [];
       for (const file of result.output.split('\0').filter(Boolean)) if (!sensitivePath(await canonicalPath(file, context.workspace), context.protectedRoots)) paths.push(file);
       return { output: paths.join('\n') + (paths.length === 256 ? '\n[最多显示 256 个文件]' : ''), isError: result.exitCode !== 0 || result.reason !== 'exit' };
@@ -95,7 +95,7 @@ export class ToolService {
     await walk(path);
     if (!files.length) return { output: '没有可搜索的文件', isError: false };
     const argv = [join(this.resources.bin, 'rg'), '--no-config', '--line-number', '--color', 'never', '--max-count', '30', ...(operation.ignoreCase ? ['--ignore-case'] : []), '--regexp', operation.pattern, '--', ...files];
-    const result = await this.processes.run({ argv, cwd: context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, signal, onOutput: observers.output });
+    const result = await this.processes.run({ argv, cwd: context.workingDirectory ?? context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, signal, onOutput: observers.output });
     return { output: result.output + (files.length === 256 || visited > 5000 ? '\n[搜索文件范围已截断，请缩小目录]' : ''), isError: result.reason !== 'exit' || result.exitCode !== 0 && result.exitCode !== 1 };
   }
   cancelTool(runId: string, toolCallId: string) { for (const item of this.active) if (item.runId === runId && item.toolCallId === toolCallId) item.abort.abort(); }

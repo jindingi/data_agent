@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { inputSchema, modelChoiceSchema, snapshotSchema, messageSchema } from '../runtime';
 import { toolOperationSchema, toolResultSchema, interactionSchema } from '../tools';
 const id = z.string().uuid();
-const runtimeConfigSchema = z.object({ sessionId: id, runId: id, hostEpoch: id, file: z.string().min(1), workspace: z.string().min(1), piSessionId: z.string().nullable(), model: modelChoiceSchema, apiKey: z.string().min(1).max(4096), protectedRoots: z.array(z.string()), filePaths: z.array(z.string()), testBaseUrl: z.string().url().optional() }).strict();
+const runtimeConfigSchema = z.object({ sessionId: id, runId: id, hostEpoch: id, file: z.string().min(1), workspace: z.string().min(1), piSessionId: z.string().nullable(), model: modelChoiceSchema, apiKey: z.string().min(1).max(4096), protectedRoots: z.array(z.string()), filePaths: z.array(z.string()), testBaseUrl: z.string().url().optional(), outputDirectory: z.string().optional(), skillsDirectory: z.string().optional() }).strict();
 export const hostRequestSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('tool.result'), result: toolResultSchema }).strict(),
   z.object({ id, type: z.literal('tool.update'), output: z.string() }).strict(),

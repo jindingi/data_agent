@@ -7,9 +7,9 @@ import { verifyRuntime } from '../../scripts/build/verify-runtime.mjs';
 import { liveKey } from '../../scripts/test/live-key.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
 
-async function rpc(page, command) { const result = await page.evaluate(command => window.dataAgent.request(command), command); assert.equal(result.ok, true, JSON.stringify(result)); return result.value; }
+export async function rpc(page, command) { const result = await page.evaluate(command => window.dataAgent.request(command), command); assert.equal(result.ok, true, JSON.stringify(result)); return result.value; }
 async function snapshot(page, sessionId) { return rpc(page, { type: 'runtime.snapshot', sessionId }); }
-async function configure(page, key = 'synthetic-p3-fixture-key') {
+export async function configure(page, key = 'synthetic-p3-fixture-key') {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByLabel('选择模型').selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
   await page.getByRole('textbox', { name: 'API key' }).fill(key);
@@ -17,7 +17,7 @@ async function configure(page, key = 'synthetic-p3-fixture-key') {
   await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
   await page.getByRole('button', { name: '关闭设置' }).click();
 }
-async function submit(page, text = 'Execute the requested fixture action.') {
+export async function submit(page, text = 'Execute the requested fixture action.') {
   const previous = await page.getByTestId('session-title').getAttribute('data-session-id');
   await page.getByRole('button', { name: '新会话', exact: true }).click();
   const sessionId = await until(async () => { const id = await page.getByTestId('session-title').getAttribute('data-session-id'); return id && id !== previous ? id : null; }, 'new session selected');
@@ -29,7 +29,7 @@ async function interaction(page, sessionId, kind = 'approval') {
   await page.getByRole('region', { name: kind === 'approval' ? '安全审批' : '澄清问题', exact: true }).waitFor({ timeout: 30_000 });
   return until(async () => (await snapshot(page, sessionId))?.interactions?.find(value => value.kind === kind), 'interaction in authoritative snapshot');
 }
-async function settled(page, sessionId) { return until(async () => { const value = await snapshot(page, sessionId); return value && ['completed','failed','cancelled'].includes(value.state) ? value : null; }, 'run settled', 60_000); }
+export async function settled(page, sessionId) { return until(async () => { const value = await snapshot(page, sessionId); return value && ['completed','failed','cancelled'].includes(value.state) ? value : null; }, 'run settled', 60_000); }
 async function late(page, value, changes = {}) {
   const response = await page.evaluate(command => window.dataAgent.request(command), { type: 'interaction.answer', interactionId: value.id, sessionId: value.sessionId, runId: value.runId, hostEpoch: value.hostEpoch, digest: value.digest, answer: { kind: value.kind, ...(value.kind === 'approval' ? { decision: 'allow_once' } : { answer: 'late' }) }, ...changes });
   assert.equal(response.ok, false); assert.equal(response.error.code, 'INTERACTION_EXPIRED');
@@ -48,7 +48,7 @@ export const cases = {
       }, 'actual DeepSeek write/bash/read complete', 240_000);
       assert.equal(final.state, 'completed', final.error ?? 'live task failed');
       for (const name of ['write','bash','read']) assert(final.tools.some(tool => tool.name === name && tool.status === 'completed'), `Missing successful ${name}`);
-      const workspace = join(root, 'data/workspace', sessionId), report = readFileSync(join(workspace, 'report.md'), 'utf8');
+      const workspace = final.outputDirectory ?? join(root, 'data/workspace', sessionId), report = readFileSync(join(workspace, 'report.md'), 'utf8');
       assert(report.length > 0 && report.includes(nonce)); assert(statSync(join(workspace, 'chart.png')).size > 100);
       assert(final.tools.some(tool => tool.name === 'read' && tool.output.includes(nonce)));
       const bash = final.tools.filter(tool => tool.name === 'bash').map(tool => tool.output).join('\n');
@@ -84,7 +84,7 @@ print(json.dumps({'python':sys.executable,'libraries':{n:importlib.metadata.vers
         const result = JSON.parse(output.split('\n').find(line => line.startsWith('{')));
         assert.equal(result.credentialInherited, false); assert.equal(result.python, join(runtimeRoot, 'python/bin/python3'));
         assert.deepEqual(result.libraries, inventory.libraries); assert(!/Glyph .* missing/.test(output)); assert(output.includes('ripgrep 15.2.0') && output.includes('fd 10.5.1'));
-        assert(statSync(join(root, 'data/workspace', sessionId, '中文图表.png')).size > 100);
+        assert(statSync(join(final.outputDirectory ?? join(root, 'data/workspace', sessionId), '中文图表.png')).size > 100);
         assert(final.tools.find(tool => tool.name === 'read').output.includes('# Runtime delivery'));
         assert.deepEqual(app.errors, []); evidence.push({ packaged, inventory, python: result.python, chinesePng: true, toolEnvironmentNoKey: true });
       } finally { await app.stop(); await fixture.close(); }

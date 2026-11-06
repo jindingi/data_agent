@@ -128,7 +128,7 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`interactions`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿和产物登记；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`interactions`、`output_versions`、`artifacts`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
 添加/提交任务时校验所选 CSV 合计 ≤100,000,000 bytes；排队到实际启动时复核存在性与大小。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
@@ -151,7 +151,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 
 运行状态：queued → starting → running / waiting_approval / waiting_input → cancelling 或终态 completed/failed/cancelled/interrupted。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
 
-运行终态与文件展示状态分开：`executionStatus` 记录 SDK/进程是否完成；每个产物的 `artifactStatus` 为 discovered/checking/available/missing/unrenderable/blocked，仅描述文件访问和展示条件。available 不表示内容正确，缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
+运行终态与文件展示状态分开：`runs.state` / `RuntimeSnapshot.state` 记录 SDK/进程是否完成；P4 的 `ArtifactRecord.state` 使用 ready/empty/too_large/invalid/changed/missing 描述文件访问和展示条件（类型还预留 unsupported）。输出版本状态为 open/published，登记错误另存 error。ready 不表示内容正确，普通文件仍可能需要导出后用其他应用打开；缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
 
 Host 内保留可序列化的活动投影；快照 = 当前分支持久化历史 + 活动 partial/tool/interaction/queue + seq 水位。Renderer 重载恢复该快照，再补后续事件；Host 崩溃不承诺恢复尚未落盘的每个 token。
 
@@ -208,7 +208,7 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 敏感路径基线覆盖应用凭证/控制文件、用户 SSH/云凭证、shell 启动文件及 `.env` 等显式凭证文件；在规则版本和样例表中列出具体模式。外部读取默认允许不等于允许读取这些文件。模型 API 为应用已配置行为，不通过工具联网审批反复询问。
 
-脚本分析不执行导入；对常见 open/Path/to_csv/savefig/delete 等识别路径，正常可解析输出避免误报；未知代码不能被宣称已完整分析。正则与有界语法分析只能提供尽力检测，任意导入、别名、原生库、动态网络和进程组逃逸不属于可保证覆盖。
+静态 shell cd 追踪后续命令的目录，外部只读检查照常允许；未解析的目录变化仍需确认。脚本分析不执行导入；对常见 open/Path/to_csv/savefig/delete 等识别路径，正常可解析输出避免误报；未知代码不能被宣称已完整分析。正则与有界语法分析只能提供尽力检测，任意导入、别名、原生库、动态网络和进程组逃逸不属于可保证覆盖。
 
 审批凭据绑定 session/run/toolCall/hostEpoch、参数、脚本 hash、规范路径、网络摘要及规则版本，原子消费一次；修改、停止、崩溃、Cmd+Q 后无效。关窗口保留等待。恶意文件内容不产生用户批准，不允许将工具输出当授权来源。
 
@@ -216,7 +216,11 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 ## 9. 通用产物管理与 UI 展示
 
-应用分配 run/version 输出位置；同一 run 内的 follow-up 可以产生新 version。Main 在输出位置扫描候选文件并登记到 SQLite artifacts，身份、归属、真实路径、文件类型、尺寸和 hash 由 Main 获取。版本 ID 或 artifact ID 冲突拒绝登记；模型自报的文件路径仍须检查。
+应用分配 run/version 输出位置；P4 为每个 run 分配一个版本，P5 补充同一持续执行 run 内 follow-up 的版本切换。Main 在输出位置扫描候选文件并登记到 SQLite artifacts，身份、归属、真实路径、文件类型、尺寸和 hash 由 Main 获取。版本 ID 或 artifact ID 冲突拒绝登记；模型自报的文件路径仍须检查。
+
+P4 的 `ArtifactService` 在 SDK 任务终态后扫描应用分配的输出目录；只登记普通文件，跳过隐藏文件与符号链接。每版最多 1,000 个文件、5,000 个扫描条目、500 MiB；报告预览最多 2 MiB，超限仍可导出。PNG 在大小/像素检查后交给 Electron 实际解码。空文件或损坏图片保留登记并标明无法展示，不将其状态当成任务执行或分析正确性结论。应用退出先等待已开始的目录分配/登记再关闭 SQLite，重启扫描未发布版本以保留已生成文件。
+
+Renderer 只请求 sessionId/artifactId，由 Main 再核对版本目录、真实路径、大小和 SHA256；预览不接受任意磁盘路径。Markdown 的相对图片只映射同版本已登记 PNG，外部图片不加载；外链只能经用户点击和 Main HTTP/HTTPS 校验后打开。整版导出保持相对目录结构，不拷贝原 CSV；已登记文件发生变化时拒绝冒充旧版本读取或导出。
 
 不要求 Agent 生成 metrics.json、manifest.json、metric 标记或特定业务 schema，也不交叉核对报告、表格和图表的数值。应用自己的产物索引只保存文件元数据；即使 Agent 自行生成同名 JSON，它也只是普通产物，不成为权威状态来源。
 

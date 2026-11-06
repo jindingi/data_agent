@@ -64,8 +64,16 @@ it('P3-POLICY classifies commands, scripts, protected paths and rechecks binding
     [{ name: 'read', path: join(context.workspace, '.env') }, 'deny'],
     [{ name: 'write', path: context.protectedRoots[1], content: 'x' }, 'deny'],
     [{ name: 'bash', command: `cd ${JSON.stringify(context.workspace)} && python3 -c 'print(1)'` }, 'allow'],
-    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && python3 -c 'print(1)'` }, 'ask'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && python3 -c 'print(1)'` }, 'allow'],
     [{ name: 'bash', command: 'curl --output .env https://example.invalid' }, 'deny'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && cat ordinary.txt | head -20` }, 'allow'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} | cat ordinary.txt` }, 'ask'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && od -c .env` }, 'deny'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && touch outside.txt` }, 'ask'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && cat .env` }, 'deny'],
+    [{ name: 'bash', command: `cd ${JSON.stringify(external)} && python3 -c \"open('outside.txt','w').write('x')\"` }, 'ask'],
+    [{ name: 'bash', command: `python3 -c \"from pathlib import Path; (Path('safe') / '/tmp/outside.txt').write_text('x')\"` }, 'ask'],
+    [{ name: 'bash', command: `python3 -c \"import os; open(os.path.join('safe','/tmp/outside.txt'),'w').write('x')\"` }, 'ask'],
     [{ name: 'bash', command: 'git fetch origin' }, 'ask'],
     [{ name: 'bash', command: "python3 - <<'PY'\nfrom pathlib import Path\nPath('safe.md').write_text('ok')\nPY\npython3 -c 'print(1)'" }, 'allow'],
     [{ name: 'bash', command: "python3 - <<'PY'\nfrom pathlib import Path\nPath('/tmp/outside.md').write_text('x')\nPY" }, 'ask'],
@@ -82,6 +90,8 @@ it('P3-POLICY classifies commands, scripts, protected paths and rechecks binding
     [{ name: 'bash', command: "python3 -c \"import requests as r; r.get('https://example.invalid')\"" }, 'ask'],
   ];
   for (const [operation, decision] of samples) expect((await inspect(operation)).decision, JSON.stringify(operation)).toBe(decision);
+  writeFileSync(join(context.workspace, 'relative-output.py'), "from pathlib import Path\nimport os\nOUT = Path(__file__).resolve().parent\n(OUT / 'local.md').write_text('x')\nopen(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'local2.md'),'w').write('x')\n");
+  expect((await inspect({ name: 'bash', command: 'python3 relative-output.py' })).decision).toBe('allow');
   const input = join(context.workspace, 'source.csv'); writeFileSync(input, 'a\n1\n'); context.inputs.push(input);
   expect((await inspect({ name: 'write', path: input, content: 'x' })).decision).toBe('ask');
   const published = join(context.workspace, 'published.md'); writeFileSync(published, 'keep'); context.published.push(published);

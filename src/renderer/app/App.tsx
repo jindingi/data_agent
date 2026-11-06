@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Archive, ArchiveRestore, Pencil, ArrowUp, ChartNoAxesCombined, ChevronDown, FileChartColumn, FileText, FolderOpen, Layers3, PanelLeftClose, PanelLeftOpen, PanelRight, Plus, Search, Settings2, ShieldCheck, Sparkles, Table2, X } from 'lucide-react';
+import { Activity, Archive, ArchiveRestore, Pencil, ArrowUp, ChartNoAxesCombined, ChevronDown, FileChartColumn, FolderOpen, Layers3, PanelLeftClose, PanelLeftOpen, PanelRight, Plus, Search, Settings2, ShieldCheck, Sparkles, Table2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog';
 import { useSessions } from '../features/sessions/use-sessions';
@@ -8,6 +8,7 @@ import { isActive, type ModelSettings as ModelConfiguration, type RunInput } fro
 import { useRuntime } from '../features/runtime/use-runtime';
 import { Transcript } from '../features/runtime/Transcript';
 import { ModelSettings } from '../features/runtime/ModelSettings';
+import { ArtifactPanel } from '../features/artifacts/ArtifactPanel';
 import { InteractionCard } from '../features/runtime/InteractionCard';
 import { request } from '../lib/desktop';
 
@@ -22,7 +23,6 @@ export function App() {
   const [draft, setDraft] = useState('');
   const [sidebar, setSidebar] = useState(true);
   const [panel, setPanel] = useState(false);
-  const [tab, setTab] = useState<'files' | 'reports'>('files');
   const [settings, setSettings] = useState(false);
   const [ping, setPing] = useState('');
   const [search, setSearch] = useState('');
@@ -65,6 +65,7 @@ export function App() {
     const unsubscribe = window.dataAgent.subscribe(event => { if (event.type === 'host.status') void refresh(); });
     return () => { mounted = false; unsubscribe(); };
   }, []);
+  useEffect(() => window.dataAgent.subscribe(event => { if (event.type === 'artifacts.changed' && event.sessionId === sessions.selected) setPanel(true); }), [sessions.selected]);
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (!event.metaKey) return;
@@ -106,7 +107,7 @@ export function App() {
           <div className="composer-wrap">
             {runtime.snapshot?.interactions?.map(interaction => <InteractionCard key={interaction.id} value={interaction} onError={setError} />)}
             {(runtime.snapshot?.queuedInputs ?? []).filter(input => input.kind !== 'prompt' || !active || runtime.snapshot?.state === 'queued' || runtime.snapshot?.state === 'starting').map(input => <div className="queued-input" key={input.inputId}><span>{active ? '等待处理' : '未发送'} · {input.kind === 'steer' ? '插话' : input.kind === 'followUp' ? '后续提问' : '提问'}</span><p>{input.text}</p>{!active && <button onClick={() => setDraft(input.text)}>放回输入框</button>}</div>)}
-            {runtime.snapshot && <div className="run-status" role="status" data-run-state={runtime.snapshot.state}><span>{({ queued: '等待运行名额', starting: '正在连接模型', running: 'Agent 正在执行', waiting_approval: '等待你批准操作', waiting_input: '等待你补充信息', completed: '本轮已结束', cancelled: '已停止', failed: '本轮执行出错' })[runtime.snapshot.state]}</span>{runtime.snapshot.inputs.filter(input => input.state === 'pending' && input.kind !== 'prompt').length > 0 && <small>有待处理输入</small>}{active && <Button size="sm" variant="outline" onClick={() => act(request({ type: 'runtime.cancel', sessionId: sessions.selected! }))}>停止</Button>}{runtime.snapshot.error && <span role="alert">{runtime.snapshot.error}</span>}</div>}
+            {runtime.snapshot && <div className="run-status" role="status" data-run-state={runtime.snapshot.state}><span>{({ queued: '等待运行名额', starting: '正在连接模型', running: 'Agent 正在执行', waiting_approval: '等待你批准操作', waiting_input: '等待你补充信息', completed: '执行完成', cancelled: '已停止', failed: '本轮执行出错' })[runtime.snapshot.state]}</span>{runtime.snapshot.inputs.filter(input => input.state === 'pending' && input.kind !== 'prompt').length > 0 && <small>有待处理输入</small>}{active && <Button size="sm" variant="outline" onClick={() => act(request({ type: 'runtime.cancel', sessionId: sessions.selected! }))}>停止</Button>}{runtime.snapshot.error && <span role="alert">{runtime.snapshot.error}</span>}</div>}
             <div className="workspace-hint"><FolderOpen size={15} /><span title={current?.workspace ?? info?.workspaceRoot}>{current ? current.workspace.split('/').slice(-2).join('/') : '会话独立工作区'}</span><button aria-label="选择新会话工作区" title="在指定位置新建会话" onClick={() => act(newSession(true))}><ChevronDown size={12} /></button><span className="hint-separator" /><ShieldCheck size={13} /><span>外部写入需审批</span></div>
             <div className="composer">
               {files.length > 0 && <div className="attachment-list">{files.map(file => <span key={file.id} title={file.path}><Table2 size={13} /><span>{file.name}{file.missing ? ' · 文件缺失' : ''}</span><button aria-label={`移除文件 ${file.name}`} onClick={() => act(sessions.removeFile(file.id))}><X size={12} /></button></span>)}</div>}
@@ -119,7 +120,7 @@ export function App() {
         </section>
         <footer className="workspace-footer"><span><span className="status-dot muted" />自然语言 · 本地文件 · 可追溯过程</span><span>AI 生成的内容请结合业务判断</span></footer>
       </main>
-      {panel && <aside className="result-panel" aria-label="结果面板"><div className="result-header"><strong>文件与产物</strong><Button size="icon" variant="ghost" aria-label="关闭结果面板" onClick={() => setPanel(false)}><X /></Button></div><div className="tabs" role="tablist" aria-label="产物类别"><button role="tab" aria-selected={tab === 'files'} onClick={() => setTab('files')}>文件</button><button role="tab" aria-selected={tab === 'reports'} onClick={() => setTab('reports')}>报告</button></div>{tab === 'files' && files.length ? <div className="file-list">{files.map(file => <div key={file.id}><Table2 size={20} /><strong>{file.name}</strong><span>{file.path}</span><small>{file.missing ? '原文件不可用' : `${file.size.toLocaleString()} bytes · 原文件引用`}</small></div>)}</div> : <div className="result-empty">{tab === 'files' ? <FolderOpen size={30} strokeWidth={1.2} /> : <FileText size={30} strokeWidth={1.2} />}<h3>{tab === 'files' ? '还没有文件' : '还没有报告'}</h3><p>{tab === 'files' ? '添加的 CSV 与生成的文件会在这里汇集。' : 'Agent 生成的报告与图表会在这里展示。'}</p></div>}</aside>}
+      {panel && <ArtifactPanel sessionId={sessions.selected} inputs={files} close={() => setPanel(false)} onError={setError} />}
     </div>
     <Dialog open={renaming} onOpenChange={setRenaming}><DialogContent><DialogTitle className="text-lg font-semibold">重命名会话</DialogTitle><DialogDescription className="mt-2 text-sm text-muted-foreground">为这个分析起一个容易找到的名字。</DialogDescription><form onSubmit={event => { event.preventDefault(); act(sessions.rename(title).then(() => setRenaming(false))); }}><input className="rename-input" aria-label="会话标题" value={title} onChange={event => setTitle(event.target.value)} maxLength={120} required /><Button type="submit">保存名称</Button></form></DialogContent></Dialog>
     <Dialog open={settings} onOpenChange={setSettings}><DialogContent><DialogTitle className="text-xl font-semibold">设置</DialogTitle><DialogDescription className="mt-2 text-sm text-muted-foreground">管理模型与本地工作环境</DialogDescription><ModelSettings value={models} onChange={setModels} onError={setError} /><div className="settings-section"><h3><FolderOpen size={15} />本地工作区</h3><p className="path-label">{info?.workspaceRoot ?? '正在加载…'}</p><p>每个会话使用独立目录，原始 CSV 不会被复制或移动。</p></div><details className="diagnostics"><summary><Activity size={15} />应用诊断</summary><dl><dt>版本</dt><dd>{info?.version}</dd><dt>平台</dt><dd>{info?.platform} / {info?.architecture}</dd><dt>本地存储</dt><dd>{info?.sqliteVersion ? 'SQLite 已连接' : '连接中'}</dd></dl><Button size="sm" variant="outline" onClick={() => void checkConnection()}>检查连接</Button><span role="status" className="ping-result">{ping}</span></details></DialogContent></Dialog>

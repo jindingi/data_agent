@@ -26,6 +26,7 @@ export const snapshotSchema = z.object({
   usage: z.object({ input: z.number(), output: z.number(), cacheRead: z.number(), cacheWrite: z.number(), totalTokens: z.number() }).optional(),
   responseModel: z.string().optional(),
   interactions: z.array(interactionSchema).optional(),
+  outputDirectory: z.string().optional(),
 }).strict();
 export type RuntimeSnapshot = z.infer<typeof snapshotSchema>;
 export type MessageView = z.infer<typeof messageSchema>;

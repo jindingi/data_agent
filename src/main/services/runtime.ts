@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 import type { HostInput } from '../../shared/contracts/host';
 import type { HostStatus } from '../../shared/contracts/ipc';
 import type { ToolHandler } from './agent-process';
+import type { ArtifactService } from './artifacts';
 import type { ToolService } from './tools';
 import type { CredentialService } from './credentials';
 import type { SessionService } from './sessions';
@@ -13,13 +14,14 @@ import { isActive, type MessageView, type ModelChoice, type RunInput, type Runti
 
 export interface RuntimeHost { pid?: number | null; request(input: HostInput): Promise<unknown>; stop(): void }
 type HostFactory = (status: (status: HostStatus) => void, snapshot: (snapshot: RuntimeSnapshot) => void, tool: ToolHandler, cancelTool: (toolCallId: string) => void) => RuntimeHost;
-interface Task { snapshot: RuntimeSnapshot; input: RunInput; model: ModelChoice; apiKey?: string; host?: RuntimeHost; starting: boolean }
+interface Task { snapshot: RuntimeSnapshot; input: RunInput; model: ModelChoice; apiKey?: string; host?: RuntimeHost; starting: boolean; outputDirectory?: string; versionId?: string }
 /** Global admission only; pi owns each conversation's steer/follow-up queue. */
 export class RuntimeService {
   private tasks = new Map<string, Task>();
   private queue: Task[] = [];
   private closing = false;
-  constructor(private db: Database.Database, private sessions: SessionService, private credentials: CredentialService, private paths: AppPaths, private createHost: HostFactory, private reader: { readHistory(file: string, workspace: string, piSessionId: string): Promise<unknown> }, private publish: (snapshot: RuntimeSnapshot) => void, private changed: () => void, private tools?: ToolService, private testBaseUrl?: string) {
+  private startingTasks = new Set<Promise<void>>();
+  constructor(private db: Database.Database, private sessions: SessionService, private credentials: CredentialService, private paths: AppPaths, private createHost: HostFactory, private reader: { readHistory(file: string, workspace: string, piSessionId: string): Promise<unknown> }, private publish: (snapshot: RuntimeSnapshot) => void, private changed: () => void, private tools?: ToolService, private testBaseUrl?: string, private artifacts?: ArtifactService, private skillsDirectory?: string) {
     db.prepare("UPDATE runs SET state='failed',ended_at=? WHERE state IN ('queued','starting','running','waiting_approval','waiting_input')").run(new Date().toISOString());
     db.prepare("UPDATE run_inputs SET state='unknown' WHERE state='pending'").run();
   }
@@ -34,7 +36,9 @@ export class RuntimeService {
       task.apiKey = undefined;
       this.tools?.cancelRun(snapshot.runId);
       const host = task.host; task.host = undefined; task.starting = false; host?.stop();
-      this.sessions.reconcile(snapshot.sessionId); this.changed(); this.pump();
+      this.sessions.reconcile(snapshot.sessionId); this.changed();
+      if (task.versionId) void this.artifacts?.publish(task.versionId);
+      this.pump();
     }
   }
   async submit(sessionId: string, input: RunInput) {
@@ -78,7 +82,8 @@ export class RuntimeService {
       const task = this.queue.shift()!;
       if (task.snapshot.state !== 'queued') continue;
       task.starting = true;
-      void this.start(task);
+      const start = this.start(task); this.startingTasks.add(start);
+      void start.finally(() => this.startingTasks.delete(start));
     }
   }
   private async start(task: Task) {
@@ -88,14 +93,19 @@ export class RuntimeService {
     try {
       const apiKey = task.apiKey;
       if (!apiKey) throw new AppError('MISSING_KEY', '运行凭证已失效');
+      if (this.artifacts) {
+        const version = await this.artifacts.createVersion(session.id, task.snapshot.runId);
+        task.versionId = version.id; task.outputDirectory = version.directory;
+        if (this.closing || task.snapshot.state !== 'starting') { void this.artifacts.publish(version.id); return; }
+      }
       task.host = this.createHost(status => {
         if (status === 'exited' && isActive(task.snapshot.state) && !this.closing) this.fail(task, 'Agent 进程已退出，本轮已停止。未确认的输入不会自动重发。');
       }, snapshot => this.update(task, snapshot), async (toolCallId, operation, observers) => {
         if (!this.tools || !task.host?.pid || !isActive(task.snapshot.state)) return { output: '当前任务无法执行工具', isError: true };
         return this.tools.execute({ sessionId: session.id, runId: task.snapshot.runId, hostEpoch: task.snapshot.hostEpoch, hostPid: task.host.pid,
-          workspace: session.workspace, protectedRoots: [this.paths.sessions, this.paths.database, `${this.paths.database}-wal`, `${this.paths.database}-shm`, this.paths.logs], inputs: this.sessions.files(session.id).map(file => file.path), published: [] }, toolCallId, operation, observers);
+          workspace: session.workspace, workingDirectory: task.outputDirectory, protectedRoots: [this.paths.sessions, this.paths.database, `${this.paths.database}-wal`, `${this.paths.database}-shm`, this.paths.logs], inputs: this.sessions.files(session.id).map(file => file.path), published: this.artifacts?.publishedPaths(session.id) ?? [] }, toolCallId, operation, observers);
       }, toolCallId => this.tools?.cancelTool(task.snapshot.runId, toolCallId));
-      await task.host.request({ type: 'runtime.start', config: { sessionId: session.id, runId: task.snapshot.runId, hostEpoch: task.snapshot.hostEpoch, file: session.sessionFile, workspace: session.workspace, piSessionId: session.piSessionId, model: task.model, apiKey, ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
+      await task.host.request({ type: 'runtime.start', config: { sessionId: session.id, runId: task.snapshot.runId, hostEpoch: task.snapshot.hostEpoch, file: session.sessionFile, workspace: session.workspace, piSessionId: session.piSessionId, model: task.model, apiKey, outputDirectory: task.outputDirectory, skillsDirectory: this.skillsDirectory, ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
         protectedRoots: [this.paths.sessions, this.paths.database, `${this.paths.database}-wal`, `${this.paths.database}-shm`, join(this.paths.home, 'logs')], filePaths: this.sessions.files(session.id).map(file => file.path) }, input: task.input });
       task.starting = false;
     } catch { this.fail(task, '无法启动任务，请检查模型凭证或重新打开会话。'); }
@@ -117,5 +127,5 @@ export class RuntimeService {
     try { await task.host?.request({ type: 'runtime.cancel' }); } catch { this.tools?.cancelRun(task.snapshot.runId); this.fail(task, '停止时 Agent 未响应，进程已结束。'); }
   }
   hostPid(sessionId: string) { return this.tasks.get(sessionId)?.host?.pid ?? null; }
-  stop() { this.closing = true; this.tools?.stop(); for (const task of this.tasks.values()) task.host?.stop(); }
+  stop() { this.closing = true; this.tools?.stop(); for (const task of this.tasks.values()) task.host?.stop(); return Promise.allSettled([...this.startingTasks]); }
 }

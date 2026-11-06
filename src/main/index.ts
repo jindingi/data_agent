@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, safeStorage } from 'electron';
+import { app, BrowserWindow, Menu, safeStorage, nativeImage } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { writeFileSync } from 'node:fs';
@@ -10,6 +10,7 @@ import { AgentProcess } from './services/agent-process';
 import { CredentialService } from './services/credentials';
 import { RuntimeService } from './services/runtime';
 import { ToolService } from './services/tools';
+import { ArtifactService } from './services/artifacts';
 import { InteractionBroker } from './services/interactions';
 import { getRuntimePaths } from '../node/runtime-paths';
 import type { ModelOption } from '../shared/runtime';
@@ -35,6 +36,8 @@ let window: BrowserWindow | null = null;
 let host: AgentProcess | undefined;
 let db: ReturnType<typeof openDatabase> | undefined;
 let runtime: RuntimeService | undefined;
+let artifacts: ArtifactService | undefined;
+let quitting = false;
 
 function createWindow() {
   window = new BrowserWindow({
@@ -55,6 +58,10 @@ app.whenReady().then(() => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'host.status', status });
   });
   const credentials = new CredentialService(db, safeStorage);
+  artifacts = new ArtifactService(db, sessions, bytes => !nativeImage.createFromBuffer(bytes).isEmpty(), sessionId => {
+    if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'artifacts.changed', sessionId });
+  });
+  for (const session of [...sessions.list(), ...sessions.list('', true)]) for (const version of artifacts.list(session.id).versions) if (version.state === 'open') void artifacts.publish(version.id);
   const interactions = new InteractionBroker(db);
   const tools = new ToolService(getRuntimePaths(app.getAppPath(), process.resourcesPath, app.isPackaged), paths.logs, interactions);
   const catalogReady = host.request({ type: 'models.list' }).then(value => { credentials.setCatalog((value as { models: ModelOption[] }).models); });
@@ -62,7 +69,7 @@ app.whenReady().then(() => {
   const changed = () => { if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' }); };
   runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot, tool, cancelTool) => new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool), host, snapshot => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
-  }, changed, tools, automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined);
+  }, changed, tools, automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined, artifacts, app.isPackaged ? join(process.resourcesPath, 'skills') : join(app.getAppPath(), 'resources/skills'));
   const info = (): SystemInfo => ({
     version: app.getVersion(), platform: process.platform, architecture: process.arch,
     electron: process.versions.electron, node: process.versions.node, abi: process.versions.modules,
@@ -75,7 +82,7 @@ app.whenReady().then(() => {
     if (action === 'quit') setTimeout(() => app.quit(), 100);
     if (action === 'close_reopen') setTimeout(() => { window?.close(); setTimeout(() => { if (!window) app.emit('activate'); }, 500); }, 100);
     return null;
-  } : undefined);
+  } : undefined, artifacts);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Data Agent', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
@@ -86,5 +93,8 @@ app.whenReady().then(() => {
 }).catch((error) => { console.error('Startup failed:', error.message); app.exit(1); });
 app.on('activate', () => { if (!window && db) createWindow(); });
 app.on('window-all-closed', () => { /* macOS background tasks remain active. */ });
-app.on('before-quit', () => { runtime?.stop(); host?.stop(); db?.close(); db = undefined; });
+app.on('before-quit', event => {
+  event.preventDefault(); if (quitting) return; quitting = true; const stopped = runtime?.stop(); host?.stop();
+  void Promise.resolve(stopped).then(() => artifacts?.settled()).finally(() => { db?.close(); db = undefined; app.exit(0); });
+});
 process.on('SIGTERM', () => app.quit());

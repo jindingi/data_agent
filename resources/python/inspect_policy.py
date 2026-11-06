@@ -6,20 +6,26 @@ No source imports, functions, substitutions or expressions are executed.
 import ast
 import json
 import posixpath
+import os
 import re
 import shlex
 import sys
 
 request = json.loads(sys.stdin.buffer.read(512 * 1024))
+base = request.get('cwd', '')
 result = {'accesses': [], 'scripts': [], 'sources': [], 'commands': [], 'network': [], 'dynamic': [], 'deny': []}
 
 def access(action, path):
     if path is None:
         result['dynamic'].append('unresolved-' + action)
     else:
+        if not path.startswith(('/', '~')):
+            if base is None: result['dynamic'].append('unresolved-working-directory')
+            else: path = posixpath.normpath(posixpath.join(base, path))
         result['accesses'].append({'action': action, 'path': path})
 
 def shell(source):
+    global base
     if not source.strip() or '\0' in source or len(source) > 100_000:
         result['deny'].append('invalid-command'); return
     # A quoted Python heredoc has no shell expansions; inspect its literal body as -c.
@@ -37,8 +43,15 @@ def shell(source):
         lex.whitespace = ' \t\r'
         lex.whitespace_split = True
         tokens = list(lex)
+        if 'cd' in tokens and any(token in ('||', '(', ')') for token in tokens):
+            result['dynamic'].append('conditional-or-subshell-cwd')
     except ValueError:
         result['dynamic'].append('unparsed-shell'); return
+    for index, token in enumerate(tokens):
+        if token == 'cd':
+            before = tokens[index-1] if index else None
+            after = next((part for part in tokens[index+1:] if re.fullmatch(r'[;&|()\n]+', part)), None)
+            if before in ('|', '&') or after in ('|', '&'): result['dynamic'].append('pipeline-or-background-cwd')
     segments, current = [], []
     for token in tokens:
         if re.fullmatch(r'[;&|()\n]+', token):
@@ -73,18 +86,23 @@ def shell(source):
                 elif arg.startswith(('--output=', '--output-document=')): access('write', arg.split('=', 1)[1])
         if command == 'cd':
             target = args[0] if len(args) == 1 else None
-            workspace = request.get('cwd')
-            if not target or not workspace or posixpath.normpath(posixpath.join(workspace, target)) != workspace:
-                result['dynamic'].append('changes-working-directory')
+            if target and not re.search(r'[$`*?~]', target) and (base is not None or target.startswith('/')):
+                base = posixpath.normpath(posixpath.join(base or '', target))
+                access('read', base)
+            else:
+                result['dynamic'].append('changes-working-directory'); base = None
+            continue
         if command in ('bash', 'sh', 'zsh'):
-            if '-c' in args and args.index('-c') + 1 < len(args): result['commands'].append(args[args.index('-c') + 1])
+            if '-c' in args and args.index('-c') + 1 < len(args): result['commands'].append({'source': args[args.index('-c') + 1], 'cwd': base or request.get('cwd', '')})
             else: result['dynamic'].append('nested-shell')
         if re.match(r'^python(?:3(?:\.\d+)?)?$', command):
-            if '-c' in args and args.index('-c') + 1 < len(args): result['sources'].append(args[args.index('-c') + 1])
+            if '-c' in args and args.index('-c') + 1 < len(args): result['sources'].append({'source': args[args.index('-c') + 1], 'cwd': base or request.get('cwd', '')})
             elif '-m' in args: result['dynamic'].append('python-module-execution')
             else:
                 candidate = next((arg for arg in args if not arg.startswith('-')), None)
-                if candidate: result['scripts'].append(candidate)
+                if candidate:
+                    if base is None and not candidate.startswith('/'): result['dynamic'].append('unresolved-script-cwd')
+                    else: result['scripts'].append({'path': posixpath.normpath(posixpath.join(base or '', candidate)), 'cwd': base or request.get('cwd', '')})
                 else: result['dynamic'].append('python-stdin')
         paths = [arg for arg in args if not arg.startswith('-')]
         if command == 'rm':
@@ -98,7 +116,7 @@ def shell(source):
             else:
                 for path in paths[:-1]: access('delete' if command == 'mv' else 'read', path)
                 access('write', paths[-1])
-        elif command in ('cat', 'head', 'tail', 'less', 'more'):
+        elif command in ('cat', 'head', 'tail', 'less', 'more', 'od', 'file', 'wc', 'md5', 'md5sum', 'sha256sum', 'shasum'):
             for path in paths: access('read', path)
         elif command == 'sed' and any(arg == '-i' or arg.startswith('-i') for arg in args):
             result['dynamic'].append('in-place-edit')
@@ -119,7 +137,10 @@ def python(source):
         return ''
     def literal(node):
         if isinstance(node, ast.Constant) and isinstance(node.value, str): return node.value
-        if isinstance(node, ast.Name): return values.get(node.id)
+        if isinstance(node, ast.Name): return request.get('file') if node.id == '__file__' else values.get(node.id)
+        if isinstance(node, ast.Attribute) and node.attr == 'parent':
+            value = literal(node.value)
+            return posixpath.dirname(value) if value is not None else None
         if isinstance(node, ast.JoinedStr):
             parts = [part.value if isinstance(part, ast.Constant) else literal(part.value) if isinstance(part, ast.FormattedValue) else None for part in node.values]
             return ''.join(parts) if all(isinstance(part, str) for part in parts) else None
@@ -127,13 +148,20 @@ def python(source):
             left, right = literal(node.left), literal(node.right)
             if left is not None and right is not None:
                 if isinstance(node.op, ast.Add): return left + right
-                if isinstance(node.op, ast.Div): return left.rstrip('/') + '/' + right
+                if isinstance(node.op, ast.Div): return posixpath.join(left, right)
         if isinstance(node, ast.Call):
             fn = name(node.func)
             if fn in ('Path', 'pathlib.Path', 'str') and node.args: return literal(node.args[0])
+            if fn in ('os.path.dirname', 'posixpath.dirname') and node.args:
+                value = literal(node.args[0]); return posixpath.dirname(value) if value is not None else None
+            if fn in ('os.path.abspath', 'os.path.realpath', 'posixpath.abspath') and node.args:
+                value = literal(node.args[0]); return os.path.realpath(posixpath.join(base or '', value)) if value is not None and base is not None else None
+            if fn in ('Path.cwd', 'pathlib.Path.cwd'): return base
+            if isinstance(node.func, ast.Attribute) and node.func.attr in ('resolve', 'absolute') and not node.args:
+                value = literal(node.func.value); return os.path.realpath(posixpath.join(base or '', value)) if value is not None and base is not None else None
             if fn in ('os.path.join', 'posixpath.join'):
                 parts = [literal(arg) for arg in node.args]
-                if all(part is not None for part in parts): return '/'.join(parts)
+                if all(part is not None for part in parts): return posixpath.join(*parts) if parts else ''
         return None
     for statement in tree.body:
         if isinstance(statement, ast.Import):
@@ -150,6 +178,7 @@ def python(source):
             if not isinstance(node, ast.Call): continue
             fn = name(node.func); leaf = fn.rsplit('.', 1)[-1]
             first = node.args[0] if node.args else None
+            if fn in ('os.chdir', 'os.fchdir'): result['dynamic'].append('python-changes-directory')
             if fn in ('eval', 'exec', '__import__', 'compile'):
                 result['dynamic'].append('dynamic-python')
             if fn.startswith(('pip.', 'ensurepip.')):
@@ -162,7 +191,7 @@ def python(source):
                     parts = [literal(item) for item in first.elts]
                     if all(part is not None for part in parts): value = shlex.join(parts)
                 if value is None: result['dynamic'].append('subprocess')
-                else: result['commands'].append(value)
+                else: result['commands'].append({'source': value, 'cwd': base or request.get('cwd', '')})
             if fn in ('open', 'io.open'):
                 mode = literal(node.args[1]) if len(node.args) > 1 else 'r'
                 for keyword in node.keywords:

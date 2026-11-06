@@ -13,6 +13,8 @@ extraResources:
     to: python
     filter:
       - '**/*.py'
+  - from: resources/skills
+    to: skills
 asarUnpack:
   - '**/*.node'
 mac:

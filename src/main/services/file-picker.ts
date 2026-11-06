@@ -13,6 +13,12 @@ export class FilePicker {
     const result = await dialog.showOpenDialog(win, { title: '选择 CSV 数据文件', properties: ['openFile', 'multiSelections'], filters: [{ name: 'CSV', extensions: ['csv'] }] });
     return result.canceled ? [] : result.filePaths;
   }
+  async chooseExportDirectory(): Promise<string | undefined> {
+    if (this.automation && process.env.DATA_AGENT_TEST_EXPORT_DIRECTORY) return process.env.DATA_AGENT_TEST_EXPORT_DIRECTORY;
+    const win = this.window(); if (!win) return;
+    const result = await dialog.showOpenDialog(win, { title: '选择产物导出目录', properties: ['openDirectory', 'createDirectory'] });
+    return result.canceled ? undefined : result.filePaths[0];
+  }
   async chooseDirectory(): Promise<string | undefined> {
     if (this.automation && process.env.DATA_AGENT_TEST_PICK_DIRECTORY) return process.env.DATA_AGENT_TEST_PICK_DIRECTORY;
     const win = this.window(); if (!win) return;

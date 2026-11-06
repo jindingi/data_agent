@@ -30,6 +30,18 @@ export const migrations: Migration[] = [{ version: 1, sql: `
     host_epoch TEXT NOT NULL, tool_call_id TEXT NOT NULL, kind TEXT NOT NULL, details TEXT NOT NULL,
     state TEXT NOT NULL, created_at TEXT NOT NULL, resolved_at TEXT
   );
+` }, { version: 5, sql: `
+  CREATE TABLE output_versions (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), run_id TEXT NOT NULL REFERENCES runs(id),
+    directory TEXT NOT NULL UNIQUE, state TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL
+  );
+  CREATE TABLE artifacts (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), run_id TEXT NOT NULL REFERENCES runs(id),
+    version_id TEXT NOT NULL REFERENCES output_versions(id), path TEXT NOT NULL UNIQUE, relative_path TEXT NOT NULL,
+    kind TEXT NOT NULL, state TEXT NOT NULL, size INTEGER NOT NULL, sha256 TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL,
+    UNIQUE(version_id,relative_path)
+  );
+  CREATE INDEX artifacts_session ON artifacts(session_id,created_at);
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');
