@@ -1,0 +1,17 @@
+{
+  "phase": "P1",
+  "required": [
+    "P0-CHECK",
+    "P0-CDP",
+    "P0-IPC",
+    "P1-SCHEMA",
+    "P1-EMPTY",
+    "P1-TREE",
+    "P1-METADATA",
+    "P1-RECOVERY",
+    "P1-INPUT-REF",
+    "P1-COORDINATION"
+  ],
+  "requiresBuild": true,
+  "requiresPackage": false
+}

@@ -3,6 +3,19 @@ import Database from 'better-sqlite3';
 export interface Migration { version: number; sql: string }
 export const migrations: Migration[] = [{ version: 1, sql: `
   CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+` }, { version: 2, sql: `
+  CREATE TABLE sessions (
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, workspace TEXT NOT NULL UNIQUE,
+    session_file TEXT NOT NULL UNIQUE, pi_session_id TEXT, state TEXT NOT NULL,
+    error TEXT, history_known INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  CREATE TABLE file_refs (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    path TEXT NOT NULL, name TEXT NOT NULL, size INTEGER NOT NULL CHECK(size >= 0), added_at TEXT NOT NULL,
+    UNIQUE(session_id, path)
+  );
+  CREATE INDEX sessions_updated ON sessions(archived,updated_at DESC);
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');

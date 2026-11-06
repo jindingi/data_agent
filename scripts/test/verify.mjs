@@ -2,8 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { platform, arch, release } from 'node:os';
 import { cases as p0 } from '../../tests/e2e/p0.mjs';
+import { cases as p1 } from '../../tests/e2e/p1.mjs';
 
 const args = process.argv.slice(2).filter(x => x !== '--');
 const phase = args.find(a => /^P\d+$/.test(a));
@@ -17,7 +19,19 @@ const command = (id, cmd) => {
   writeFileSync(join(dir, `${id}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
   if (result.status !== 0) throw new Error(`${id} failed (${result.status}): see ${id}.log`);
 };
-const cases = { ...p0, 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
+const nativeIds = ['P1-SCHEMA', 'P1-TREE', 'P1-RECOVERY', 'P1-COORDINATION'];
+function nativeCase(id) {
+  const jsonFile = join(dir, `${id}.vitest.json`);
+  const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }; delete env.DEEPSEEK_API_KEY;
+  const result = spawnSync(createRequire(import.meta.url)('electron'), [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/integration', '-t', id, '--reporter=json', `--outputFile=${jsonFile}`], { env, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+  writeFileSync(join(dir, `${id}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
+  if (result.status !== 0 || !existsSync(jsonFile)) throw new Error(`Native integration failed: ${id}.log`);
+  const report = JSON.parse(readFileSync(jsonFile, 'utf8'));
+  const matches = report.testResults.flatMap(r => r.assertionResults).filter(r => r.fullName.includes(id));
+  if (matches.length !== 1 || matches[0].status !== 'passed') throw new Error('Native case missing, skipped or failed');
+  return { assertion: matches[0].fullName, electronNodeABI: true };
+}
+const cases = { ...p0, ...p1, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
 function save() {
   summary.finished = new Date().toISOString(); summary.total = summary.cases.length;
   summary.passed = summary.cases.filter(c => c.status === 'passed').length;
@@ -41,8 +55,8 @@ try {
   if (phase && !manifest) throw new Error(`Phase ${phase} is not implemented; cannot pass or skip.`);
   if (caseIndex >= 0 && !selected) throw new Error('--case requires a case ID');
   if (phase && selected) throw new Error('A phase gate must run all required cases; use test:e2e -- --case for targeted testing');
-  if (args.includes('--integration')) throw new Error('Integration suite not implemented yet; cannot report success.');
-  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--packaged') ? ['P0-PACKAGE'] : Object.keys(p0).filter(id => id !== 'P0-PACKAGE'));
+
+  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--integration') ? nativeIds : args.includes('--packaged') ? ['P0-PACKAGE'] : [...Object.keys(p0).filter(id => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
   if (!ids.length || ids.some(id => !cases[id])) throw new Error('Missing or unknown required test');
   if (!args.includes('--no-build')) command('build', ['build']);
   if (ids.includes('P0-PACKAGE')) command('package', ['exec', 'electron-builder', '--mac', 'dir', '--arm64']);

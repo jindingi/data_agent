@@ -4,6 +4,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { ensureAppPaths, getAppPaths } from '../node/app-paths';
 import { openDatabase } from './storage/database';
+import { SessionService } from './services/sessions';
+import { FilePicker } from './services/file-picker';
 import { AgentProcess } from './services/agent-process';
 import { registerHandlers } from './ipc/handlers';
 import { IPC_EVENT } from '../shared/channels';
@@ -40,6 +42,8 @@ function createWindow() {
 }
 app.whenReady().then(() => {
   db = openDatabase(paths.database);
+  const sessions = new SessionService(db, paths);
+  sessions.reconcile();
   host = new AgentProcess(join(here, 'agent.js'), (status) => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'host.status', status });
   });
@@ -50,7 +54,9 @@ app.whenReady().then(() => {
     hostStatus: host!.status, hostPid: host!.pid,
     sqliteVersion: (db!.prepare('SELECT sqlite_version() AS version').get() as { version: string }).version,
   });
-  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host);
+  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host, sessions, new FilePicker(() => window, automation), () => {
+    if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' });
+  });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Data Agent', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },

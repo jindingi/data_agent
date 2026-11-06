@@ -3,7 +3,7 @@
 ## 应纳入 Git
 
 - 根 README、产品说明、技术设计、开发/验收计划，以及长期维护的架构决策与工作流程。
-- 正式产品源码、内置 skills、测试源代码、小型合成 fixtures、构建/测试配置和依赖 lockfile；当前产品源码尚未创建。
+- 正式产品源码、内置 skills、测试源代码、小型合成 fixtures、构建/测试配置和依赖 lockfile；正式源码位于 src/，验收位于 tests/ 和 scripts/test/。
 - `validation/` 中明确保留的可复用源代码：pi 会话/事件/恢复探针，Electron/CDP/打包/进程生命周期 harness，策略机制探针，以及固定运行时和工具下载、哈希验证脚本。
 - 可复用脚本所需的小型静态资源，例如 `resource-probe.txt`。下载资源的地址、版本、hash 与许可获取方式随脚本维护，不提交可重新下载的大型二进制。
 

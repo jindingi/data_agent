@@ -15,13 +15,16 @@ export async function freePort() {
   const server = createServer(); await new Promise(r => server.listen(0, '127.0.0.1', r));
   const port = server.address().port; await new Promise(r => server.close(r)); return port;
 }
-export async function startApp(root, { packaged = false, automation = true, port: selectedPort } = {}) {
+export async function startApp(root, { packaged = false, automation = true, port: selectedPort, pickFiles, pickDirectory } = {}) {
   root = resolve(root); mkdirSync(root, { recursive: true });
   const port = selectedPort ?? await freePort();
   const executable = packaged ? resolve('release/mac-arm64/Data Agent.app/Contents/MacOS/Data Agent') : require('electron');
   if (!existsSync(executable)) throw new Error(`Missing executable: ${executable}`);
   const args = [...(packaged ? [] : [resolve('.')]), ...(automation ? ['--data-agent-automation'] : []), `--remote-debugging-port=${port}`];
   const env = { ...process.env, DATA_AGENT_HOME: join(root, 'data'), DATA_AGENT_USER_DATA: join(root, 'userData') };
+  delete env.DATA_AGENT_TEST_PICK_FILES; delete env.DATA_AGENT_TEST_PICK_DIRECTORY;
+  if (automation && pickFiles) env.DATA_AGENT_TEST_PICK_FILES = JSON.stringify(pickFiles);
+  if (automation && pickDirectory) env.DATA_AGENT_TEST_PICK_DIRECTORY = pickDirectory;
   delete env.ELECTRON_RUN_AS_NODE; delete env.DEEPSEEK_API_KEY;
   const logFile = join(root, 'electron.log'); const fd = openSync(logFile, 'a');
   const child = spawn(executable, args, { env, stdio: ['ignore', fd, fd] }); closeSync(fd);

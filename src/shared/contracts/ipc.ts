@@ -3,10 +3,18 @@ import { z } from 'zod';
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('system.info') }).strict(),
+  z.object({ ...base, type: z.literal('sessions.list'), search: z.string().max(200).default(''), archived: z.boolean().default(false) }).strict(),
+  z.object({ ...base, type: z.literal('sessions.create'), chooseWorkspace: z.boolean().default(false) }).strict(),
+  z.object({ ...base, type: z.literal('sessions.open'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('sessions.rename'), sessionId: z.string().uuid(), title: z.string().trim().min(1).max(120) }).strict(),
+  z.object({ ...base, type: z.literal('sessions.archive'), sessionId: z.string().uuid(), archived: z.boolean() }).strict(),
+  z.object({ ...base, type: z.literal('files.pick'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('files.remove'), sessionId: z.string().uuid(), fileId: z.string().uuid() }).strict(),
   z.object({ ...base, type: z.literal('system.ping'), text: z.string().max(256) }).strict(),
 ]);
 export type Command = z.infer<typeof commandSchema>;
-export type CommandInput = Command extends infer T ? T extends Command ? Omit<T, 'requestId'> : never : never;
+type Input = z.input<typeof commandSchema>;
+export type CommandInput = Input extends infer T ? T extends Input ? Omit<T, 'requestId'> : never : never;
 export type Result<T = unknown> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } };
 export type HostStatus = 'starting' | 'ready' | 'exited';
 export interface SystemInfo {
@@ -23,7 +31,7 @@ export interface SystemInfo {
   hostPid: number | null;
   sqliteVersion: string;
 }
-export type AppEvent = { type: 'host.status'; status: HostStatus };
+export type AppEvent = { type: 'host.status'; status: HostStatus } | { type: 'sessions.changed' };
 export interface DesktopAPI {
   request: (command: CommandInput) => Promise<Result>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;

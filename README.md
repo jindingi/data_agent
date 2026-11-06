@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-正式工程已开始实现：P0 桌面骨架通过真实 CDP、IPC、SQLite、进程故障、隔离与打包验收。会话、模型和分析流程仍在后续阶段实现；当前不可将界面骨架当作完整分析产品。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
+正式工程已开始实现：P0 桌面骨架和 P1 会话存储已通过验收。现可管理会话、选择工作区、引用多个 CSV 并恢复原生 JSONL 历史；模型执行和分析流程仍在后续阶段实现，当前不能作为完整分析产品使用。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
 
 ## 文档
 
@@ -31,9 +31,10 @@ pnpm dev
 ```sh
 pnpm check
 pnpm verify:phase -- P0
+pnpm verify:phase -- P1
 pnpm dev:cdp
 ```
 
 阶段门禁会构建并实际启动 Electron，结果位于被忽略的 `test-results/`。`dev:cdp` 为开发助手开启独立测试实例，输出 CDP endpoint 和临时数据目录，Ctrl+C 退出；正常产品启动不开放 CDP。
 
-本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。现阶段只包含 P0 已实现能力，完整 Python/分析链路将在 P3–P7 接入并验收。
+本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。现阶段仅包含已实现的桌面与会话能力，完整 Python/分析链路将在 P3–P7 接入并验收。

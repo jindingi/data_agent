@@ -1,6 +1,6 @@
 import { utilityProcess, MessageChannelMain, type UtilityProcess, type MessagePortMain } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { hostResponseSchema } from '../../shared/contracts/host';
+import { hostResponseSchema, type HostInput } from '../../shared/contracts/host';
 import { AppError } from '../../shared/errors';
 import type { HostStatus } from '../../shared/contracts/ipc';
 
@@ -31,7 +31,7 @@ export class AgentProcess {
             clearTimeout(readyTimer); this.status = 'ready'; onStatus('ready'); resolve();
           } else {
             const request = this.pending.get(parsed.data.id);
-            if (request) { clearTimeout(request.timer); this.pending.delete(parsed.data.id); request.resolve(parsed.data); }
+            if (request) { clearTimeout(request.timer); this.pending.delete(parsed.data.id); if (parsed.data.type === 'error') request.reject(new AppError(parsed.data.code, parsed.data.message)); else request.resolve(parsed.data); }
           }
         });
         port1.start(); this.child!.postMessage({ type: 'connect' }, [port2]);
@@ -47,14 +47,16 @@ export class AgentProcess {
     // Constructor startup can fail before the first caller awaits it.
     void this.ready.catch(() => {});
   }
-  async ping(text: string) {
+  ping(text: string) { return this.request({ type: 'ping', text }); }
+  readHistory(file: string, workspace: string, piSessionId: string) { return this.request({ type: 'history.read', file, workspace, piSessionId }); }
+  private async request(input: HostInput) {
     await this.ready;
     if (this.status !== 'ready') throw new AppError('HOST_EXITED', 'Agent 进程已退出');
     const id = randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); reject(new AppError('HOST_TIMEOUT', 'Agent 未响应')); }, 5_000);
       this.pending.set(id, { resolve, reject, timer });
-      this.port!.postMessage({ id, type: 'ping', text });
+      this.port!.postMessage({ ...input, id });
     });
   }
   stop() { this.child?.kill(); }
