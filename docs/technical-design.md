@@ -105,6 +105,8 @@ data_agent/
 
 Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host 通过 shared contracts 通信，不能互相 import 实现；shared 不依赖 Node/Electron/pi；node 是可复用基础设施。TypeScript 不能替代 IPC 运行时校验。依赖方向用 lint 检查。
 
+P2 的具体实现将准入/进程路由放在 `main/services/runtime.ts`，进程传输放在 `agent-process.ts`，凭证在 `credentials.ts`；Host 使用 `agent/session-runtime.ts`、`input-identity.ts`、`event-adapter.ts`、`models.ts` 和固定 `resource-loader.ts`。Renderer 的 `features/runtime/` 提供快照订阅、模型设置和 Streamdown 过程展示。SQLite migrations 当前集中在 `storage/database.ts`，无需为小型初始 schema 拆出空模块；以上目录树同时列出了后续阶段的职责位置。
+
 ## 4. 输入路径、存储和删除
 
 业务状态默认位于 `~/.data_agent/`，测试用独立 `DATA_AGENT_HOME`。自选 workspace 和原始 CSV 路径是全局目录之外的合法引用。Electron userData 与业务数据根分离；测试同时隔离两者。
@@ -122,7 +124,7 @@ Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host �
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管 sessions、file_refs、runs、run_inputs、pending_inputs、approvals、artifacts、settings、schema_migrations。`file_refs` 是名称/原始路径引用，不是 CSV 版本库；`run_inputs` 关联当次选用路径和提交时的大小，不代表冻结文件内容。用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿、审批和产物登记；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
 添加/提交任务时校验所选 CSV 合计 ≤100,000,000 bytes；排队到实际启动时复核存在性与大小。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
@@ -134,7 +136,7 @@ JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。Session
 
 ## 5. 命令、事件与运行状态
 
-IPC 命令携带 requestId/sessionId；输入另带 inputId。Host 事件包含 schemaVersion/sessionId/runId/hostEpoch/seq/type/payload。每个 Host 独立 epoch/seq，不能把 A 的快照或 B 的迟到事件应用到另一个会话。
+IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过 `runtime.event` 发送白名单 `snapshot` 对象，包含 schemaVersion/sessionId/runId/hostEpoch/seq 与完整可序列化投影；控制命令另有按请求 ID 关联的响应。每个 Host 独立 epoch/seq，不能把 A 的快照或 B 的迟到事件应用到另一个会话。
 
 - `message_update` 的 text_delta/thinking_delta/toolcall_* 驱动正文与准备调用。
 - `tool_execution_start/update/end` 驱动工具状态，用 toolCallId 关联。

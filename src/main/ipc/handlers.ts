@@ -6,8 +6,11 @@ import type { AgentProcess } from '../services/agent-process';
 import type { SessionService } from '../services/sessions';
 import type { FilePicker } from '../services/file-picker';
 import type { HistoryItem } from '../../shared/models';
+import type { CredentialService } from '../services/credentials';
+import type { RuntimeService } from '../services/runtime';
+import type { MessageView } from '../../shared/runtime';
 
-export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void) {
+export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void, credentials: CredentialService, runtime: RuntimeService, catalogReady: Promise<void>) {
   ipcMain.handle(IPC_COMMAND, async (event, raw): Promise<Result> => {
     if (!trusted(event)) return { ok: false, error: { code: 'UNTRUSTED_SENDER', message: '请求来源不受信任' } };
     const parsed = commandSchema.safeParse(raw);
@@ -15,6 +18,12 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
     try {
       switch (parsed.data.type) {
         case 'system.info': return { ok: true, value: info() };
+        case 'models.settings': await catalogReady; return { ok: true, value: credentials.settings() };
+        case 'models.select': await catalogReady; return { ok: true, value: credentials.select(parsed.data.model) };
+        case 'models.key': await catalogReady; return { ok: true, value: credentials.save(parsed.data.provider, parsed.data.key) };
+        case 'runtime.submit': await catalogReady; return { ok: true, value: await runtime.submit(parsed.data.sessionId, parsed.data.input) };
+        case 'runtime.snapshot': return { ok: true, value: runtime.snapshot(parsed.data.sessionId) };
+        case 'runtime.cancel': await runtime.cancel(parsed.data.sessionId); return { ok: true, value: null };
         case 'system.ping': return { ok: true, value: await host.ping(parsed.data.text) };
         case 'sessions.list': return { ok: true, value: sessions.list(parsed.data.search, parsed.data.archived) };
         case 'sessions.create': {
@@ -23,10 +32,12 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
           const value = sessions.create(directory); changed(); return { ok: true, value };
         }
         case 'sessions.open': {
-          sessions.reconcile(parsed.data.sessionId);
+          if (!runtime.snapshot(parsed.data.sessionId)) sessions.reconcile(parsed.data.sessionId);
           const session = sessions.get(parsed.data.sessionId);
-          const history = session.state === 'persisted' && session.piSessionId ? (await host.readHistory(session.sessionFile, session.workspace, session.piSessionId) as { items: HistoryItem[] }).items : [];
-          return { ok: true, value: { session, files: sessions.files(session.id), history } };
+          const active = runtime.snapshot(session.id);
+          // Active history comes from its sole writer's snapshot, not a second SessionManager.
+          const transcript = !active && session.state === 'persisted' && session.piSessionId ? await host.readHistory(session.sessionFile, session.workspace, session.piSessionId) as { items: HistoryItem[]; messages: MessageView[] } : { items: [], messages: active?.messages ?? [] };
+          return { ok: true, value: { session, files: sessions.files(session.id), history: transcript.items, messages: transcript.messages } };
         }
         case 'sessions.rename': { const value = sessions.rename(parsed.data.sessionId, parsed.data.title); changed(); return { ok: true, value }; }
         case 'sessions.archive': { const value = sessions.archive(parsed.data.sessionId, parsed.data.archived); changed(); return { ok: true, value }; }

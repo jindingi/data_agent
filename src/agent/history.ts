@@ -3,6 +3,9 @@ import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { inspectSessionFile } from '../node/session-integrity';
 import { AppError } from '../shared/errors';
 import type { HistoryItem } from '../shared/models';
+import { stripEnvelope } from './input-identity';
+import { projectMessage } from './event-adapter';
+import type { MessageView } from '../shared/runtime';
 
 /** Only the Host owns native session access; preflight must succeed before open(). */
 export function readHistory(file: string, workspace: string, expectedId: string) {
@@ -10,12 +13,15 @@ export function readHistory(file: string, workspace: string, expectedId: string)
   if (inspected.state !== 'persisted') throw new AppError('HISTORY_UNAVAILABLE', inspected.error || '会话历史不可用');
   const manager = SessionManager.open(file, dirname(file), workspace);
   const items: HistoryItem[] = [];
+  const messages: MessageView[] = [];
+  const known = new Set(manager.getEntries().flatMap(entry => entry.type === 'custom' && entry.customType === 'data_agent.input_submitted' ? [(entry.data as { inputId: string }).inputId] : []));
   for (const entry of manager.getBranch()) {
     if (entry.type !== 'message') continue;
     const message = entry.message;
     const content = 'content' in message ? message.content : '';
     const text = typeof content === 'string' ? content : Array.isArray(content) ? content.filter(b => b.type === 'text').map(b => b.text).join('\n') : '';
-    items.push({ id: entry.id, role: message.role, text });
+    items.push({ id: entry.id, role: message.role, text: message.role === 'user' ? stripEnvelope(text, known) : text });
+    messages.push(projectMessage(entry.id, message, text => stripEnvelope(text, known)));
   }
-  return { piSessionId: manager.getSessionId(), items };
+  return { piSessionId: manager.getSessionId(), items, messages };
 }

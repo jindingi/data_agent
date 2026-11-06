@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, safeStorage } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { writeFileSync } from 'node:fs';
@@ -7,6 +7,9 @@ import { openDatabase } from './storage/database';
 import { SessionService } from './services/sessions';
 import { FilePicker } from './services/file-picker';
 import { AgentProcess } from './services/agent-process';
+import { CredentialService } from './services/credentials';
+import { RuntimeService } from './services/runtime';
+import type { ModelOption } from '../shared/runtime';
 import { registerHandlers } from './ipc/handlers';
 import { IPC_EVENT } from '../shared/channels';
 import type { SystemInfo } from '../shared/contracts/ipc';
@@ -28,6 +31,7 @@ const rendererURL = !app.isPackaged && process.env.ELECTRON_RENDERER_URL ? proce
 let window: BrowserWindow | null = null;
 let host: AgentProcess | undefined;
 let db: ReturnType<typeof openDatabase> | undefined;
+let runtime: RuntimeService | undefined;
 
 function createWindow() {
   window = new BrowserWindow({
@@ -47,6 +51,13 @@ app.whenReady().then(() => {
   host = new AgentProcess(join(here, 'agent.js'), (status) => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'host.status', status });
   });
+  const credentials = new CredentialService(db, safeStorage);
+  const catalogReady = host.request({ type: 'models.list' }).then(value => { credentials.setCatalog((value as { models: ModelOption[] }).models); });
+  void catalogReady.catch(() => {});
+  const changed = () => { if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' }); };
+  runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot) => new AgentProcess(join(here, 'agent.js'), status, snapshot), host, snapshot => {
+    if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
+  }, changed);
   const info = (): SystemInfo => ({
     version: app.getVersion(), platform: process.platform, architecture: process.arch,
     electron: process.versions.electron, node: process.versions.node, abi: process.versions.modules,
@@ -54,9 +65,7 @@ app.whenReady().then(() => {
     hostStatus: host!.status, hostPid: host!.pid,
     sqliteVersion: (db!.prepare('SELECT sqlite_version() AS version').get() as { version: string }).version,
   });
-  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host, sessions, new FilePicker(() => window, automation), () => {
-    if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' });
-  });
+  registerHandlers((event) => Boolean(window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === rendererURL), info, host, sessions, new FilePicker(() => window, automation), changed, credentials, runtime, catalogReady);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Data Agent', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
@@ -67,5 +76,5 @@ app.whenReady().then(() => {
 }).catch((error) => { console.error('Startup failed:', error.message); app.exit(1); });
 app.on('activate', () => { if (!window && db) createWindow(); });
 app.on('window-all-closed', () => { /* macOS background tasks remain active. */ });
-app.on('before-quit', () => { host?.stop(); db?.close(); db = undefined; });
+app.on('before-quit', () => { runtime?.stop(); host?.stop(); db?.close(); db = undefined; });
 process.on('SIGTERM', () => app.quit());

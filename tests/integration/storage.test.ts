@@ -7,7 +7,7 @@ import { SessionManager, createAgentSession, ModelRuntime, SettingsManager } fro
 import { registerFauxProvider, streamSimple } from '@earendil-works/pi-ai/compat';
 import { createResourceLoader } from '../../src/agent/resource-loader';
 import { fauxAssistantMessage } from '@earendil-works/pi-ai/providers/faux';
-import { openDatabase, migrate } from '../../src/main/storage/database';
+import { openDatabase, migrate, migrations } from '../../src/main/storage/database';
 import { SessionService } from '../../src/main/services/sessions';
 import { ensureAppPaths, getAppPaths } from '../../src/node/app-paths';
 import { readHistory } from '../../src/agent/history';
@@ -33,10 +33,10 @@ function nativeHistory() {
 describe('native storage acceptance', () => {
   it('P1-SCHEMA migrations are idempotent and transactional', () => {
     migrate(db);
-    expect(db.prepare('SELECT count(*) AS n FROM schema_migrations').get()).toEqual({ n: 2 });
-    expect(() => migrate(db, [{ version: 3, sql: 'CREATE TABLE rollback_probe(id TEXT); INSERT INTO table_that_does_not_exist VALUES (1);' }])).toThrow();
+    expect(db.prepare('SELECT count(*) AS n FROM schema_migrations').get()).toEqual({ n: migrations.length });
+    expect(() => migrate(db, [{ version: 999, sql: 'CREATE TABLE rollback_probe(id TEXT); INSERT INTO table_that_does_not_exist VALUES (1);' }])).toThrow();
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name='rollback_probe'").get()).toBeUndefined();
-    expect(db.prepare('SELECT version FROM schema_migrations WHERE version=3').get()).toBeUndefined();
+    expect(db.prepare('SELECT version FROM schema_migrations WHERE version=999').get()).toBeUndefined();
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
   });
   it('P1-TREE native JSONL round-trips through the production history reader', async () => {

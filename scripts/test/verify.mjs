@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { platform, arch, release } from 'node:os';
 import { cases as p0 } from '../../tests/e2e/p0.mjs';
 import { cases as p1 } from '../../tests/e2e/p1.mjs';
+import { cases as p2 } from '../../tests/e2e/p2.mjs';
 
 const args = process.argv.slice(2).filter(x => x !== '--');
 const phase = args.find(a => /^P\d+$/.test(a));
@@ -19,7 +20,7 @@ const command = (id, cmd) => {
   writeFileSync(join(dir, `${id}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
   if (result.status !== 0) throw new Error(`${id} failed (${result.status}): see ${id}.log`);
 };
-const nativeIds = ['P1-SCHEMA', 'P1-TREE', 'P1-RECOVERY', 'P1-COORDINATION'];
+const nativeIds = ['P1-SCHEMA', 'P1-TREE', 'P1-RECOVERY', 'P1-COORDINATION', 'P2-STREAM', 'P2-SNAPSHOT', 'P2-IDENTITY', 'P2-CREDENTIAL', 'P2-READ-BOUNDS', 'P2-PREFLIGHT', 'P2-REQUEST-LIMIT'];
 function nativeCase(id) {
   const jsonFile = join(dir, `${id}.vitest.json`);
   const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }; delete env.DEEPSEEK_API_KEY;
@@ -31,7 +32,7 @@ function nativeCase(id) {
   if (matches.length !== 1 || matches[0].status !== 'passed') throw new Error('Native case missing, skipped or failed');
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
-const cases = { ...p0, ...p1, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
+const cases = { ...p0, ...p1, ...p2, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
 function save() {
   summary.finished = new Date().toISOString(); summary.total = summary.cases.length;
   summary.passed = summary.cases.filter(c => c.status === 'passed').length;
@@ -56,7 +57,7 @@ try {
   if (caseIndex >= 0 && !selected) throw new Error('--case requires a case ID');
   if (phase && selected) throw new Error('A phase gate must run all required cases; use test:e2e -- --case for targeted testing');
 
-  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--integration') ? nativeIds : args.includes('--packaged') ? ['P0-PACKAGE'] : [...Object.keys(p0).filter(id => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
+  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--live') ? Object.keys(p2) : args.includes('--integration') ? nativeIds : args.includes('--packaged') ? ['P0-PACKAGE'] : [...Object.keys(p0).filter(id => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
   if (!ids.length || ids.some(id => !cases[id])) throw new Error('Missing or unknown required test');
   if (!args.includes('--no-build')) command('build', ['build']);
   if (ids.includes('P0-PACKAGE')) command('package', ['exec', 'electron-builder', '--mac', 'dir', '--arm64']);

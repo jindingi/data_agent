@@ -16,6 +16,14 @@ export const migrations: Migration[] = [{ version: 1, sql: `
     UNIQUE(session_id, path)
   );
   CREATE INDEX sessions_updated ON sessions(archived,updated_at DESC);
+` }, { version: 3, sql: `
+  CREATE TABLE runs (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), host_epoch TEXT NOT NULL,
+    state TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL, ended_at TEXT
+  );
+  CREATE TABLE run_inputs (
+    id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), kind TEXT NOT NULL, state TEXT NOT NULL, entry_id TEXT
+  );
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');

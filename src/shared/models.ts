@@ -5,5 +5,5 @@ export interface SessionRecord {
 }
 export interface FileReference { id: string; sessionId: string; path: string; name: string; size: number; missing: boolean }
 export interface HistoryItem { id: string; role: string; text: string }
-export interface SessionDetail { session: SessionRecord; files: FileReference[]; history: HistoryItem[] }
+export interface SessionDetail { session: SessionRecord; files: FileReference[]; history: HistoryItem[]; messages?: import('./runtime').MessageView[] }
 export const MAX_INPUT_BYTES = 100_000_000;

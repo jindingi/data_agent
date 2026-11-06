@@ -1,6 +1,6 @@
 # MVP 分阶段开发、程序验收与 Agent 效果评测计划
 
-更新日期：2026-11-06。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列 pnpm 产品命令仍需在对应阶段实现，不能与现有探针命令混淆。
+更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列 pnpm 产品命令仍需在对应阶段实现，不能与现有探针命令混淆。
 
 ## 1. 两类验证与完成规则
 
@@ -20,7 +20,7 @@
 - 修复失败后重跑相关用例；完整保留前次失败记录。不能无限重试模型直到碰巧通过文件交付断言；Judge 质量评价另行保留，不用重复采样隐藏差评。
 - 所有自动验收都运行于独立临时数据根目录，禁止使用或清理真实 `~/.data_agent`。
 
-当前状态：正式产品 P0–P7 尚未完成；技术前置验证单独记录为实际通过/失败及限制。不得把已验证能力写成“以后再研究”，也不得把探针通过写成产品 E2E 已通过。
+当前逐阶段状态见 [实施进度](implementation-status.md)，完整 P0–P7 交付尚未完成；技术前置验证单独记录为实际通过/失败及限制。不得把已验证能力写成“以后再研究”，也不得把探针通过写成产品 E2E 已通过。
 
 现有可执行入口（实际存在）：`python3 validation/policy/probe.py`、`validation/pi/` 的 SDK/live runner、`validation/runtime/` 的运行时准备与哈希/工具验证脚本、`validation/electron/` 的真实 CDP/打包 runner。精确环境、命令及证据见 [验证入口与证据说明](../validation/README.md)。产品开发应复用已验证机制，仅将工作台流程断言移入正式测试；旧探针的业务 oracle、metrics schema 和数值断言不迁移为产品门禁。只在集成发生变化时再验证相应边界。
 
@@ -41,19 +41,19 @@
 | API 地址 | `https://api.deepseek.com` |
 | 请求 `model` | `deepseek-flash` |
 | API 方式 | pi 的 openai-completions 适配 |
-| 凭证 | 本地 zsh 从 `~/.zshrc` 加载的 `DEEPSEEK_API_KEY` |
+| 凭证 | `DEEPSEEK_API_KEY`；测试脚本读取继承环境，未设置时只解析 `~/.zshrc` 的字面量赋值 |
 | 调用配置 | thinking enabled / high；验证 SDK 的实际请求映射 |
 
 显示名称不直接用作 API model ID。官方当前将 `deepseek-flash` 映射至 V4.1 Flash，别名后续可能更新；每次 live 测试记录请求模型、响应模型字段、时间、SDK 版本、request ID（若有）和用量。[官方调用说明](https://api-docs.deepseek.com/)
 
-在已经加载 `.zshrc` 的本地终端中直接执行 live 命令；若从未加载该文件的执行环境启动，可显式使用：
+P2 已提供以下入口，均会发起真实模型请求：
 
 ```sh
-zsh -ic 'pnpm test:integration:live'
-zsh -ic 'pnpm verify:phase -- P2'
+pnpm test:integration:live
+pnpm verify:phase -- P2
 ```
 
-这些命令须等对应脚本实现后才可运行。测试启动器只读取继承环境，不打印环境变量集合；缺 key 时立即报 `MISSING_DEEPSEEK_API_KEY`，不尝试从其他配置文件找替代凭证。生产应用不 source `.zshrc`，仍通过 BYOK 设置管理密钥。
+单项调试可用 `pnpm test:e2e -- --case P2-LIVE-READ`。`scripts/test/live-key.mjs` 优先读取继承环境；否则只解析 `~/.zshrc` 中 `DEEPSEEK_API_KEY` 的简单字面量赋值，拒绝命令替换/变量展开，不执行或 source 整个文件。缺 key 明确失败，不跳过 live、不寻找其他提供方的替代凭证。测试脚本通过真实设置页配置隔离实例；生产应用不读取 `.zshrc`，仍通过 BYOK 设置管理密钥。
 
 本地 live 测试只发送合成 fixture、临时文件路径与必要工具结果。凭证仅进入 Main/Agent Host 的模型调用链，命令/Python 子进程显式移除；使用伪密钥哨兵验证日志脱敏，真实密钥只做内存内泄漏检查并输出布尔结果，不输出匹配内容。
 
@@ -67,7 +67,7 @@ zsh -ic 'pnpm verify:phase -- P2'
 
 ## 3. 测试入口与证据约定
 
-| 待实现命令 | 责任 |
+| 命令（按对应阶段实现） | 责任 |
 | --- | --- |
 | `pnpm check` | TypeScript、lint、依赖方向、静态配置与文档链接检查 |
 | `pnpm test:unit` | Vitest 纯逻辑测试 |
@@ -171,6 +171,8 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P2-CREDENTIAL | 缺 key 或错误模型前置 reject 后释放会话状态和并发许可，可立即再次提交；伪 key 哨兵不进入日志/JSONL/Renderer 事件；model ID 请求值是 deepseek-flash，不是显示名 |
 | P2-LIVE-THINKING | 使用已验证可产生思考的多步工具任务，核验实际非空 thinking 及工具续传的 reasoning_content；简单任务无 thinking 不伪造、不误报 SDK 失败 |
 | P2-CDP-LIVE | 从真实窗口提问并看到流式结果、展开 read 工具卡；重启后显示相同历史；live 证据包含实际请求与用量 |
+
+补充回归 `P2-PREFLIGHT` 验证主进程错误释放、双会话准入和排队凭证绑定；`P2-READ-BOUNDS` 验证读取上限/敏感符号链接；`P2-REQUEST-LIMIT` 验证第 21 次请求未进入提供方。四个 live Case ID 复用同一次有独立结果的真实窗口多轮场景，分别检查工具续传、上下文、thinking 与 CDP；不会为每个 ID 重复采样模型答案。
 
 **门禁：** `pnpm verify:phase -- P2`，必须执行 P2-LIVE-READ/CONTEXT/CDP-LIVE，不可仅用 HTTP ping 或 curl 成功代替 SDK/Electron 集成。
 

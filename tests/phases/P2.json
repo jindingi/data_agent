@@ -1,0 +1,20 @@
+{
+  "phase": "P2",
+  "required": [
+    "P0-CHECK",
+    "P0-CDP",
+    "P0-IPC",
+    "P1-TREE",
+    "P2-STREAM",
+    "P2-SNAPSHOT",
+    "P2-IDENTITY",
+    "P2-CREDENTIAL",
+    "P2-PREFLIGHT",
+    "P2-READ-BOUNDS",
+    "P2-REQUEST-LIMIT",
+    "P2-LIVE-READ",
+    "P2-LIVE-CONTEXT",
+    "P2-LIVE-THINKING",
+    "P2-CDP-LIVE"
+  ]
+}

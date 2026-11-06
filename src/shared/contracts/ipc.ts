@@ -1,8 +1,15 @@
 import { z } from 'zod';
+import { inputSchema, modelChoiceSchema, type RuntimeSnapshot } from '../runtime';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('system.info') }).strict(),
+  z.object({ ...base, type: z.literal('models.settings') }).strict(),
+  z.object({ ...base, type: z.literal('models.select'), model: modelChoiceSchema }).strict(),
+  z.object({ ...base, type: z.literal('models.key'), provider: z.string().min(1).max(100), key: z.string().max(4096) }).strict(),
+  z.object({ ...base, type: z.literal('runtime.submit'), sessionId: z.string().uuid(), input: inputSchema }).strict(),
+  z.object({ ...base, type: z.literal('runtime.snapshot'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('runtime.cancel'), sessionId: z.string().uuid() }).strict(),
   z.object({ ...base, type: z.literal('sessions.list'), search: z.string().max(200).default(''), archived: z.boolean().default(false) }).strict(),
   z.object({ ...base, type: z.literal('sessions.create'), chooseWorkspace: z.boolean().default(false) }).strict(),
   z.object({ ...base, type: z.literal('sessions.open'), sessionId: z.string().uuid() }).strict(),
@@ -31,7 +38,7 @@ export interface SystemInfo {
   hostPid: number | null;
   sqliteVersion: string;
 }
-export type AppEvent = { type: 'host.status'; status: HostStatus } | { type: 'sessions.changed' };
+export type AppEvent = { type: 'host.status'; status: HostStatus } | { type: 'sessions.changed' } | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface DesktopAPI {
   request: (command: CommandInput) => Promise<Result>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;
