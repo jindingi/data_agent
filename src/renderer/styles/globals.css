@@ -84,3 +84,17 @@ button { cursor: pointer; } button:disabled { cursor: default; } button,input,te
 .artifact-markdown table { display:block; overflow:auto; font-size:11px; }
 .artifact-markdown th,.artifact-markdown td { border:1px solid #36443c; padding:6px; }
 .artifact-link { color:#a7d8bd; text-decoration:underline; display:inline-flex; align-items:center; gap:4px; }
+
+.maintenance-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; font-size:11px; }
+.maintenance-note { margin:12px 0; color:#9baea3; font-size:12px; line-height:1.7; white-space:normal; }
+.maintenance-error { color:#eeae9f; font-size:13px; margin:12px 0; }
+.delete-choice { display:flex; gap:10px; align-items:center; font-size:14px; margin-top:20px; }
+.deletion-files { max-height:220px; overflow:auto; font-size:11px; overflow-wrap:anywhere; }
+.deletion-files li { border:1px solid #4b403b; border-radius:6px; padding:8px; margin:6px 0; }
+.tool-log { border-top:1px solid #3a4940; margin-top:12px; }
+.tool-log pre { max-height:240px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+.history-pagination { display:flex; gap:8px; align-items:center; justify-content:center; position:sticky; top:0; z-index:2; padding:10px 0; background:#141518; font-size:11px; color:#a7b8ad; }
+.result-panel.expanded { width:min(68vw,950px); }
+.result-header strong { flex:1; }
+.paged-text pre { white-space:pre-wrap; overflow-wrap:anywhere; }

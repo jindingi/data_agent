@@ -7,10 +7,10 @@ export function bounded(text: string) { return text.length <= LIMIT ? text : `${
 function stringify(value: unknown) { try { return bounded(JSON.stringify(value) ?? ''); } catch { return '[不可显示]'; } }
 export function projectMessage(id: string, raw: { role: string; content?: unknown; toolCallId?: string; isError?: boolean }, strip: (text: string) => string): MessageView {
   const blocks: MessageView['blocks'] = [];
-  if (typeof raw.content === 'string') blocks.push({ type: 'text', text: bounded(raw.role === 'user' ? strip(raw.content) : raw.content) });
+  if (typeof raw.content === 'string') blocks.push({ type: 'text', text: raw.role === 'user' ? strip(raw.content) : raw.role === 'toolResult' ? bounded(raw.content) : raw.content });
   else if (Array.isArray(raw.content)) for (const block of raw.content) {
-    if (block.type === 'text') blocks.push({ type: 'text', text: bounded(raw.role === 'user' ? strip(block.text) : block.text) });
-    if (block.type === 'thinking') blocks.push({ type: 'thinking', text: bounded(block.thinking) });
+    if (block.type === 'text') blocks.push({ type: 'text', text: raw.role === 'user' ? strip(block.text) : raw.role === 'toolResult' ? bounded(block.text) : block.text });
+    if (block.type === 'thinking') blocks.push({ type: 'thinking', text: block.thinking });
     if (block.type === 'toolCall') blocks.push({ type: 'toolCall', id: block.id, name: block.name, arguments: stringify(block.arguments) });
   }
   return { id, role: raw.role, blocks, ...(raw.toolCallId ? { toolCallId: raw.toolCallId, isError: raw.isError } : {}) };

@@ -36,19 +36,23 @@ export class SessionService {
       throw new AppError('WORKSPACE_CREATE_FAILED', `无法完成工作区创建：${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
+  private assertMutable(id: string) {
+    if (this.get(id).state === 'deleting') throw new AppError('SESSION_UNAVAILABLE', '会话正在删除，请完成清理');
+  }
   rename(id: string, title: string) {
-    this.get(id);
+    this.assertMutable(id);
     this.db.prepare('UPDATE sessions SET title=?, updated_at=? WHERE id=?').run(title, new Date().toISOString(), id);
     return this.get(id);
   }
   archive(id: string, archived: boolean) {
-    this.get(id);
+    this.assertMutable(id);
     this.db.prepare('UPDATE sessions SET archived=?, updated_at=? WHERE id=?').run(Number(archived), new Date().toISOString(), id);
     return this.get(id);
   }
   reconcile(id?: string) {
     const rows = id ? [this.get(id)] : [...this.list('', false), ...this.list('', true)];
     for (const row of rows) {
+      if (row.state === 'deleting') continue;
       let result;
       try {
         if (row.state === 'creating' && !existsSync(row.workspace)) mkdirSync(row.workspace, { mode: 0o700 });
@@ -66,7 +70,7 @@ export class SessionService {
     return files.map(f => ({ ...f, missing: !existsSync(f.path) }));
   }
   addFiles(sessionId: string, selected: string[]) {
-    this.get(sessionId);
+    this.assertMutable(sessionId);
     const current = this.files(sessionId);
     const seen = new Set(current.map(f => f.path));
     const additions: Omit<FileReference, 'missing'>[] = [];
@@ -86,7 +90,7 @@ export class SessionService {
     return this.files(sessionId);
   }
   removeFile(sessionId: string, fileId: string) {
-    this.get(sessionId);
+    this.assertMutable(sessionId);
     this.db.prepare('DELETE FROM file_refs WHERE id=? AND session_id=?').run(fileId, sessionId);
     return this.files(sessionId);
   }

@@ -1,9 +1,10 @@
+import { checkOutputBudget, runOutputRoot } from '../../node/output-budget';
 import { open, mkdir, readdir, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PolicyService, digest, type PolicyContext } from './policy';
 import { InteractionBroker } from './interactions';
-import { ProcessRunner } from '../../node/process-runner';
+import { ProcessRunner, type LogObserver } from '../../node/process-runner';
 import { readText } from '../../node/read-text';
 import { canonicalPath, sensitivePath } from '../../node/path-policy';
 import { requireRuntime, type RuntimePaths } from '../../node/runtime-paths';
@@ -18,8 +19,8 @@ export class ToolService {
   private closed = new Set<string>();
   readonly policy: PolicyService;
   readonly processes: ProcessRunner;
-  constructor(private resources: RuntimePaths, logs: string, readonly broker: InteractionBroker) {
-    this.policy = new PolicyService(resources); this.processes = new ProcessRunner(resources, logs);
+  constructor(private resources: RuntimePaths, logs: string, readonly broker: InteractionBroker, logObserver?: LogObserver) {
+    this.policy = new PolicyService(resources); this.processes = new ProcessRunner(resources, logs, logObserver);
   }
   execute(context: ToolContext, toolCallId: string, operation: ToolOperation, observers: ToolObservers): Promise<ToolResult> {
     const previous = this.tails.get(context.runId) ?? Promise.resolve();
@@ -36,7 +37,7 @@ export class ToolService {
         if (decision.decision === 'deny') throw new Error(decision.reasons.join('；'));
         const binding = digest({ sessionId: context.sessionId, runId: context.runId, hostEpoch: context.hostEpoch, toolCallId, fingerprint: decision.fingerprint });
         if (decision.decision === 'ask') {
-          const description = [decision.reasons.join('；'), operation.name === 'bash' ? operation.command : `${operation.name}: ${operation.path}`, ...decision.paths.map(item => `${item.action}: ${item.path}`), ...decision.scripts.map(item => `SHA256 ${item.hash}: ${item.path}`), ...decision.network].join('\n').slice(0, 20_000);
+          const description = [decision.reasons.join('；'), operation.name === 'bash' ? operation.command : `${operation.name}: ${operation.path}`, ...decision.paths.map(item => `${item.action}: ${item.path}`), ...decision.scripts.map(item => `SHA256（JSON 编码脚本文本）${item.hash}: ${item.path}`), ...decision.network].join('\n').slice(0, 20_000);
           const answer = await this.broker.request({ sessionId: context.sessionId, runId: context.runId, hostEpoch: context.hostEpoch, toolCallId, kind: 'approval', digest: binding, title: '批准这一次操作？', description, options: [] }, item.abort.signal, observers.interaction);
           if (answer.kind !== 'approval' || answer.decision !== 'allow_once') throw new Error('用户拒绝了这一次操作，未执行');
         }
@@ -55,8 +56,9 @@ export class ToolService {
     signal.throwIfAborted();
     if (operation.name === 'read') { const result = await readText(context.workingDirectory ?? context.workspace, context.protectedRoots, { ...operation, path: checkedPath! }, signal); return { ...result, isError: false }; }
     if (operation.name === 'bash') {
-      const result = await this.processes.run({ argv: ['/bin/bash', '--noprofile', '--norc', '-c', operation.command], cwd: context.workingDirectory ?? context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, timeoutSeconds: operation.timeout, signal, onOutput: observers.output });
-      return { output: result.output + (result.reason !== 'exit' ? `\n[执行结束：${result.reason}]` : result.exitCode ? `\n[退出码：${result.exitCode}]` : ''), isError: result.reason !== 'exit' || result.exitCode !== 0, details: { ...result, output: undefined } };
+      const outputRoot = runOutputRoot(context); await checkOutputBudget(outputRoot);
+      const result = await this.processes.run({ argv: ['/bin/bash', '--noprofile', '--norc', '-c', operation.command], outputRoot, cwd: context.workingDirectory ?? context.workspace, runId: context.runId, toolCallId, hostPid: context.hostPid, timeoutSeconds: operation.timeout, signal, onOutput: observers.output });
+      return { output: result.output + (result.reason !== 'exit' ? `\n[执行结束：${({ output_limit: '产物超过 500 MiB，已停止进程', output_entry_limit: '产物目录超过 5,000 个条目，已停止进程', output_path_changed: '产物目录路径已变更，已停止进程' } as Record<string, string>)[result.reason] ?? result.reason}]` : result.exitCode ? `\n[退出码：${result.exitCode}]` : ''), isError: result.reason !== 'exit' || result.exitCode !== 0, details: { ...result, output: undefined } };
     }
     const path = checkedPath!;
     if (await canonicalPath(path, context.workspace) !== path) throw new Error('操作路径已变化，请重新调用工具');
@@ -69,7 +71,7 @@ export class ToolService {
         if (original.split(operation.oldText).length !== 2) throw new Error('oldText 必须在文件中恰好出现一次；文件未修改');
         content = original.replace(operation.oldText, () => operation.newText);
       } else content = operation.content;
-      signal.throwIfAborted(); await mkdir(dirname(path), { recursive: true });
+      signal.throwIfAborted(); await checkOutputBudget(runOutputRoot(context), { path, bytes: Buffer.byteLength(content) }); await mkdir(dirname(path), { recursive: true });
       const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
       try { signal.throwIfAborted(); await handle.writeFile(content, 'utf8'); } finally { await handle.close(); }
       return { output: `已${operation.name === 'edit' ? '修改' : '写入'} ${path}（${Buffer.byteLength(content)} bytes）`, isError: false };

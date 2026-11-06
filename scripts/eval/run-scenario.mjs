@@ -29,18 +29,21 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     evidence.final=final;evidence.sessionId=sessionId;evidence.sessionFile=join(root,'application/data/sessions',`${sessionId}.jsonl`);
     assert.equal(final.state,'completed',final.error??'Agent did not finish');
     const listing=await until(async()=>{const value=await rpc(page,{type:'artifacts.list',sessionId});return value.versions.some(version=>version.runId===final.runId&&version.state==='published')?value:null;},'analysis artifacts published');
-    const files=listing.files.filter(file=>file.runId===final.runId), report=files.find(file=>file.relativePath==='report.md'&&file.size>0&&file.state==='ready'), chart=files.find(file=>file.kind==='png'&&file.size>0&&file.state==='ready');
-    evidence.artifacts=files;assert(report,'nonempty report.md required by fixture');assert(chart,'displayable PNG required by fixture');
+    const reportName=scenario.delivery?.report ?? 'report.md', chartRequired=scenario.delivery?.chart ?? true;
+    const files=listing.files.filter(file=>file.runId===final.runId), report=files.find(file=>file.relativePath===reportName&&file.size>0&&file.state==='ready'), chart=files.find(file=>file.kind==='png'&&file.size>0&&file.state==='ready');
+    evidence.artifacts=files;assert(report,`nonempty ${reportName} required by fixture`);if(chartRequired)assert(chart,'displayable PNG required by fixture');
     await page.getByRole('complementary',{name:'结果面板'}).waitFor();await page.getByRole('tab',{name:'报告',exact:true}).click();
     await page.getByLabel('选择报告或图表').selectOption(report.id);await page.locator('.artifact-markdown').waitFor();
     assert((await page.locator('.artifact-markdown').innerText()).length>0);
     await page.screenshot({path:join(root,'report.png'),fullPage:true});
+    if(chart) {
     await page.getByLabel('选择报告或图表').selectOption(chart.id);
     await until(()=>page.locator('.artifact-scroll > .artifact-image').evaluate(element=>element.complete&&element.naturalWidth>0),'actual chart preview',30_000);
     await page.screenshot({path:join(root,'chart.png'),fullPage:true});
-    for(const [name,text]of Object.entries(scenario.files))assert.equal(readFileSync(join(sources,name),'utf8'),text);
+    }
+    for(const [name,text]of Object.entries(scenario.files))assert.deepEqual(readFileSync(join(sources,name)),Buffer.isBuffer(text)?text:Buffer.from(text));
     assert.deepEqual(app.errors,[]);assert(!JSON.stringify(final).includes(key));assert(!readFileSync(evidence.sessionFile,'utf8').includes(key));
-    evidence.status='passed';evidence.programChecks={reportNonempty:true,pngDisplayed:true,reportDisplayed:true,originalFilesUnchanged:true,analysisAccuracyChecked:false};
+    evidence.status='passed';evidence.programChecks={reportNonempty:true,pngRequired:chartRequired,pngDisplayed:Boolean(chart),reportDisplayed:true,originalFilesUnchanged:true,analysisAccuracyChecked:false};
   } catch(error){evidence.status='failed';evidence.error=String(error.stack??error).replaceAll(key,'[REDACTED]');}
   finally {await app?.stop();evidence.elapsedMs=Date.now()-started;writeFileSync(join(root,'evaluation.json'),JSON.stringify(evidence,null,2));}
   if(evidence.status!=='passed')throw new Error(evidence.error);

@@ -15,7 +15,10 @@ export class AgentProcess {
   private port: MessagePortMain | undefined;
   private pending = new Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private ready: Promise<void>;
+  private exited: Promise<void>;
+  private resolveExit!: () => void;
   constructor(entry: string, onStatus: (status: HostStatus) => void, onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {}, onTool?: ToolHandler, onToolCancel?: (toolCallId: string) => void, onOutput?: (inputId: string) => Promise<string>) {
+    this.exited = new Promise(resolve => { this.resolveExit = resolve; });
     this.ready = new Promise((resolve, reject) => {
       const readyTimer = setTimeout(() => { reject(new AppError('HOST_TIMEOUT', 'Agent 进程启动超时')); this.stop(); }, 15_000);
       this.child = utilityProcess.fork(entry, [], {
@@ -61,7 +64,7 @@ export class AgentProcess {
         port1.start(); this.child!.postMessage({ type: 'connect' }, [port2]);
       });
       this.child.on('exit', () => {
-        clearTimeout(readyTimer); this.status = 'exited'; this.pid = null;
+        clearTimeout(readyTimer); this.status = 'exited'; this.pid = null; this.resolveExit();
         const error = new AppError('HOST_EXITED', 'Agent 进程已退出');
         reject(error);
         for (const item of this.pending.values()) { clearTimeout(item.timer); item.reject(error); }
@@ -84,4 +87,5 @@ export class AgentProcess {
     });
   }
   stop() { this.child?.kill(); }
+  async stopAndWait() { this.stop(); await this.exited; }
 }

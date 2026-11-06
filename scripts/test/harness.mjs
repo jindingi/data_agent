@@ -32,6 +32,9 @@ export async function startApp(root, { packaged = false, automation = true, port
   delete env.ELECTRON_RUN_AS_NODE; delete env.DEEPSEEK_API_KEY;
   const logFile = join(root, 'electron.log'); const fd = openSync(logFile, 'a');
   const child = spawn(executable, args, { env, stdio: ['ignore', fd, fd] }); closeSync(fd);
+  // Scope the idle/display sleep assertion to this real test instance, including failures.
+  const awake = spawn('/usr/bin/caffeinate', ['-di', '-w', String(child.pid)], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
+  const awakeExit = new Promise(resolve => { awake.once('exit', resolve); awake.once('error', resolve); });
   let exited = false; child.once('exit', () => { exited = true; });
   const exit = new Promise(r => child.once('exit', r));
   const errors = []; let browser; let page;
@@ -48,6 +51,8 @@ export async function startApp(root, { packaged = false, automation = true, port
       await Promise.race([exit, delay(8000)]);
       if (!exited) { child.kill('SIGKILL'); await exit; }
     }
+    if (awake.exitCode === null) awake.kill('SIGTERM');
+    await awakeExit;
     try { await browser?.close(); } catch { /* App already exited. */ }
   }
   try {

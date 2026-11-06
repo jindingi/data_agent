@@ -10,9 +10,11 @@ import type { CredentialService } from '../services/credentials';
 import type { RuntimeService } from '../services/runtime';
 import type { MessageView } from '../../shared/runtime';
 import type { ArtifactService } from '../services/artifacts';
+import type { DeletionService } from '../services/deletion';
+import type { LogService } from '../services/logs';
 import type { InteractionBroker } from '../services/interactions';
 
-export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void, credentials: CredentialService, runtime: RuntimeService, catalogReady: Promise<void>, interactions: InteractionBroker, automationControl?: (action: 'close_reopen' | 'quit' | 'host_pid', sessionId?: string) => unknown, artifacts?: ArtifactService) {
+export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean, info: () => SystemInfo, host: AgentProcess, sessions: SessionService, picker: FilePicker, changed: () => void, credentials: CredentialService, runtime: RuntimeService, catalogReady: Promise<void>, interactions: InteractionBroker, automationControl?: (action: 'close_reopen' | 'quit' | 'host_pid', sessionId?: string) => unknown, artifacts?: ArtifactService, logs?: LogService, deletion?: DeletionService) {
   ipcMain.handle(IPC_COMMAND, async (event, raw): Promise<Result> => {
     if (!trusted(event)) return { ok: false, error: { code: 'UNTRUSTED_SENDER', message: '请求来源不受信任' } };
     const parsed = commandSchema.safeParse(raw);
@@ -37,6 +39,7 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'system.info': return { ok: true, value: info() };
         case 'models.settings': await catalogReady; return { ok: true, value: credentials.settings() };
         case 'models.select': await catalogReady; return { ok: true, value: credentials.select(parsed.data.model) };
+        case 'models.thinking': await catalogReady; return { ok: true, value: credentials.setThinking(parsed.data.level) };
         case 'models.key': await catalogReady; return { ok: true, value: credentials.save(parsed.data.provider, parsed.data.key) };
         case 'runtime.submit': await catalogReady; return { ok: true, value: await runtime.submit(parsed.data.sessionId, parsed.data.input) };
         case 'runtime.snapshot': return { ok: true, value: await runtime.restoreSnapshot(parsed.data.sessionId) };
@@ -48,6 +51,10 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
           return { ok: true, value: null };
         }
         case 'system.ping': return { ok: true, value: await host.ping(parsed.data.text) };
+        case 'sessions.deletePreview': return { ok: true, value: deletion!.preview(parsed.data.sessionId) };
+        case 'sessions.delete': return { ok: true, value: await deletion!.remove(parsed.data.sessionId, parsed.data.deleteArtifacts) };
+        case 'logs.list': return { ok: true, value: logs!.list(parsed.data.sessionId, parsed.data.toolCallId) };
+        case 'logs.page': return { ok: true, value: await logs!.page(parsed.data.sessionId, parsed.data.logId, parsed.data.offset) };
         case 'sessions.list': return { ok: true, value: sessions.list(parsed.data.search, parsed.data.archived) };
         case 'sessions.create': {
           const directory = parsed.data.chooseWorkspace ? await picker.chooseDirectory() : undefined;

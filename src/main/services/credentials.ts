@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { AppError } from '../../shared/errors';
-import { DEFAULT_MODEL, modelChoiceSchema, type ModelChoice, type ModelOption, type ModelSettings } from '../../shared/runtime';
+import { DEFAULT_MODEL, modelChoiceSchema, type ModelChoice, type ModelOption, type ModelSettings, type ThinkingLevel } from '../../shared/runtime';
 
 interface Encryption { isEncryptionAvailable(): boolean; encryptString(value: string): Buffer; decryptString(value: Buffer): string }
 /** Only Main decrypts saved BYOK. Renderer receives presence metadata, never saved keys. */
@@ -14,10 +14,20 @@ export class CredentialService {
     try { return modelChoiceSchema.parse(JSON.parse(this.get('model.selected') || 'null')); } catch { return DEFAULT_MODEL; }
   }
   settings(): ModelSettings {
-    return { selected: this.selected(), models: this.models, configuredProviders: this.db.prepare("SELECT key FROM app_metadata WHERE key LIKE 'credential.%'").all().map(row => (row as { key: string }).key.slice('credential.'.length)), encryptionAvailable: this.encryption.isEncryptionAvailable() };
+    return { thinkingLevel: this.thinking(), selected: this.selected(), models: this.models, configuredProviders: this.db.prepare("SELECT key FROM app_metadata WHERE key LIKE 'credential.%'").all().map(row => (row as { key: string }).key.slice('credential.'.length)), encryptionAvailable: this.encryption.isEncryptionAvailable() };
   }
   validate(model: ModelChoice) {
     if (!this.models.some(item => item.provider === model.provider && item.model === model.model)) throw new AppError('UNKNOWN_MODEL', '所选模型不在内置模型列表中');
+  }
+  thinking(model = this.selected()): ThinkingLevel {
+    const levels = this.models.find(item => item.provider === model.provider && item.model === model.model)?.thinkingLevels ?? ['off'];
+    const saved = this.get(`thinking.${model.provider}/${model.model}`) as ThinkingLevel | undefined;
+    return saved && levels.includes(saved) ? saved : levels.includes('high') ? 'high' : levels[0] ?? 'off';
+  }
+  setThinking(level: ThinkingLevel) {
+    const model = this.selected(); this.validate(model);
+    if (!this.models.find(item => item.provider === model.provider && item.model === model.model)!.thinkingLevels.includes(level)) throw new AppError('UNSUPPORTED_THINKING', '所选模型不支持该思考级别');
+    this.set(`thinking.${model.provider}/${model.model}`, level); return this.settings();
   }
   select(model: ModelChoice) { this.validate(model); this.set('model.selected', JSON.stringify(model)); return this.settings(); }
   save(provider: string, key: string) {

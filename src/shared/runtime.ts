@@ -3,8 +3,10 @@ import { interactionSchema } from './tools';
 
 export const modelChoiceSchema = z.object({ provider: z.string().min(1).max(100), model: z.string().min(1).max(200) }).strict();
 export type ModelChoice = z.infer<typeof modelChoiceSchema>;
-export interface ModelOption extends ModelChoice { name: string; reasoning: boolean; vision: boolean; verified: boolean }
-export interface ModelSettings { selected: ModelChoice; models: ModelOption[]; configuredProviders: string[]; encryptionAvailable: boolean }
+export const thinkingLevelSchema = z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+export type ThinkingLevel = z.infer<typeof thinkingLevelSchema>;
+export interface ModelOption extends ModelChoice { name: string; reasoning: boolean; vision: boolean; verified: boolean; thinkingLevels: ThinkingLevel[] }
+export interface ModelSettings { thinkingLevel: ThinkingLevel; selected: ModelChoice; models: ModelOption[]; configuredProviders: string[]; encryptionAvailable: boolean }
 export const DEFAULT_MODEL: ModelChoice = { provider: 'deepseek', model: 'deepseek-flash' };
 export const inputSchema = z.object({ inputId: z.string().uuid(), kind: z.enum(['prompt', 'steer', 'followUp']), text: z.string().trim().min(1).max(100_000) }).strict();
 export type RunInput = z.infer<typeof inputSchema>;

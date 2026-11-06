@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto';
 
 /** Scripted HTTP transport only: actual pi SDK, IPC, tools and UI remain in use. */
 export async function modelFixture() {
-  const requests = [], replies = [];
+  const requests = [], replies = [], authorizations = [];
   const server = createServer(async (request, response) => {
     let body = ''; for await (const chunk of request) body += chunk;
+    authorizations.push(request.headers.authorization ?? '');
     const payload = JSON.parse(body); requests.push(payload);
     let reply = replies.shift();
     if (!reply) { response.writeHead(500); response.end('Fixture response queue exhausted'); return; }
@@ -24,7 +25,7 @@ export async function modelFixture() {
     response.end('data: [DONE]\n\n');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, requests,
+  return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, requests, authorizations,
     set: (...values) => { replies.splice(0, replies.length, ...values); },
     close: () => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }),
   };

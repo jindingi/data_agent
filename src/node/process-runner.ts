@@ -1,14 +1,16 @@
+import { createHash } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { mkdirSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { RuntimePaths } from './runtime-paths';
 
 export interface ProcessResult { output: string; exitCode: number | null; reason: string; peakRss: number; truncated: boolean; pid: number | null }
-interface Options { argv: string[]; cwd: string; runId: string; toolCallId: string; hostPid: number; signal?: AbortSignal; timeoutSeconds?: number; onOutput?: (text: string) => void }
+export type LogObserver = (record: { runId: string; toolCallId: string; path: string; result?: ProcessResult }) => void;
+interface Options { outputRoot?: string; argv: string[]; cwd: string; runId: string; toolCallId: string; hostPid: number; signal?: AbortSignal; timeoutSeconds?: number; onOutput?: (text: string) => void }
 export class ProcessRunner {
   private children = new Set<ChildProcessWithoutNullStreams>();
   private logBytes = new Map<string, number>();
-  constructor(private paths: RuntimePaths, private logs: string) {}
+  constructor(private paths: RuntimePaths, private logs: string, private logObserver?: LogObserver) {}
   environment(workspace: string) {
     const cache = join(workspace, '.cache'); const home = join(workspace, '.home'); const temp = join(workspace, '.tmp');
     for (const dir of [cache, home, temp]) mkdirSync(dir, { recursive: true });
@@ -19,7 +21,8 @@ export class ProcessRunner {
     options.signal?.throwIfAborted();
     const env = this.environment(options.cwd);
     const logDir = join(this.logs, options.runId); mkdirSync(logDir, { recursive: true, mode: 0o700 });
-    const logFile = join(logDir, `${options.toolCallId.replace(/[^\w-]/g, '_').slice(0, 150)}.log`);
+    const logFile = join(logDir, `${options.toolCallId.replace(/[^\w-]/g, '_').slice(0, 100)}-${createHash('sha256').update(options.toolCallId).digest('hex').slice(0, 16)}.log`);
+    this.logObserver?.({ runId: options.runId, toolCallId: options.toolCallId, path: logFile });
     return new Promise((resolve, reject) => {
       const child = spawn(this.paths.python, ['-I', '-B', join(this.paths.helpers, 'supervisor.py')], { env, cwd: options.cwd, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
       this.children.add(child);
@@ -55,11 +58,12 @@ export class ProcessRunner {
         this.children.delete(child); options.signal?.removeEventListener('abort', cancel);
         if (settled) return; settled = true;
         result.output = Buffer.concat(chunks).toString('utf8') + (result.truncated ? '\n[输出已截断；完整日志受每次任务 10 MiB 上限约束。]' : ''); chunks = [];
+        this.logObserver?.({ runId: options.runId, toolCallId: options.toolCallId, path: logFile, result });
         resolve(result);
       };
       child.once('error', () => { if (!settled) { settled = true; this.children.delete(child); options.signal?.removeEventListener('abort', cancel); reject(new Error('内置工具进程无法启动')); } });
       child.once('close', finish);
-      child.stdin.write(JSON.stringify({ argv: options.argv, cwd: options.cwd, env, mainPid: process.pid, hostPid: options.hostPid, timeoutSeconds: Math.min(options.timeoutSeconds ?? 180, 180) }) + '\n');
+      child.stdin.write(JSON.stringify({ argv: options.argv, cwd: options.cwd, env, outputRoot: options.outputRoot, mainPid: process.pid, hostPid: options.hostPid, timeoutSeconds: Math.min(options.timeoutSeconds ?? 180, 180) }) + '\n');
       if (options.signal?.aborted) cancel();
     });
   }

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { inputSchema, modelChoiceSchema, snapshotSchema, messageSchema } from '../runtime';
+import { inputSchema, thinkingLevelSchema, modelChoiceSchema, snapshotSchema, messageSchema } from '../runtime';
 import { toolOperationSchema, toolResultSchema, interactionSchema } from '../tools';
 const id = z.string().uuid();
-const runtimeConfigSchema = z.object({ sessionId: id, runId: id, hostEpoch: id, file: z.string().min(1), workspace: z.string().min(1), piSessionId: z.string().nullable(), model: modelChoiceSchema, apiKey: z.string().min(1).max(4096), protectedRoots: z.array(z.string()), filePaths: z.array(z.string()), testBaseUrl: z.string().url().optional(), outputDirectory: z.string().optional(), skillsDirectory: z.string().optional() }).strict();
+const runtimeConfigSchema = z.object({ sessionId: id, runId: id, hostEpoch: id, file: z.string().min(1), workspace: z.string().min(1), piSessionId: z.string().nullable(), model: modelChoiceSchema, thinkingLevel: thinkingLevelSchema.optional(), apiKey: z.string().min(1).max(4096), protectedRoots: z.array(z.string()), filePaths: z.array(z.string()), testBaseUrl: z.string().url().optional(), outputDirectory: z.string().optional(), skillsDirectory: z.string().optional() }).strict();
 export const hostRequestSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('output.result'), directory: z.string().optional(), error: z.string().optional() }).strict(),
   z.object({ id, type: z.literal('tool.result'), result: toolResultSchema }).strict(),
@@ -23,7 +23,7 @@ export const hostResponseSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ready'), pid: z.number().int().positive() }).strict(),
   z.object({ type: z.literal('pong'), id, text: z.string(), pid: z.number().int().positive() }).strict(),
   z.object({ type: z.literal('history'), id, piSessionId: z.string(), items: z.array(z.object({ id: z.string(), role: z.string(), text: z.string() })), messages: z.array(messageSchema), inputs: z.array(z.object({ inputId: id, state: z.literal('committed'), entryId: z.string() })) }).strict(),
-  z.object({ type: z.literal('models'), id, models: z.array(modelChoiceSchema.extend({ name: z.string(), reasoning: z.boolean(), vision: z.boolean(), verified: z.boolean() })) }).strict(),
+  z.object({ type: z.literal('models'), id, models: z.array(modelChoiceSchema.extend({ name: z.string(), reasoning: z.boolean(), vision: z.boolean(), verified: z.boolean(), thinkingLevels: z.array(thinkingLevelSchema) })) }).strict(),
   z.object({ type: z.literal('accepted'), id }).strict(),
   z.object({ type: z.literal('snapshot'), id, snapshot: snapshotSchema }).strict(),
   z.object({ type: z.literal('runtime.event'), snapshot: snapshotSchema }).strict(),

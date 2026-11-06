@@ -10,6 +10,8 @@ import { AgentProcess } from './services/agent-process';
 import { CredentialService } from './services/credentials';
 import { RuntimeService } from './services/runtime';
 import { ToolService } from './services/tools';
+import { DeletionService } from './services/deletion';
+import { LogService } from './services/logs';
 import { ArtifactService } from './services/artifacts';
 import { InteractionBroker } from './services/interactions';
 import { getRuntimePaths } from '../node/runtime-paths';
@@ -37,6 +39,7 @@ let host: AgentProcess | undefined;
 let db: ReturnType<typeof openDatabase> | undefined;
 let runtime: RuntimeService | undefined;
 let artifacts: ArtifactService | undefined;
+let deletion: DeletionService | undefined;
 let quitting = false;
 
 function createWindow() {
@@ -61,15 +64,17 @@ app.whenReady().then(() => {
   artifacts = new ArtifactService(db, sessions, bytes => !nativeImage.createFromBuffer(bytes).isEmpty(), sessionId => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'artifacts.changed', sessionId });
   });
-  for (const session of [...sessions.list(), ...sessions.list('', true)]) for (const version of artifacts.list(session.id).versions) if (version.state === 'open') void artifacts.publish(version.id);
+  for (const session of [...sessions.list(), ...sessions.list('', true)]) if (session.state !== 'deleting') for (const version of artifacts.list(session.id).versions) if (version.state === 'open') void artifacts.publish(version.id);
   const interactions = new InteractionBroker(db);
-  const tools = new ToolService(getRuntimePaths(app.getAppPath(), process.resourcesPath, app.isPackaged), paths.logs, interactions);
+  const logs = new LogService(db, paths.logs);
+  const tools = new ToolService(getRuntimePaths(app.getAppPath(), process.resourcesPath, app.isPackaged), paths.logs, interactions, logs.register);
   const catalogReady = host.request({ type: 'models.list' }).then(value => { credentials.setCatalog((value as { models: ModelOption[] }).models); });
   void catalogReady.catch(() => {});
   const changed = () => { if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' }); };
   runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot, tool, cancelTool, advanceOutput) => new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool, advanceOutput), host, snapshot => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
   }, changed, tools, automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined, artifacts, app.isPackaged ? join(process.resourcesPath, 'skills') : join(app.getAppPath(), 'resources/skills'));
+  deletion = new DeletionService(db, sessions, runtime, artifacts, paths, changed);
   const info = (): SystemInfo => ({
     version: app.getVersion(), platform: process.platform, architecture: process.arch,
     electron: process.versions.electron, node: process.versions.node, abi: process.versions.modules,
@@ -82,7 +87,7 @@ app.whenReady().then(() => {
     if (action === 'quit') setTimeout(() => app.quit(), 100);
     if (action === 'close_reopen') setTimeout(() => { window?.close(); setTimeout(() => { if (!window) app.emit('activate'); }, 500); }, 100);
     return null;
-  } : undefined, artifacts);
+  } : undefined, artifacts, logs, deletion);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Data Agent', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
@@ -95,6 +100,6 @@ app.on('activate', () => { if (!window && db) createWindow(); });
 app.on('window-all-closed', () => { /* macOS background tasks remain active. */ });
 app.on('before-quit', event => {
   event.preventDefault(); if (quitting) return; quitting = true; const stopped = runtime?.stop(); host?.stop();
-  void Promise.resolve(stopped).then(() => artifacts?.settled()).finally(() => { db?.close(); db = undefined; app.exit(0); });
+  void Promise.resolve(stopped).then(() => deletion?.settled()).then(() => artifacts?.settled()).finally(() => { db?.close(); db = undefined; app.exit(0); });
 });
 process.on('SIGTERM', () => app.quit());

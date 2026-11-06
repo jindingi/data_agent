@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-正式工程已实现桌面骨架、会话存储和 pi 通用工具链路：可管理会话、选择工作区、引用多个 CSV、配置内置模型与 BYOK、流式显示正文/思考/工具过程，并恢复原生 JSONL 历史。Python 执行、写入审批和澄清已接入，P4 已通过完整验收：支持版本化产物、Markdown/PNG 预览和整版导出，已跑通真实 DeepSeek 多 CSV 分析链路并完成独立 Judge 记录。P5 已通过多轮、并发、后台与崩溃恢复验收，并保留未发送输入；文件边界、交互性能与最终交付仍待 P6–P7 完成，当前不是完整 MVP。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
+正式工程已实现桌面骨架、会话存储和 pi 通用工具链路：可管理会话、选择工作区、引用多个 CSV、配置内置模型与 BYOK、流式显示正文/思考/工具过程，并恢复原生 JSONL 历史。Python 执行、写入审批和澄清已接入，P4 已通过完整验收：支持版本化产物、Markdown/PNG 预览和整版导出，已跑通真实 DeepSeek 多 CSV 分析链路并完成独立 Judge 记录。P5 已通过多轮、并发、后台与崩溃恢复验收，并保留未发送输入；P6 已加入可恢复删除、完整日志与长会话分页、模型思考级别设置，并通过 100 MB 定向基准；完整阶段门禁和最终交付仍待 P6–P7 完成，当前不是完整 MVP。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
 
 ## 文档
 
@@ -36,6 +36,8 @@ pnpm verify:phase -- P1
 pnpm verify:phase -- P2  # 包含真实 DeepSeek 请求
 pnpm verify:phase -- P3  # 工具/审批/CDP/内置运行时及真实模型
 pnpm verify:phase -- P4  # 产物登记、预览、导出与真实多 CSV 链路
+pnpm verify:phase -- P5  # 多轮、并发、后台与恢复
+pnpm verify:phase -- P6  # 边界、设置、性能、删除及真实多轮回归
 pnpm dev:cdp
 ```
 

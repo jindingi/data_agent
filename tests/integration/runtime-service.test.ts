@@ -22,7 +22,7 @@ it('P2-PREFLIGHT credentials and model errors leave no run or permit; later inpu
     encryptString: value => { const nonce = randomBytes(12), cipher = createCipheriv('aes-256-gcm', secret, nonce); const ciphertext = Buffer.concat([cipher.update(value), cipher.final()]); return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]); },
     decryptString: value => { const cipher = createDecipheriv('aes-256-gcm', secret, value.subarray(0, 12)); cipher.setAuthTag(value.subarray(12, 28)); return Buffer.concat([cipher.update(value.subarray(28)), cipher.final()]).toString(); },
   });
-  credentials.setCatalog([{ provider: 'deepseek', model: 'deepseek-flash', name: 'DeepSeek', reasoning: true, vision: false, verified: false }]);
+  credentials.setCatalog([{ provider: 'deepseek', model: 'deepseek-flash', name: 'DeepSeek', reasoning: true, vision: false, verified: false, thinkingLevels: ['off', 'high'] }]);
   const events: RuntimeSnapshot[] = []; const usedKeys: string[] = []; let starts = 0, stops = 0;
   const service = new RuntimeService(db, sessions, credentials, paths, (_status, emit) => {
     let current: RuntimeSnapshot;

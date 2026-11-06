@@ -34,6 +34,31 @@ def identity(pid):
 def alive(pid, started):
     return started is not None and identity(pid) == started
 
+def output_limit(root):
+    if not root:
+        return None
+    if os.path.realpath(root) != root:
+        return 'output_path_changed'
+    total, count, directories = 0, 0, [root]
+    while directories:
+        with os.scandir(directories.pop()) as entries:
+            for entry in entries:
+                count += 1
+                if count > 5000:
+                    return 'output_entry_limit'
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    directories.append(entry.path)
+                elif entry.is_file(follow_symlinks=False):
+                    try:
+                        total += entry.stat(follow_symlinks=False).st_size
+                    except FileNotFoundError:
+                        continue
+                    if total > 500 * 1024**2:
+                        return 'output_limit'
+    return None
+
 worker = None
 reason = 'exit'
 exit_code = None
@@ -47,12 +72,17 @@ try:
     main_identity, host_identity = identity(main_pid), identity(host_pid)
     if not alive(main_pid, main_identity) or not alive(host_pid, host_identity):
         raise ValueError('Parent is unavailable')
+    initial_limit = output_limit(config.get('outputRoot'))
+    if initial_limit:
+        reason = initial_limit
+        sys.exit(0)
     worker = subprocess.Popen(config['argv'], cwd=config['cwd'], env=config['env'],
                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               start_new_session=True, close_fds=True)
     emit({'type': 'started', 'pid': worker.pid, 'supervisorPid': os.getpid()})
     started = time.monotonic()
     peak = 0
+    output_checked = 0
     streams = {worker.stdout.fileno(): 'stdout', worker.stderr.fileno(): 'stderr'}
     for fd in streams:
         os.set_blocking(fd, False)
@@ -63,6 +93,11 @@ try:
             reason = 'parent_exit'; break
         if time.monotonic() - started > min(config.get('timeoutSeconds', 180), 180):
             reason = 'timeout'; break
+        if time.monotonic() - output_checked >= 0.25:
+            output_checked = time.monotonic()
+            limit = output_limit(config.get('outputRoot'))
+            if limit:
+                reason = limit; break
         try:
             parent = psutil.Process(worker.pid)
             rss = sum(p.memory_info().rss for p in [parent] + parent.children(recursive=True) if p.is_running())
@@ -87,6 +122,9 @@ try:
                 streams.pop(fd, None)
         exit_code = worker.poll()
         if exit_code is not None:
+            limit = output_limit(config.get('outputRoot'))
+            if limit:
+                reason = limit
             # Drain available output, but never wait forever for a background descendant.
             for fd in list(streams):
                 while True:

@@ -110,6 +110,8 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 - 开发 agent 每完成一项可见功能即可接入 dev:cdp 验证，再把关键流程固化为 spec。可用兼容该 endpoint 的 CDP MCP/CLI；不兼容时运行项目 Playwright 脚本。Chrome DevTools MCP 对 Electron 的兼容性需实测，不能假定。[MCP 支持范围](https://github.com/ChromeDevTools/chrome-devtools-mcp)
 - Renderer Network 面板不能证明 Agent Host 的模型请求已验证，需要合并 Host 日志与 live 断言。
 
+实际 macOS 测试实例运行期间通过与 PID 绑定的 caffeinate 防止系统/显示休眠，进程结束即释放；不改变正常产品启动行为。
+
 ## 5. 程序回归样本与断言边界
 
 程序回归使用小型合成 CSV、中文/空格路径、同名不同目录文件、超限文件、恶意 Markdown、符号链接与坏 JSONL。固定数据用于重复执行，不携带分析正确性的机器断言。工作台仅登记文件路径与大小；BOM、GB18030、引号内换行、坏日期或重复列不触发工作台解析。
@@ -251,6 +253,8 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P6-RENDER | 恶意 Markdown 无脚本执行、无自动远程图片请求、无任意 file 读取；长消息与日志分页可操作；PNG 与静态报告正确展示 |
 | P6-DELETE | 删除先停止任务；仅清理明确选择的登记应用产物；保留外部父目录、原始 CSV 和用户手工放入的未登记文件；模拟部分失败可继续清理，不丢路径记录 |
 | P6-LIVE-REGRESSION | 使用固定 DeepSeek 配置再次执行文件交付与多轮流程，指定报告存在且非空，设置页面名称与实际请求 model ID 对应；分析质量另记录在 Judge 报告 |
+
+除表中主用例外，P6 清单包含 `P6-DELETE-STORAGE`、`P6-LOG-STORAGE`、`P6-READ-ENCODING`、`P6-OUTPUT-LIMIT`、`P6-LOG-LIMIT` 、`P6-LOG-UI` 和 `P6-DRAFTS`，验证恢复清单/路径隔离、UTF-8 分页、二进制反馈、500 MiB 产物终止及每 run 10 MiB 日志上限及切换会话时未提交的输入框文字隔离。基准固定两份各 50 MB 文件，通过实际 UI 发送计时；并发采样与所有 30 次交互耗时保存在本地结果，不以独立脚本代替工作台流程。
 
 **门禁：** `pnpm verify:phase -- P6`。180 秒/2 GiB/CDP p95 为产品门禁；独立 Python 的实际基准已见验证记录，不能当作含 UI/LLM 的实测。本机配置满足基准要求。若初次测量表明目标需调整，必须记录数据与理由并显式修订门禁，不能在报告中悄悄放宽。
 

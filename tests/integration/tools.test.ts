@@ -149,3 +149,22 @@ it('P3-CANCEL abort reaps a real worker and descendant; heartbeat stays stopped 
   }
   const size = statSync(heartbeat).size; await delay(10_000); expect(statSync(heartbeat).size).toBe(size);
 }, 25_000);
+
+it('P6-OUTPUT-LIMIT stops actual oversized output processes and blocks further growth without deleting files', async () => {
+  const source = "import time\nwith open('large.bin','wb') as f: f.truncate(500*1024*1024+1)\nwhile True: time.sleep(.1)\n";
+  expect((await execute({ name: 'write', path: 'large.py', content: source })).isError).toBe(false);
+  const started = Date.now(), result = await execute({ name: 'bash', command: 'python3 large.py' });
+  expect(Date.now() - started).toBeLessThan(5000); expect(result.isError).toBe(true); expect(result.output).toContain('500 MiB'); expect(result.details?.reason).toBe('output_limit');
+  expect(statSync(join(context.workspace, 'large.bin')).size).toBe(500*1024*1024+1);
+  const rejected = await execute({ name: 'write', path: 'more.txt', content: 'must not write' }); expect(rejected.isError).toBe(true); expect(rejected.output).toContain('500 MiB');
+  expect(existsSync(join(context.workspace, 'more.txt'))).toBe(false);
+  const shrink = await execute({ name: 'write', path: 'large.bin', content: 'explicit replacement' }); expect(shrink.isError, shrink.output).toBe(false);
+  expect((await execute({ name: 'bash', command: 'printf recovered' })).isError).toBe(false);
+}, 15_000);
+it('P6-LOG-LIMIT retains at most 10 MiB across actual tools in one run with bounded UI output', async () => {
+  const first = await execute({ name: 'bash', command: "python3 -c 'print(\"x\" * (12*1024*1024))'" });
+  expect(first.isError).toBe(false); expect(first.output).toContain('截断'); expect(Buffer.byteLength(first.output)).toBeLessThan(64*1024);
+  expect((await execute({ name: 'bash', command: "python3 -c 'print(\"y\" * 100000)'" })).isError).toBe(false);
+  const { readdirSync } = await import('node:fs'); const logDir = join(root, 'data/logs', context.runId);
+  expect(readdirSync(logDir).reduce((sum, file) => sum + statSync(join(logDir, file)).size, 0)).toBe(10*1024*1024);
+}, 15_000);

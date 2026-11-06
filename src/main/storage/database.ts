@@ -47,6 +47,26 @@ export const migrations: Migration[] = [{ version: 1, sql: `
     input_id TEXT PRIMARY KEY REFERENCES run_inputs(id) ON DELETE CASCADE,
     text TEXT NOT NULL
   );
+` }, { version: 7, sql: `
+  CREATE TABLE tool_logs (
+    id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), tool_call_id TEXT NOT NULL,
+    path TEXT NOT NULL UNIQUE, peak_rss INTEGER NOT NULL DEFAULT 0, reason TEXT, truncated INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(run_id,tool_call_id)
+  );
+  CREATE TABLE run_files (
+    run_id TEXT NOT NULL REFERENCES runs(id), path TEXT NOT NULL, size INTEGER NOT NULL,
+    PRIMARY KEY(run_id,path)
+  );
+  CREATE TABLE deletion_jobs (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    delete_artifacts INTEGER NOT NULL, prepared INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE deletion_files (
+    session_id TEXT NOT NULL REFERENCES deletion_jobs(session_id) ON DELETE CASCADE,
+    path TEXT NOT NULL, kind TEXT NOT NULL, sha256 TEXT,
+    state TEXT NOT NULL DEFAULT 'pending', error TEXT,
+    PRIMARY KEY(session_id,path)
+  );
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');

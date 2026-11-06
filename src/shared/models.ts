@@ -1,4 +1,4 @@
-export type SessionState = 'creating' | 'draft' | 'persisted' | 'missing' | 'corrupt' | 'incompatible' | 'unavailable';
+export type SessionState = 'creating' | 'draft' | 'persisted' | 'missing' | 'corrupt' | 'incompatible' | 'unavailable' | 'deleting';
 export interface SessionRecord {
   id: string; title: string; workspace: string; sessionFile: string; piSessionId: string | null;
   state: SessionState; error: string | null; archived: boolean; createdAt: string; updatedAt: string;

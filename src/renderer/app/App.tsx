@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Activity, Archive, ArchiveRestore, Pencil, ArrowUp, ChartNoAxesCombined, ChevronDown, FileChartColumn, FolderOpen, Layers3, PanelLeftClose, PanelLeftOpen, PanelRight, Plus, Search, Settings2, ShieldCheck, Sparkles, Table2, X } from 'lucide-react';
+import { Activity, Trash2, Archive, ArchiveRestore, Pencil, ArrowUp, ChartNoAxesCombined, ChevronDown, FileChartColumn, FolderOpen, Layers3, PanelLeftClose, PanelLeftOpen, PanelRight, Plus, Search, Settings2, ShieldCheck, Sparkles, Table2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog';
+import { DeleteSessionDialog } from '../features/sessions/DeleteSessionDialog';
 import { useSessions } from '../features/sessions/use-sessions';
 import type { SystemInfo } from '../../shared/contracts/ipc';
 import { isActive, type ModelSettings as ModelConfiguration, type RunInput } from '../../shared/runtime';
@@ -20,7 +21,7 @@ const ideas = [
 export function App() {
   const [info, setInfo] = useState<SystemInfo>();
   const [error, setError] = useState('');
-  const [draft, setDraft] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [sidebar, setSidebar] = useState(true);
   const [panel, setPanel] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -28,11 +29,15 @@ export function App() {
   const [search, setSearch] = useState('');
   const [archived, setArchived] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [models, setModels] = useState<ModelConfiguration>();
   const [sending, setSending] = useState(false);
   const [inputKind, setInputKind] = useState<'steer' | 'followUp'>('steer');
   const sessions = useSessions(search, archived, setError);
+  const draftKey = sessions.selected ?? 'new';
+  const draft = drafts[draftKey] ?? '';
+  const setDraft = (value: string) => setDrafts(previous => ({ ...previous, [draftKey]: value }));
   const runtime = useRuntime(sessions.selected, setError);
   const active = runtime.snapshot ? isActive(runtime.snapshot.state) : false;
   const current = sessions.detail?.session;
@@ -41,7 +46,7 @@ export function App() {
   const act = (task: Promise<unknown>) => { void task.catch(error => setError(error instanceof Error ? error.message : '操作失败')); };
   async function newSession(chooseWorkspace = false) {
     const value = await sessions.create(chooseWorkspace);
-    if (value) { setArchived(false); setSearch(''); setDraft(''); }
+    if (value) { setArchived(false); setSearch(''); }
   }
   async function send() {
     if (!draft.trim() || sending) return;
@@ -96,11 +101,11 @@ export function App() {
         <div className="sidebar-bottom"><div className="local-badge"><span className={info?.hostStatus === 'ready' ? 'status-dot' : 'status-dot muted'} /><span data-testid="host-status">{info?.hostStatus === 'ready' ? '本地工作台已就绪' : info?.hostStatus === 'exited' ? 'Agent 连接已断开' : '正在启动工作台'}</span></div><Button variant="ghost" className="settings-button" aria-label="设置" onClick={() => setSettings(true)}><Settings2 />设置<span>⌘ ,</span></Button></div>
       </aside>}
       <main className="main-area">
-        <header className="workspace-header"><Button size="icon" variant="ghost" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}>{sidebar ? <PanelLeftClose /> : <PanelLeftOpen />}</Button><span className="breadcrumb" data-testid="session-title" data-session-id={current?.id}>工作台<span>/</span><strong>{current?.title ?? '新会话'}</strong></span><div className="header-actions">{current && <><Button size="icon" variant="ghost" aria-label="重命名会话" onClick={() => { setTitle(current.title); setRenaming(true); }}><Pencil /></Button><Button size="icon" variant="ghost" aria-label={current.archived ? '恢复会话' : '归档会话'} onClick={() => act(sessions.archiveCurrent())}>{current.archived ? <ArchiveRestore /> : <Archive />}</Button></>}<span className="privacy-label"><ShieldCheck size={14} />文件保留在本地</span><Button size="icon" variant="ghost" aria-label="切换结果面板" aria-pressed={panel} onClick={() => setPanel(!panel)}><PanelRight /></Button></div></header>
+        <header className="workspace-header"><Button size="icon" variant="ghost" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}>{sidebar ? <PanelLeftClose /> : <PanelLeftOpen />}</Button><span className="breadcrumb" data-testid="session-title" data-session-id={current?.id}>工作台<span>/</span><strong>{current?.title ?? '新会话'}</strong></span><div className="header-actions">{current && <><Button size="icon" variant="ghost" aria-label="重命名会话" onClick={() => { setTitle(current.title); setRenaming(true); }}><Pencil /></Button><Button size="icon" variant="ghost" aria-label={current.archived ? '恢复会话' : '归档会话'} onClick={() => act(sessions.archiveCurrent())}>{current.archived ? <ArchiveRestore /> : <Archive />}</Button><Button size="icon" variant="ghost" aria-label="删除会话" onClick={() => setDeleting(current.id)}><Trash2 /></Button></>}<span className="privacy-label"><ShieldCheck size={14} />文件保留在本地</span><Button size="icon" variant="ghost" aria-label="切换结果面板" aria-pressed={panel} onClick={() => setPanel(!panel)}><PanelRight /></Button></div></header>
         {error && <div role="alert" className="error-banner">{error}<button aria-label="关闭错误" onClick={() => setError('')}><X size={16} /></button></div>}
         {current?.error && <div role="alert" className="error-banner">{current.error}</div>}
         <section className={`welcome ${history.length ? 'has-history' : ''}`}>
-          {history.length ? <Transcript messages={history} tools={runtime.snapshot?.tools ?? []} /> : <><div className="welcome-icon"><ChartNoAxesCombined size={28} strokeWidth={1.5} /></div>
+          {history.length ? <Transcript key={sessions.selected} sessionId={sessions.selected!} messages={history} tools={runtime.snapshot?.tools ?? []} /> : <><div className="welcome-icon"><ChartNoAxesCombined size={28} strokeWidth={1.5} /></div>
           <div className="eyebrow">FROM DATA TO UNDERSTANDING</div>
           <h1>让数据，回答你的问题。</h1>
           <p className="welcome-copy">带上你的数据，说说你想了解什么。<br />让 AI 协助探索、绘图，把发现整理成报告。</p></>}
@@ -123,6 +128,7 @@ export function App() {
       </main>
       {panel && <ArtifactPanel sessionId={sessions.selected} inputs={files} close={() => setPanel(false)} onError={setError} />}
     </div>
+    {deleting && <DeleteSessionDialog key={deleting} sessionId={deleting} close={() => setDeleting(null)} deleted={() => { sessions.select(null); setDeleting(null); setError(''); void sessions.refresh(); }} />}
     <Dialog open={renaming} onOpenChange={setRenaming}><DialogContent><DialogTitle className="text-lg font-semibold">重命名会话</DialogTitle><DialogDescription className="mt-2 text-sm text-muted-foreground">为这个分析起一个容易找到的名字。</DialogDescription><form onSubmit={event => { event.preventDefault(); act(sessions.rename(title).then(() => setRenaming(false))); }}><input className="rename-input" aria-label="会话标题" value={title} onChange={event => setTitle(event.target.value)} maxLength={120} required /><Button type="submit">保存名称</Button></form></DialogContent></Dialog>
     <Dialog open={settings} onOpenChange={setSettings}><DialogContent><DialogTitle className="text-xl font-semibold">设置</DialogTitle><DialogDescription className="mt-2 text-sm text-muted-foreground">管理模型与本地工作环境</DialogDescription><ModelSettings value={models} onChange={setModels} onError={setError} /><div className="settings-section"><h3><FolderOpen size={15} />本地工作区</h3><p className="path-label">{info?.workspaceRoot ?? '正在加载…'}</p><p>每个会话使用独立目录，原始 CSV 不会被复制或移动。</p></div><details className="diagnostics"><summary><Activity size={15} />应用诊断</summary><dl><dt>版本</dt><dd>{info?.version}</dd><dt>平台</dt><dd>{info?.platform} / {info?.architecture}</dd><dt>本地存储</dt><dd>{info?.sqliteVersion ? 'SQLite 已连接' : '连接中'}</dd></dl><Button size="sm" variant="outline" onClick={() => void checkConnection()}>检查连接</Button><span role="status" className="ping-result">{ping}</span></details></DialogContent></Dialog>
   </div>;

@@ -128,15 +128,15 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`interactions`、`output_versions`、`artifacts`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。后续阶段增加 `run_files`（当次选用路径/大小）；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`run_files`、`tool_logs`、`deletion_jobs`、`deletion_files`、`interactions`、`output_versions`、`artifacts`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。`run_files` 记录提交时选用的路径/登记大小，`tool_logs` 只存工具输出文件索引、结束原因和进程树采样峰值 RSS；`deletion_jobs`/`deletion_files` 保留明确清理选择与每个路径的进度。仍不另建永久聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
-添加/提交任务时校验所选 CSV 合计 ≤100,000,000 bytes；排队到实际启动时复核存在性与大小。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
+添加 CSV 时按文件元数据校验单文件及选用合计 ≤100,000,000 bytes；提交任务时检查原路径是否缺失，记录当时选用的路径和已登记大小。排队任务沿用提交时的引用；不冻结文件内容、不检测外部替换，也不按内容解析 CSV。实际读取失败由通用工具返回。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
 JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。SessionManager 是唯一 JSONL 写者；Main 是唯一 SQLite 写者；二者没有跨介质原子事务。状态使用 creating/draft/persisted/missing 等，启动对账，不把 `message_end` 当落盘 ACK。
 
 `appSessionId` 与 pi header ID 分开；用 `SessionManager.open(exactFile, sessionsDir, cwd)` 保持精确文件布局。草稿没有 JSONL 是正常状态；已有历史却缺失/零字节/损坏时不能静默新建。先只读预检和备份，再使用可能迁移文件的 SDK API。
 
-删除会话只清理明确登记的应用自有文件，原始 CSV、自选父目录、用户手动放入且未登记的文件保留。部分失败保留清理记录；外部 workspace 不可用时显示异常，不自动换新目录。读取不存在的源 CSV 正常报错，不实现外部变更恢复功能。
+删除会话先标记 deleting，停止本会话并等待 Host、工具进程和产物登记收束。默认仅清理原生会话记录和登记工具日志；用户显式勾选后才清理登记产物。原始 CSV（包括被另一会话引用的路径）、自选父目录、用户手动放入且未登记的文件保留。按普通文件、路径和登记 hash 校验后逐个删除，不递归清空 workspace；仅移除空的产物祖先目录。路径重定向或内容变更时保留文件和 SQLite 清理记录，重启后可继续，不能用重试修改最初的清理选择。部分失败保留清理记录；外部 workspace 不可用时显示异常，不自动换新目录。读取不存在的源 CSV 正常报错，不实现外部变更恢复功能。
 
 ## 5. 命令、事件与运行状态
 
@@ -175,7 +175,7 @@ tools 使用明确名称白名单，customTools 提供受控实现；`tools: []`
 
 ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；SettingsManager、模型配置、agentDir、session 文件均显式指定，避免读取 workspace/global `.pi` 的任意扩展与配置。分析 skills 指导 Agent 自主写脚本，而不是把业务步骤固定为工具 API。
 
-模型 UI 使用 pi 可用的 API-key provider/model 清单，展示能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型与 key 以 run 配置确定，不在运行中切换。
+模型 UI 使用 pi 可用的 API-key provider/model 清单，展示能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
 
 本地真实测试固定：
 
@@ -236,9 +236,9 @@ Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载�
 
 初始产品默认值：单工具执行 180 秒；单 run 活跃执行时间 10 分钟、最多 20 次模型请求；HTTP 暂时性失败最多重试 2 次且计入限额。工作台不判定业务错误或统计“业务自修复次数”；Agent 可在总预算内自行修复代码或解释无法完成的原因。等待用户审批/澄清不计活跃执行计时，但继续占会话名额，可显式停止。截断日志不截断错误状态。
 
-工具单次 UI 文本最多 64 KiB，完整轮转日志每 run 最多 10 MiB；单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；初始 run 产物目录上限 500 MiB。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
+工具单次 UI 文本有界，进程输出保留前 60 KiB 加截断提示（低于 64 KiB）；进程日志每 run 合计最多保留最早 10 MiB，超出部分不再写盘。`logs.list/page` 按 sessionId 与登记 logId 读取，每页 32 KiB、保留 UTF-8 字符边界，不接受任意路径。会话界面每页至多 20 条可见消息，正文/思考每段约 8 KiB，可翻到末尾；正文和思考不再在 Host 投影处丢弃长文本，原生 JSONL 仍保存完整消息。报告面板可展开。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；初始 run 产物目录上限 500 MiB（含同一 run 的各个输出版本）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
 
-100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。实际基准数据与已测数值见验证记录。
+100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。正式 P6 基准由 `tests/e2e/p6-benchmark.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数字见本地阶段结果。
 
 结构化日志含 session/run/tool/input/epoch，避免跨会话串联；脱敏 key/header，保留有限错误、退出码、耗时、版本与 artifact hash。指标和审批信息不是 assistant 正文，不伪造为 thinking。
 
