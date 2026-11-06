@@ -10,12 +10,12 @@ import { RuntimeService } from '../../src/main/services/runtime';
 import { ensureAppPaths, getAppPaths } from '../../src/node/app-paths';
 import type { RuntimeSnapshot } from '../../src/shared/runtime';
 
-const cleanups: (() => void)[] = [];
-afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup(); });
+const cleanups: (() => void | Promise<void>)[] = [];
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 it('P2-PREFLIGHT credentials and model errors leave no run or permit; later input starts and cancellation releases admission', async () => {
   const root = mkdtempSync(join(tmpdir(), 'data-agent-admission-')); cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   const paths = getAppPaths({ DATA_AGENT_HOME: join(root, 'data'), DATA_AGENT_USER_DATA: join(root, 'user') }, true); ensureAppPaths(paths);
-  const db = openDatabase(paths.database); cleanups.push(() => db.close());
+  const db = openDatabase(paths.database); cleanups.push(() => { db.close(); });
   const sessions = new SessionService(db, paths); const secret = randomBytes(32);
   const credentials = new CredentialService(db, {
     isEncryptionAvailable: () => true,

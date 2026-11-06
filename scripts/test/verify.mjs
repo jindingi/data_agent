@@ -9,6 +9,7 @@ import { cases as p1 } from '../../tests/e2e/p1.mjs';
 import { cases as p2 } from '../../tests/e2e/p2.mjs';
 import { cases as p3 } from '../../tests/e2e/p3.mjs';
 import { cases as p4 } from '../../tests/e2e/p4.mjs';
+import { cases as p5 } from '../../tests/e2e/p5.mjs';
 
 const args = process.argv.slice(2).filter(x => x !== '--');
 const phase = args.find(a => /^P\d+$/.test(a));
@@ -34,7 +35,7 @@ function nativeCase(id) {
   if (matches.length !== 1 || matches[0].status !== 'passed') throw new Error('Native case missing, skipped or failed');
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
-const cases = { ...p0, ...p1, ...p2, ...p3, ...p4, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
+const cases = { ...p0, ...p1, ...p2, ...p3, ...p4, ...p5, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
 function save() {
   summary.finished = new Date().toISOString(); summary.total = summary.cases.length;
   summary.passed = summary.cases.filter(c => c.status === 'passed').length;

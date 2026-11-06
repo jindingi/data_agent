@@ -67,7 +67,7 @@ app.whenReady().then(() => {
   const catalogReady = host.request({ type: 'models.list' }).then(value => { credentials.setCatalog((value as { models: ModelOption[] }).models); });
   void catalogReady.catch(() => {});
   const changed = () => { if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'sessions.changed' }); };
-  runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot, tool, cancelTool) => new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool), host, snapshot => {
+  runtime = new RuntimeService(db, sessions, credentials, paths, (status, snapshot, tool, cancelTool, advanceOutput) => new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool, advanceOutput), host, snapshot => {
     if (window && !window.isDestroyed()) window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
   }, changed, tools, automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined, artifacts, app.isPackaged ? join(process.resourcesPath, 'skills') : join(app.getAppPath(), 'resources/skills'));
   const info = (): SystemInfo => ({

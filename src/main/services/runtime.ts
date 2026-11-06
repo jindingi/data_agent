@@ -10,34 +10,64 @@ import type { CredentialService } from './credentials';
 import type { SessionService } from './sessions';
 import type { AppPaths } from '../../node/app-paths';
 import { AppError } from '../../shared/errors';
-import { isActive, type MessageView, type ModelChoice, type RunInput, type RuntimeSnapshot } from '../../shared/runtime';
+import { isActive, terminalTools, type MessageView, type ModelChoice, type RunInput, type RuntimeSnapshot } from '../../shared/runtime';
 
 export interface RuntimeHost { pid?: number | null; request(input: HostInput): Promise<unknown>; stop(): void }
-type HostFactory = (status: (status: HostStatus) => void, snapshot: (snapshot: RuntimeSnapshot) => void, tool: ToolHandler, cancelTool: (toolCallId: string) => void) => RuntimeHost;
-interface Task { snapshot: RuntimeSnapshot; input: RunInput; model: ModelChoice; apiKey?: string; host?: RuntimeHost; starting: boolean; outputDirectory?: string; versionId?: string }
+type HostFactory = (status: (status: HostStatus) => void, snapshot: (snapshot: RuntimeSnapshot) => void, tool: ToolHandler, cancelTool: (toolCallId: string) => void, advanceOutput: (inputId: string) => Promise<string>) => RuntimeHost;
+interface Task { snapshot: RuntimeSnapshot; input: RunInput; model: ModelChoice; apiKey?: string; host?: RuntimeHost; starting: boolean; outputDirectory?: string; versionId?: string; inputVersions?: Map<string, string> }
 /** Global admission only; pi owns each conversation's steer/follow-up queue. */
 export class RuntimeService {
   private tasks = new Map<string, Task>();
   private queue: Task[] = [];
+  private recovered = new Map<string, RuntimeSnapshot>();
   private closing = false;
   private startingTasks = new Set<Promise<void>>();
+  private advancingTasks = new Set<Promise<string>>();
+  private finishingTasks = new Set<Promise<void>>();
   constructor(private db: Database.Database, private sessions: SessionService, private credentials: CredentialService, private paths: AppPaths, private createHost: HostFactory, private reader: { readHistory(file: string, workspace: string, piSessionId: string): Promise<unknown> }, private publish: (snapshot: RuntimeSnapshot) => void, private changed: () => void, private tools?: ToolService, private testBaseUrl?: string, private artifacts?: ArtifactService, private skillsDirectory?: string) {
-    db.prepare("UPDATE runs SET state='failed',ended_at=? WHERE state IN ('queued','starting','running','waiting_approval','waiting_input')").run(new Date().toISOString());
+    db.prepare("UPDATE runs SET state='interrupted',ended_at=? WHERE state IN ('queued','starting','running','waiting_approval','waiting_input')").run(new Date().toISOString());
     db.prepare("UPDATE run_inputs SET state='unknown' WHERE state='pending'").run();
   }
-  snapshot(sessionId: string) { this.sessions.get(sessionId); return this.tasks.get(sessionId)?.snapshot ?? null; }
+  snapshot(sessionId: string) {
+    this.sessions.get(sessionId);
+    const value = this.tasks.get(sessionId)?.snapshot ?? this.recovered.get(sessionId);
+    return value ? this.withDrafts(value) : null;
+  }
+  private withDrafts(snapshot: RuntimeSnapshot): RuntimeSnapshot {
+    const drafts = this.db.prepare(`SELECT i.id AS inputId,i.kind,d.text,i.run_id AS runId,i.state
+      FROM input_drafts d JOIN run_inputs i ON i.id=d.input_id JOIN runs r ON r.id=i.run_id
+      WHERE r.session_id=? ORDER BY i.rowid`).all(snapshot.sessionId) as (RunInput & { runId: string; state: string })[];
+    const unsentInputs = drafts.filter(d => d.runId !== snapshot.runId || d.state !== 'pending' || !isActive(snapshot.state))
+      .map(({ inputId, kind, text }) => ({ inputId, kind, text }));
+    return { ...snapshot, queuedInputs: isActive(snapshot.state) ? snapshot.queuedInputs ?? [] : [], unsentInputs };
+  }
+  discardDraft(sessionId: string, inputId: string) {
+    const snapshot = this.snapshot(sessionId);
+    if (!snapshot?.unsentInputs?.some(input => input.inputId === inputId)) throw new AppError('DRAFT_UNAVAILABLE', '只能移除该会话的未发送输入');
+    this.db.prepare('DELETE FROM input_drafts WHERE input_id=?').run(inputId);
+  }
   private update(task: Task, snapshot: RuntimeSnapshot) {
-    if (this.closing || !isActive(task.snapshot.state) || this.tasks.get(snapshot.sessionId) !== task || task.snapshot.hostEpoch !== snapshot.hostEpoch || snapshot.seq <= task.snapshot.seq) return;
-    task.snapshot = snapshot;
+    if (!isActive(task.snapshot.state) || this.tasks.get(snapshot.sessionId) !== task || task.snapshot.hostEpoch !== snapshot.hostEpoch || snapshot.seq <= task.snapshot.seq) return;
+    if (!isActive(snapshot.state)) snapshot = { ...snapshot, activity: null, interactions: [], messages: snapshot.messages.map(message => ({ ...message, pending: false })), tools: snapshot.tools.map(tool => tool.status === 'running' ? { ...tool, status: 'failed', output: tool.output || '执行已结束，未收到完整工具结果' } : tool) };
     this.db.prepare('UPDATE runs SET state=?,ended_at=? WHERE id=?').run(snapshot.state, isActive(snapshot.state) ? null : new Date().toISOString(), snapshot.runId);
-    for (const input of snapshot.inputs) this.db.prepare('UPDATE run_inputs SET state=?,entry_id=? WHERE id=? AND run_id=?').run(input.state, input.entryId ?? null, input.inputId, snapshot.runId);
+    this.db.transaction(() => {
+      for (const input of snapshot.inputs) {
+        const result = this.db.prepare('UPDATE run_inputs SET state=?,entry_id=? WHERE id=? AND run_id=?').run(input.state, input.entryId ?? null, input.inputId, snapshot.runId);
+        if (result.changes && input.state === 'committed') this.db.prepare('DELETE FROM input_drafts WHERE input_id=?').run(input.inputId);
+      }
+    })();
+    snapshot = this.withDrafts(snapshot); task.snapshot = snapshot;
     this.publish(snapshot);
     if (!isActive(snapshot.state)) {
       task.apiKey = undefined;
       this.tools?.cancelRun(snapshot.runId);
       const host = task.host; task.host = undefined; task.starting = false; host?.stop();
       this.sessions.reconcile(snapshot.sessionId); this.changed();
-      if (task.versionId) void this.artifacts?.publish(task.versionId);
+      if (task.versionId) {
+        const versionId = task.versionId;
+        const finished = Promise.resolve(this.tools?.settled(snapshot.runId)).then(() => this.artifacts?.publish(versionId));
+        this.finishingTasks.add(finished); void finished.finally(() => this.finishingTasks.delete(finished));
+      }
       this.pump();
     }
   }
@@ -62,6 +92,7 @@ export class RuntimeService {
     let messages: MessageView[] = [];
     if (session.piSessionId && session.state === 'persisted') messages = (await this.reader.readHistory(session.sessionFile, session.workspace, session.piSessionId) as { messages: MessageView[] }).messages;
     // A read RPC yields: recheck admission before creating another task for the same session.
+    if (this.closing) throw new AppError('QUITTING', '应用正在退出');
     if (isActive(this.tasks.get(sessionId)?.snapshot.state ?? 'completed')) throw new AppError('ALREADY_RUNNING', '该会话已有任务');
     const task: Task = { input, model, apiKey, starting: false, snapshot: { schemaVersion: 1, sessionId, runId: randomUUID(), hostEpoch: randomUUID(), seq: 0, state: 'queued', messages, tools: [], inputs: [{ inputId: input.inputId, kind: input.kind, state: 'pending' }], queuedInputs: [input], error: null } };
     this.db.transaction(() => {
@@ -69,12 +100,56 @@ export class RuntimeService {
       this.insertInput(task, input);
       this.db.prepare('UPDATE sessions SET updated_at=? WHERE id=?').run(new Date().toISOString(), sessionId);
     })();
-    this.tasks.set(sessionId, task); this.queue.push(task); this.publish(task.snapshot); this.changed(); this.pump();
+    task.snapshot = this.withDrafts(task.snapshot); this.tasks.set(sessionId, task); this.queue.push(task); this.publish(task.snapshot); this.changed(); this.pump();
     return task.snapshot;
+  }
+  /** Rebuild a terminal projection from SQLite metadata and the native history, never replay input. */
+  async restoreSnapshot(sessionId: string): Promise<RuntimeSnapshot | null> {
+    const current = this.snapshot(sessionId); if (current) return current;
+    const session = this.sessions.get(sessionId);
+    const run = this.db.prepare('SELECT id,host_epoch,state FROM runs WHERE session_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(sessionId) as { id: string; host_epoch: string; state: RuntimeSnapshot['state'] } | undefined;
+    if (!run) return null;
+    let messages: MessageView[] = [];
+    if (session.state === 'persisted' && session.piSessionId) {
+      const history = await this.reader.readHistory(session.sessionFile, session.workspace, session.piSessionId) as { messages: MessageView[]; inputs?: RuntimeSnapshot['inputs'] };
+      messages = history.messages;
+      this.db.transaction(() => {
+        for (const input of history.inputs ?? []) if (input.state === 'committed') {
+          const result = this.db.prepare("UPDATE run_inputs SET state='committed',entry_id=? WHERE id=? AND run_id IN (SELECT id FROM runs WHERE session_id=?)").run(input.entryId, input.inputId, sessionId);
+          if (result.changes) this.db.prepare('DELETE FROM input_drafts WHERE input_id=?').run(input.inputId);
+        }
+      })();
+    }
+    if (this.tasks.has(sessionId)) return this.tasks.get(sessionId)!.snapshot;
+    const inputs = this.db.prepare('SELECT id AS inputId,kind,state,entry_id AS entryId FROM run_inputs WHERE run_id=? ORDER BY rowid').all(run.id) as (RuntimeSnapshot['inputs'][number] & { entryId: string | null })[];
+    const output = this.db.prepare('SELECT directory FROM output_versions WHERE run_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(run.id) as { directory: string } | undefined;
+    const snapshot: RuntimeSnapshot = { schemaVersion: 1, sessionId, runId: run.id, hostEpoch: run.host_epoch, seq: 0, state: run.state, messages, tools: terminalTools(messages), inputs: inputs.map(({ entryId, ...input }) => ({ ...input, ...(entryId ? { entryId } : {}) })), queuedInputs: [], interactions: [], activity: null,
+      error: run.state === 'interrupted' ? '上次执行意外中断。已保留历史和已生成文件，未确认输入不会自动重发。' : null, ...(output ? { outputDirectory: output.directory } : {}) };
+    this.recovered.set(sessionId, snapshot); return this.withDrafts(snapshot);
+  }
+  private advanceOutput(task: Task, inputId: string) {
+    const advance = this.performAdvanceOutput(task, inputId); this.advancingTasks.add(advance);
+    void advance.then(() => this.advancingTasks.delete(advance), () => this.advancingTasks.delete(advance)); return advance;
+  }
+  private async performAdvanceOutput(task: Task, inputId: string) {
+    if (this.closing || !task.host || !isActive(task.snapshot.state) || !this.artifacts) throw new Error('Run unavailable');
+    const input = this.db.prepare('SELECT kind FROM run_inputs WHERE id=? AND run_id=?').get(inputId, task.snapshot.runId) as { kind: string } | undefined;
+    if (input?.kind !== 'followUp') throw new Error('Unknown follow-up');
+    task.inputVersions ??= new Map(); const known = task.inputVersions.get(inputId); if (known) return known;
+    // The SDK context hook reaches here only after consuming the next follow-up at a tool boundary.
+    if (task.versionId) await this.artifacts.publish(task.versionId);
+    if (this.closing || !isActive(task.snapshot.state)) throw new Error('Run stopped');
+    const version = await this.artifacts.createVersion(task.snapshot.sessionId, task.snapshot.runId);
+    if (this.closing || !isActive(task.snapshot.state)) { await this.artifacts.publish(version.id); throw new Error('Run stopped'); }
+    task.versionId = version.id; task.outputDirectory = version.directory; task.inputVersions.set(inputId, version.directory);
+    return version.directory;
   }
   private insertInput(task: Task, input: RunInput) {
     if (this.db.prepare('SELECT id FROM run_inputs WHERE id=?').get(input.inputId)) throw new AppError('DUPLICATE_INPUT', '该输入已提交，不会重复执行');
-    this.db.prepare('INSERT INTO run_inputs VALUES (?,?,?,?,NULL)').run(input.inputId, task.snapshot.runId, input.kind, 'pending');
+    this.db.transaction(() => {
+      this.db.prepare('INSERT INTO run_inputs VALUES (?,?,?,?,NULL)').run(input.inputId, task.snapshot.runId, input.kind, 'pending');
+      this.db.prepare('INSERT INTO input_drafts VALUES (?,?)').run(input.inputId, input.text);
+    })();
   }
   private pump() {
     if (this.closing) return;
@@ -99,21 +174,21 @@ export class RuntimeService {
         if (this.closing || task.snapshot.state !== 'starting') { void this.artifacts.publish(version.id); return; }
       }
       task.host = this.createHost(status => {
-        if (status === 'exited' && isActive(task.snapshot.state) && !this.closing) this.fail(task, 'Agent 进程已退出，本轮已停止。未确认的输入不会自动重发。');
+        if (status === 'exited' && isActive(task.snapshot.state) && !this.closing) this.fail(task, 'Agent 进程异常退出，本轮已中断。未确认的输入不会自动重发。', 'interrupted');
       }, snapshot => this.update(task, snapshot), async (toolCallId, operation, observers) => {
         if (!this.tools || !task.host?.pid || !isActive(task.snapshot.state)) return { output: '当前任务无法执行工具', isError: true };
         return this.tools.execute({ sessionId: session.id, runId: task.snapshot.runId, hostEpoch: task.snapshot.hostEpoch, hostPid: task.host.pid,
           workspace: session.workspace, workingDirectory: task.outputDirectory, protectedRoots: [this.paths.sessions, this.paths.database, `${this.paths.database}-wal`, `${this.paths.database}-shm`, this.paths.logs], inputs: this.sessions.files(session.id).map(file => file.path), published: this.artifacts?.publishedPaths(session.id) ?? [] }, toolCallId, operation, observers);
-      }, toolCallId => this.tools?.cancelTool(task.snapshot.runId, toolCallId));
+      }, toolCallId => this.tools?.cancelTool(task.snapshot.runId, toolCallId), inputId => this.advanceOutput(task, inputId));
       await task.host.request({ type: 'runtime.start', config: { sessionId: session.id, runId: task.snapshot.runId, hostEpoch: task.snapshot.hostEpoch, file: session.sessionFile, workspace: session.workspace, piSessionId: session.piSessionId, model: task.model, apiKey, outputDirectory: task.outputDirectory, skillsDirectory: this.skillsDirectory, ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
         protectedRoots: [this.paths.sessions, this.paths.database, `${this.paths.database}-wal`, `${this.paths.database}-shm`, join(this.paths.home, 'logs')], filePaths: this.sessions.files(session.id).map(file => file.path) }, input: task.input });
       task.starting = false;
     } catch { this.fail(task, '无法启动任务，请检查模型凭证或重新打开会话。'); }
     finally { task.apiKey = undefined; }
   }
-  private fail(task: Task, error: string) {
+  private fail(task: Task, error: string, state: 'failed' | 'interrupted' = 'failed') {
     if (!isActive(task.snapshot.state)) return;
-    this.update(task, { ...task.snapshot, seq: task.snapshot.seq + 1, state: 'failed', error, inputs: task.snapshot.inputs.map(input => input.state === 'pending' ? { ...input, state: 'unknown' } : input) });
+    this.update(task, { ...task.snapshot, seq: task.snapshot.seq + 1, state, error, inputs: task.snapshot.inputs.map(input => input.state === 'pending' ? { ...input, state: 'unknown' } : input) });
   }
   async cancel(sessionId: string) {
     const task = this.tasks.get(sessionId);
@@ -127,5 +202,16 @@ export class RuntimeService {
     try { await task.host?.request({ type: 'runtime.cancel' }); } catch { this.tools?.cancelRun(task.snapshot.runId); this.fail(task, '停止时 Agent 未响应，进程已结束。'); }
   }
   hostPid(sessionId: string) { return this.tasks.get(sessionId)?.host?.pid ?? null; }
-  stop() { this.closing = true; this.tools?.stop(); for (const task of this.tasks.values()) task.host?.stop(); return Promise.allSettled([...this.startingTasks]); }
+  async stop() {
+    this.closing = true;
+    await Promise.allSettled([...this.tasks.keys()].map(id => this.cancel(id)));
+    this.tools?.stop();
+    for (const task of this.tasks.values()) {
+      if (isActive(task.snapshot.state)) this.update(task, { ...task.snapshot, seq: task.snapshot.seq + 1, state: 'cancelled', activity: null, interactions: [], inputs: task.snapshot.inputs.map(input => input.state === 'pending' ? { ...input, state: 'cancelled' } : input) });
+      task.host?.stop(); task.apiKey = undefined;
+    }
+    await Promise.allSettled([...this.startingTasks, ...this.advancingTasks]);
+    await Promise.allSettled([...this.finishingTasks]);
+    await this.tools?.settled();
+  }
 }

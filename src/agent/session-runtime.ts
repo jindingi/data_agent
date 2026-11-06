@@ -1,12 +1,12 @@
 import { dirname } from 'node:path';
 import { createHash } from 'node:crypto';
-import { createAgentSession, createExtensionRuntime, loadSkillsFromDir, SessionManager, SettingsManager, type AgentSession, type ContextEvent, type BeforeProviderRequestEvent, type MessageEndEvent, type ModelRuntime } from '@earendil-works/pi-coding-agent';
+import { createAgentSession, createExtensionRuntime, loadSkillsFromDir, SessionManager, SettingsManager, type AgentSession, type ContextEvent, type ContextWithSystemEvent, type BeforeProviderRequestEvent, type MessageEndEvent, type ModelRuntime } from '@earendil-works/pi-coding-agent';
 import type { ModelChoice, RunInput, RuntimeSnapshot } from '../shared/runtime';
 import { AppError } from '../shared/errors';
 import { inspectSessionFile } from '../node/session-integrity';
 import { createResourceLoader } from './resource-loader';
 import { createModelRuntime } from './models';
-import { InputIdentity, trustedExtension } from './input-identity';
+import { InputIdentity, trustedExtension, inputId, messageText } from './input-identity';
 import { EventAdapter } from './event-adapter';
 import { readTool } from './tools/read';
 import { redactor } from './redact';
@@ -35,6 +35,8 @@ export class SessionRuntime {
   private redact = <T>(value: T): T => value;
   private interactions: Interaction[] = [];
   private outputDirectory: string | undefined;
+  private nextOutputInput: string | undefined;
+  private outputError: string | undefined;
   private remainingMs = 10 * 60_000;
   private activeSince = 0;
   private unsubscribeTools: (() => void) | undefined;
@@ -61,7 +63,21 @@ export class SessionRuntime {
     instance.redact = redact;
     const handlers = trustedExtension(new Map([
       ['message_end', [async (event: unknown) => ({ message: redact((event as MessageEndEvent).message) })]],
-      ['context', [async (event: unknown) => { const result = instance.identity.context(event as ContextEvent); dependencies?.onContext?.({ type: 'context', ...result }); return result; }]],
+      ['context', [async (event: unknown) => {
+        if (instance.nextOutputInput && dependencies?.tools?.advanceOutput) {
+          const id = instance.nextOutputInput; instance.nextOutputInput = undefined;
+          try {
+            instance.outputDirectory = await dependencies.tools.advanceOutput(id);
+            instance.manager.appendCustomEntry('data_agent.output_version', { inputId: id, directory: instance.outputDirectory });
+            instance.flush();
+          } catch { instance.outputError = '无法切换后续提问的产物版本，本轮已停止。'; instance.adapter.error = instance.outputError; }
+        }
+        const result = instance.identity.context(event as ContextEvent); dependencies?.onContext?.({ type: 'context', ...result }); return result;
+      }]],
+      ['context_with_system', [async (event: unknown) => {
+        const messages = (event as ContextWithSystemEvent).messages;
+        return { messages: instance.outputDirectory ? [...messages, { role: 'system' as const, content: `当前输入的产物输出目录和工具默认工作目录：${instance.outputDirectory}。此前目录仅供读取；新的报告、图表和脚本写到当前目录。此路径更新优先于历史中的输出目录。`, timestamp: 0 }] : messages };
+      }]],
       ['before_provider_request', [async (event: unknown) => {
         const payload = (event as BeforeProviderRequestEvent).payload;
         instance.recordRequest(payload); dependencies?.onRequest?.(payload);
@@ -71,7 +87,7 @@ export class SessionRuntime {
       skills: config.skillsDirectory ? loadSkillsFromDir({ dir: config.skillsDirectory, source: 'bundled' }).skills : [],
       extensions: { extensions: [handlers], errors: [], runtime: createExtensionRuntime() } });
     const { session } = await createAgentSession({ cwd: config.outputDirectory ?? config.workspace, agentDir: dirname(config.file), sessionManager: instance.manager, modelRuntime: runtime, model, thinkingLevel: model.reasoning ? 'high' : 'off',
-      settingsManager: SettingsManager.inMemory({ retry: { enabled: true, maxRetries: 2 }, compaction: { enabled: true }, cacheWarming: 'off' }), resourceLoader: loader,
+      settingsManager: SettingsManager.inMemory({ retry: { enabled: true, maxRetries: 2 }, compaction: { enabled: true }, steeringMode: 'one-at-a-time', followUpMode: 'one-at-a-time', cacheWarming: 'off' }), resourceLoader: loader,
       tools: dependencies?.tools ? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'ask_clarification'] : ['read'], customTools: dependencies?.tools ? genericTools(dependencies.tools, redact) : [readTool(config.workspace, config.protectedRoots)],
     });
     instance.session = session;
@@ -88,6 +104,7 @@ export class SessionRuntime {
     // public stream entry instead, so request 21 never reaches the provider (including retries).
     const stream = session.agent.streamFunction;
     session.agent.streamFunction = (...args) => {
+      if (instance.outputError) throw new Error(instance.outputError);
       if (++instance.requests > 20) {
         instance.adapter.error = '已达到本次任务的 20 次模型请求上限。';
         throw new Error(instance.adapter.error);
@@ -96,7 +113,11 @@ export class SessionRuntime {
       return stream(selectedModel, context, { ...options, maxTokens: Math.min(options?.maxTokens ?? 16_384, 16_384) });
     };
     session.subscribe(event => {
-      if (event.type === 'message_start' && event.message.role === 'user') instance.identity.consumed(event.message);
+      if (event.type === 'message_start' && event.message.role === 'user') {
+        const id = inputId(messageText(event.message));
+        if (id && instance.identity.snapshot().find(input => input.inputId === id)?.kind === 'followUp') instance.nextOutputInput = id;
+        instance.identity.consumed(event.message);
+      }
       instance.adapter.accept(redact(event));
       if (event.type === 'turn_end' || event.type === 'agent_settled') instance.identity.reconcile();
       if (event.type === 'message_end' && event.message.role === 'assistant') {
@@ -133,7 +154,7 @@ export class SessionRuntime {
   }
   snapshot() { return this.redact({ ...this.adapter.snapshot(), ...(this.outputDirectory ? { outputDirectory: this.outputDirectory } : {}), interactions: structuredClone(this.interactions), requests: structuredClone(this.requestEvidence), ...(this.usage ? { usage: { ...this.usage } } : {}), ...(this.responseModel ? { responseModel: this.responseModel } : {}) }); }
   private pauseTimer() { clearTimeout(this.timer); if (this.activeSince) this.remainingMs -= Date.now() - this.activeSince; this.activeSince = 0; }
-  private startTimer() { this.activeSince = Date.now(); this.timer = setTimeout(() => { this.adapter.error = '任务超过 10 分钟活跃执行时限，已停止。'; void this.cancel(); }, Math.max(1, this.remainingMs)); }
+  private startTimer() { this.activeSince = Date.now(); this.timer = setTimeout(() => { this.adapter.error = '任务超过 10 分钟活跃执行时限，已停止。'; void this.cancel(true); }, Math.max(1, this.remainingMs)); }
   private schedule() { this.emitTimer ??= setTimeout(() => { this.emitTimer = undefined; this.publish(this.snapshot()); }, 40); }
   private flush() { clearTimeout(this.emitTimer); this.emitTimer = undefined; this.publish(this.snapshot()); }
   async submit(input: RunInput) {
@@ -151,9 +172,9 @@ export class SessionRuntime {
     }).finally(() => {
       clearTimeout(this.timer); this.running = false;
       this.identity.settle(this.cancelled); this.adapter.restore(this.manager);
-      this.adapter.state = this.adapter.error ? 'failed' : this.cancelled ? 'cancelled' : 'completed'; this.flush();
+      this.adapter.activity = null; this.adapter.state = this.adapter.error ? 'failed' : this.cancelled ? 'cancelled' : 'completed'; this.flush();
     });
   }
-  async cancel() { this.cancelled = true; this.session.clearQueue(); await this.session.abort(); }
+  async cancel(preserveError = false) { this.cancelled = true; if (!preserveError) this.adapter.error = null; this.session.clearQueue(); await this.session.abort(); }
   async dispose() { if (this.running) await this.cancel(); clearTimeout(this.timer); clearTimeout(this.emitTimer); this.unsubscribeTools?.(); this.session.dispose(); }
 }

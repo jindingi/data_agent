@@ -25,18 +25,20 @@ export class EventAdapter {
   private ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId' | 'hostEpoch'>;
   state: RuntimeSnapshot['state'] = 'starting';
   error: string | null = null;
+  activity: RuntimeSnapshot['activity'] = null;
   constructor(ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId' | 'hostEpoch'>, private identity: InputIdentity) {
     // TypeScript Pick is not runtime filtering: never retain/spread the full run config.
     this.ids = { sessionId: ids.sessionId, runId: ids.runId, hostEpoch: ids.hostEpoch };
   }
   restore(manager: SessionManager) {
     this.messages = [];
+    this.tools.clear();
     for (const entry of manager.getBranch()) {
       if (entry.type !== 'message') continue;
       this.messages.push(projectMessage(entry.id, entry.message, text => this.identity.strip(text)));
       const message = entry.message;
       if (message.role === 'assistant') for (const block of message.content) if (block.type === 'toolCall') {
-        this.tools.set(block.id, { id: block.id, name: block.name, arguments: stringify(block.arguments), output: '', status: 'running' });
+        this.tools.set(block.id, { id: block.id, name: block.name, arguments: stringify(block.arguments), output: '执行已结束，未收到完整工具结果', status: 'failed' });
       }
       if (message.role === 'toolResult') {
         const tool = this.tools.get(message.toolCallId);
@@ -46,6 +48,9 @@ export class EventAdapter {
     this.currentId = null;
   }
   accept(event: AgentSessionEvent) {
+    if (event.type === 'auto_retry_start') this.activity = { kind: 'retry', attempt: event.attempt, maxAttempts: event.maxAttempts };
+    if (event.type === 'compaction_start') this.activity = { kind: 'compaction', reason: event.reason };
+    if (event.type === 'auto_retry_end' || event.type === 'compaction_end' || event.type === 'agent_settled') this.activity = null;
     if (event.type === 'message_start') this.currentId = `${this.ids.hostEpoch}:${++this.ordinal}`;
     if (event.type === 'message_start' || event.type === 'message_update' || event.type === 'message_end') {
       const id = this.currentId ?? `${this.ids.hostEpoch}:${++this.ordinal}`;
@@ -62,6 +67,6 @@ export class EventAdapter {
     }
   }
   snapshot(): RuntimeSnapshot {
-    return structuredClone({ schemaVersion: 1, ...this.ids, seq: ++this.seq, state: this.state, messages: this.messages, tools: [...this.tools.values()], inputs: this.identity.snapshot(), queuedInputs: this.identity.pending(), error: this.error });
+    return structuredClone({ schemaVersion: 1, ...this.ids, seq: ++this.seq, state: this.state, messages: this.messages, tools: [...this.tools.values()], inputs: this.identity.snapshot(), queuedInputs: this.identity.pending(), error: this.error, activity: this.activity });
   }
 }

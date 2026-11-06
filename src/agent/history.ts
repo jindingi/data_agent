@@ -3,7 +3,7 @@ import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { inspectSessionFile } from '../node/session-integrity';
 import { AppError } from '../shared/errors';
 import type { HistoryItem } from '../shared/models';
-import { stripEnvelope } from './input-identity';
+import { stripEnvelope, inputId, messageText } from './input-identity';
 import { projectMessage } from './event-adapter';
 import type { MessageView } from '../shared/runtime';
 
@@ -23,5 +23,10 @@ export function readHistory(file: string, workspace: string, expectedId: string)
     items.push({ id: entry.id, role: message.role, text: message.role === 'user' ? stripEnvelope(text, known) : text });
     messages.push(projectMessage(entry.id, message, text => stripEnvelope(text, known)));
   }
-  return { piSessionId: manager.getSessionId(), items, messages };
+  const inputs = manager.getEntries().flatMap(entry => {
+    if (entry.type !== 'message' || entry.message.role !== 'user') return [];
+    const id = inputId(messageText(entry.message));
+    return id && known.has(id) ? [{ inputId: id, state: 'committed' as const, entryId: entry.id }] : [];
+  });
+  return { piSessionId: manager.getSessionId(), items, messages, inputs };
 }

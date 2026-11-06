@@ -16,6 +16,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('models.key'), provider: z.string().min(1).max(100), key: z.string().max(4096) }).strict(),
   z.object({ ...base, type: z.literal('runtime.submit'), sessionId: z.string().uuid(), input: inputSchema }).strict(),
   z.object({ ...base, type: z.literal('runtime.snapshot'), sessionId: z.string().uuid() }).strict(),
+  z.object({ ...base, type: z.literal('runtime.discardDraft'), sessionId: z.string().uuid(), inputId: z.string().uuid() }).strict(),
   z.object({ ...base, type: z.literal('runtime.cancel'), sessionId: z.string().uuid() }).strict(),
   z.object({ ...base, type: z.literal('interaction.answer'), interactionId: z.string().uuid(), sessionId: z.string().uuid(), runId: z.string().uuid(), hostEpoch: z.string().uuid(), digest: z.string().length(64), answer: interactionAnswerSchema }).strict(),
   z.object({ ...base, type: z.literal('sessions.list'), search: z.string().max(200).default(''), archived: z.boolean().default(false) }).strict(),

@@ -128,7 +128,7 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`interactions`、`output_versions`、`artifacts`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。后续阶段增加 `run_files`（当次选用路径/大小）、未发送草稿；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`interactions`、`output_versions`、`artifacts`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。后续阶段增加 `run_files`（当次选用路径/大小）；不另建聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
 添加/提交任务时校验所选 CSV 合计 ≤100,000,000 bytes；排队到实际启动时复核存在性与大小。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
@@ -166,6 +166,8 @@ SDK 原生 steer/followUp 没有应用 inputId 参数；同文本消息不能靠
 在 turn_end/agent_settled 或命令最终收束后读取实际 JSONL record 确认映射；恢复先加载已有 committed，再幂等补缺失映射，不反复 append 同一 ACK。应用生成 UUID 并校验登记表，只信应用外层标记。本次确认是完整 record 可读，不声称 fsync 级断电耐久性。具体格式、上下文处理、相同文本与恢复结果见 [验证入口与证据说明](../validation/README.md)。应用自带的可信身份 hook 可以显式加载；关闭的是宿主/用户的自动资源发现，不是禁止应用自带适配代码。
 
 确认持久化后才把 input 标 committed；未知结果标 unknown，不能自动重放。abort 后显式清 SDK 队列，未消费输入保留未发送。同一文本的两次用户输入仍是两个 inputId。
+
+Main 在接受输入时原子登记 run_inputs 与 input_drafts，再交给 Host；全局排队时同样保留文字。重启后只读原生历史对账 committed，清理已落盘草稿；剩余未知/取消输入通过 Main 的 unsentInputs 投影呈现，可放回输入框或显式移除，不自动重发。未发送输入跨后续 run 保留，移除按会话和 inputId 校验，不能删除活动队列中的输入。JSONL 仍为唯一永久会话内容。用户主动停止会清除暂时性模型错误，以 cancelled 收束；运行超时保留限额错误，以 failed 收束。
 
 ## 7. 通用工具、资源和模型
 
@@ -216,7 +218,7 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 ## 9. 通用产物管理与 UI 展示
 
-应用分配 run/version 输出位置；P4 为每个 run 分配一个版本，P5 补充同一持续执行 run 内 follow-up 的版本切换。Main 在输出位置扫描候选文件并登记到 SQLite artifacts，身份、归属、真实路径、文件类型、尺寸和 hash 由 Main 获取。版本 ID 或 artifact ID 冲突拒绝登记；模型自报的文件路径仍须检查。
+应用分配 run/version 输出位置；普通提问创建新 run/version；同一持续执行 run 的 follow-up 在 SDK 实际消费输入后，通过受信 context hook 等待 Main 发布上一版并分配新版本。Main 更新工具默认目录，Host 更新该次模型上下文中的输出目录；steer 保持当前版本。版本分配失败停止本轮，不让下一次模型请求继续写旧目录。Main 在输出位置扫描候选文件并登记到 SQLite artifacts，身份、归属、真实路径、文件类型、尺寸和 hash 由 Main 获取。版本 ID 或 artifact ID 冲突拒绝登记；模型自报的文件路径仍须检查。
 
 P4 的 `ArtifactService` 在 SDK 任务终态后扫描应用分配的输出目录；只登记普通文件，跳过隐藏文件与符号链接。每版最多 1,000 个文件、5,000 个扫描条目、500 MiB；报告预览最多 2 MiB，超限仍可导出。PNG 在大小/像素检查后交给 Electron 实际解码。空文件或损坏图片保留登记并标明无法展示，不将其状态当成任务执行或分析正确性结论。应用退出先等待已开始的目录分配/登记再关闭 SQLite，重启扫描未发布版本以保留已生成文件。
 

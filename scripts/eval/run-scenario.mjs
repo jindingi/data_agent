@@ -19,36 +19,13 @@ export async function runScenario(id, root, { packaged = false } = {}) {
   for(const file of execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{encoding:'utf8'}).split('\0').filter(Boolean).sort()) if(existsSync(file)) sourceHash.update(file).update('\0').update(readFileSync(file)).update('\0');
   evidence.sourceTreeHash=sourceHash.digest('hex');
   writeFileSync(join(root,'evaluation.json'),JSON.stringify(evidence,null,2));
-  const reviewed=new Set(), answered=new Set(); evidence.reviewedApprovals=[];
-  const reviewMode=process.env.DATA_AGENT_EVAL_REVIEW==='1';
-  evidence.reviewMode=reviewMode;
   try {
     app=await startApp(join(root,'application'),{packaged,pickFiles:paths});const page=app.page;await configure(page,key);
     await page.getByRole('button',{name:'添加 CSV 文件',exact:true}).click();
     await page.getByRole('button',{name:`移除文件 ${Object.keys(scenario.files).at(-1)}`,exact:true}).waitFor();
     sessionId=await until(()=>page.getByTestId('session-title').getAttribute('data-session-id'),'imported session');
     await page.getByRole('textbox',{name:'分析需求'}).fill(scenario.task);await page.getByRole('button',{name:'发送分析需求',exact:true}).click();
-    const final=await until(async()=>{
-      const value=await rpc(page,{type:'runtime.snapshot',sessionId});
-      if(value?.interactions?.length) {
-        evidence.pendingInteractions=value.interactions;
-        writeFileSync(join(root,'pending-interactions.json'),JSON.stringify({sessionId,outputDirectory:value.outputDirectory,interactions:value.interactions},null,2));
-        if(!reviewMode) throw new Error('Scenario needs human interaction; evidence retained for review.');
-        for(const interaction of value.interactions) {
-          if(answered.has(interaction.id))continue;
-          if(!reviewed.has(interaction.id)){console.log(`Review required: ${join(root,'pending-interactions.json')}`);reviewed.add(interaction.id);}
-          const decisionPath=join(root,`review-${interaction.id}.json`);
-          if(!existsSync(decisionPath))continue;
-          const decision=JSON.parse(readFileSync(decisionPath,'utf8'));
-          assert.equal(decision.digest,interaction.digest);assert(interaction.kind==='approval'&&['allow_once','deny'].includes(decision.decision)&&typeof decision.reason==='string');
-          await page.locator(`[data-interaction-id="${interaction.id}"]`).getByRole('button',{name:decision.decision==='allow_once'?'允许这一次':'拒绝',exact:true}).click();
-          answered.add(interaction.id);
-          evidence.reviewedApprovals.push({id:interaction.id,digest:interaction.digest,decision:decision.decision,reason:decision.reason});
-          writeFileSync(join(root,'evaluation.json'),JSON.stringify(evidence,null,2));
-        }
-      }
-      return value&&['completed','failed','cancelled'].includes(value.state)?value:null;
-    },'real analysis task finished',reviewMode?900_000:300_000);
+    const final=await waitReviewedRun(page,sessionId,root,evidence);
     evidence.final=final;evidence.sessionId=sessionId;evidence.sessionFile=join(root,'application/data/sessions',`${sessionId}.jsonl`);
     assert.equal(final.state,'completed',final.error??'Agent did not finish');
     const listing=await until(async()=>{const value=await rpc(page,{type:'artifacts.list',sessionId});return value.versions.some(version=>version.runId===final.runId&&version.state==='published')?value:null;},'analysis artifacts published');
@@ -68,4 +45,32 @@ export async function runScenario(id, root, { packaged = false } = {}) {
   finally {await app?.stop();evidence.elapsedMs=Date.now()-started;writeFileSync(join(root,'evaluation.json'),JSON.stringify(evidence,null,2));}
   if(evidence.status!=='passed')throw new Error(evidence.error);
   return {evaluationId:id,evidence:join(root,'evaluation.json'),programChecks:evidence.programChecks,judgeStatus:evidence.judgeStatus};
+}
+
+/** Explicit review decisions always travel through the actual approval UI. */
+export async function waitReviewedRun(page,sessionId,root,evidence,previousRunId) {
+  const reviewed=new Set(), answered=new Set(); evidence.reviewedApprovals=[];
+  const reviewMode=process.env.DATA_AGENT_EVAL_REVIEW==='1';
+  evidence.reviewMode=reviewMode;
+  return until(async()=>{
+      const value=await rpc(page,{type:'runtime.snapshot',sessionId});
+      if(value?.interactions?.length) {
+        evidence.pendingInteractions=value.interactions;
+        writeFileSync(join(root,'pending-interactions.json'),JSON.stringify({sessionId,outputDirectory:value.outputDirectory,interactions:value.interactions},null,2));
+        if(!reviewMode) throw new Error('Scenario needs human interaction; evidence retained for review.');
+        for(const interaction of value.interactions) {
+          if(answered.has(interaction.id))continue;
+          if(!reviewed.has(interaction.id)){console.log(`Review required: ${join(root,'pending-interactions.json')}`);reviewed.add(interaction.id);}
+          const decisionPath=join(root,`review-${interaction.id}.json`);
+          if(!existsSync(decisionPath))continue;
+          const decision=JSON.parse(readFileSync(decisionPath,'utf8'));
+          assert.equal(decision.digest,interaction.digest);assert(interaction.kind==='approval'&&['allow_once','deny'].includes(decision.decision)&&typeof decision.reason==='string');
+          await page.locator(`[data-interaction-id="${interaction.id}"]`).getByRole('button',{name:decision.decision==='allow_once'?'允许这一次':'拒绝',exact:true}).click();
+          answered.add(interaction.id);
+          evidence.reviewedApprovals.push({id:interaction.id,digest:interaction.digest,decision:decision.decision,reason:decision.reason});
+          writeFileSync(join(root,'evaluation.json'),JSON.stringify(evidence,null,2));
+        }
+      }
+      return value&&value.runId!==previousRunId&&['completed','failed','cancelled','interrupted'].includes(value.state)?value:null;
+    },'real analysis task finished',reviewMode?900_000:300_000);
 }

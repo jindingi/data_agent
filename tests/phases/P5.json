@@ -1,0 +1,24 @@
+{
+  "phase": "P5",
+  "required": [
+    "P0-CHECK",
+    "P1-SCHEMA",
+    "P1-TREE",
+    "P2-STREAM",
+    "P2-SNAPSHOT",
+    "P2-IDENTITY",
+    "P2-PREFLIGHT",
+    "P3-APPROVAL",
+    "P4-ARTIFACT",
+    "P4-VERSIONS",
+    "P5-MULTITURN",
+    "P5-STEER",
+    "P5-FOLLOWUP",
+    "P5-STOP",
+    "P5-CRASH",
+    "P5-SWITCH",
+    "P5-WINDOW",
+    "P5-RETRY-COMPACT",
+    "P5-LIVE-RESUME"
+  ]
+}

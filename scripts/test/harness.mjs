@@ -45,7 +45,7 @@ export async function startApp(root, { packaged = false, automation = true, port
     }
     if (!exited) {
       child.kill('SIGTERM');
-      await Promise.race([exit, delay(3000)]);
+      await Promise.race([exit, delay(8000)]);
       if (!exited) { child.kill('SIGKILL'); await exit; }
     }
     try { await browser?.close(); } catch { /* App already exited. */ }

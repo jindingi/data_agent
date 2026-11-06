@@ -15,7 +15,7 @@ export class AgentProcess {
   private port: MessagePortMain | undefined;
   private pending = new Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   private ready: Promise<void>;
-  constructor(entry: string, onStatus: (status: HostStatus) => void, onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {}, onTool?: ToolHandler, onToolCancel?: (toolCallId: string) => void) {
+  constructor(entry: string, onStatus: (status: HostStatus) => void, onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {}, onTool?: ToolHandler, onToolCancel?: (toolCallId: string) => void, onOutput?: (inputId: string) => Promise<string>) {
     this.ready = new Promise((resolve, reject) => {
       const readyTimer = setTimeout(() => { reject(new AppError('HOST_TIMEOUT', 'Agent 进程启动超时')); this.stop(); }, 15_000);
       this.child = utilityProcess.fork(entry, [], {
@@ -32,6 +32,13 @@ export class AgentProcess {
         port1.on('message', ({ data }) => {
           const parsed = hostResponseSchema.safeParse(data);
           if (!parsed.success) return;
+          if (parsed.data.type === 'output.advance') {
+            const request = parsed.data;
+            void (onOutput ? onOutput(request.inputId) : Promise.reject(new Error('unsupported')))
+              .then(directory => this.port?.postMessage({ type: 'output.result', id: request.id, directory }))
+              .catch(() => { if (this.status === 'ready') this.port?.postMessage({ type: 'output.result', id: request.id, error: '无法切换产物版本，任务已停止' }); });
+            return;
+          }
           if (parsed.data.type === 'tool.cancel') { onToolCancel?.(parsed.data.toolCallId); return; }
           if (parsed.data.type === 'tool.request') {
             const request = parsed.data;

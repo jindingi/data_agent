@@ -42,6 +42,11 @@ export const migrations: Migration[] = [{ version: 1, sql: `
     UNIQUE(version_id,relative_path)
   );
   CREATE INDEX artifacts_session ON artifacts(session_id,created_at);
+` }, { version: 6, sql: `
+  CREATE TABLE input_drafts (
+    input_id TEXT PRIMARY KEY REFERENCES run_inputs(id) ON DELETE CASCADE,
+    text TEXT NOT NULL
+  );
 ` }];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');

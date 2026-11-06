@@ -100,5 +100,6 @@ export class ToolService {
   }
   cancelTool(runId: string, toolCallId: string) { for (const item of this.active) if (item.runId === runId && item.toolCallId === toolCallId) item.abort.abort(); }
   cancelRun(runId: string) { this.closed.add(runId); for (const item of this.active) if (item.runId === runId) item.abort.abort(); this.broker.cancelRun(runId); }
+  async settled(runId?: string) { await Promise.allSettled(runId ? [this.tails.get(runId)] : [...this.tails.values()]); }
   stop() { for (const item of this.active) item.abort.abort(); this.broker.stop(); this.processes.stop(); }
 }

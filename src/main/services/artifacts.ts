@@ -83,7 +83,7 @@ export class ArtifactService {
               }
             }
             if (kind === 'markdown' && stat.size > MAX_TEXT_BYTES) { value.state = 'too_large'; value.error = '报告超过 2 MiB，请导出后查看'; }
-            this.db.prepare('INSERT INTO artifacts VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(value.id, value.sessionId, value.runId, value.versionId, value.path, value.relativePath, value.kind, value.state, value.size, value.sha256, value.error, value.createdAt);
+            this.db.prepare('INSERT INTO artifacts VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(version_id,relative_path) DO UPDATE SET state=excluded.state,size=excluded.size,sha256=excluded.sha256,error=excluded.error').run(value.id, value.sessionId, value.runId, value.versionId, value.path, value.relativePath, value.kind, value.state, value.size, value.sha256, value.error, value.createdAt);
           } finally { await handle.close(); }
         }
       };

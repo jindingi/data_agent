@@ -39,7 +39,8 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'models.select': await catalogReady; return { ok: true, value: credentials.select(parsed.data.model) };
         case 'models.key': await catalogReady; return { ok: true, value: credentials.save(parsed.data.provider, parsed.data.key) };
         case 'runtime.submit': await catalogReady; return { ok: true, value: await runtime.submit(parsed.data.sessionId, parsed.data.input) };
-        case 'runtime.snapshot': return { ok: true, value: runtime.snapshot(parsed.data.sessionId) };
+        case 'runtime.snapshot': return { ok: true, value: await runtime.restoreSnapshot(parsed.data.sessionId) };
+        case 'runtime.discardDraft': runtime.discardDraft(parsed.data.sessionId, parsed.data.inputId); return { ok: true, value: null };
         case 'runtime.cancel': await runtime.cancel(parsed.data.sessionId); return { ok: true, value: null };
         case 'interaction.answer': {
           const input = parsed.data;
@@ -56,7 +57,7 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'sessions.open': {
           if (!runtime.snapshot(parsed.data.sessionId)) sessions.reconcile(parsed.data.sessionId);
           const session = sessions.get(parsed.data.sessionId);
-          const active = runtime.snapshot(session.id);
+          const active = await runtime.restoreSnapshot(session.id);
           // Active history comes from its sole writer's snapshot, not a second SessionManager.
           const transcript = !active && session.state === 'persisted' && session.piSessionId ? await host.readHistory(session.sessionFile, session.workspace, session.piSessionId) as { items: HistoryItem[]; messages: MessageView[] } : { items: [], messages: active?.messages ?? [] };
           return { ok: true, value: { session, files: sessions.files(session.id), history: transcript.items, messages: transcript.messages } };

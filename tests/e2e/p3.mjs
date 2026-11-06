@@ -18,9 +18,9 @@ export async function configure(page, key = 'synthetic-p3-fixture-key') {
   await page.getByRole('button', { name: '关闭设置' }).click();
 }
 export async function submit(page, text = 'Execute the requested fixture action.') {
-  const previous = await page.getByTestId('session-title').getAttribute('data-session-id');
+  const known = new Set((await rpc(page, { type: 'sessions.list' })).map(session => session.id));
   await page.getByRole('button', { name: '新会话', exact: true }).click();
-  const sessionId = await until(async () => { const id = await page.getByTestId('session-title').getAttribute('data-session-id'); return id && id !== previous ? id : null; }, 'new session selected');
+  const sessionId = await until(async () => { const id = await page.getByTestId('session-title').getAttribute('data-session-id'); return id && !known.has(id) ? id : null; }, 'new session selected');
   await page.getByRole('textbox', { name: '分析需求' }).fill(text);
   await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
   return sessionId;
@@ -29,7 +29,7 @@ async function interaction(page, sessionId, kind = 'approval') {
   await page.getByRole('region', { name: kind === 'approval' ? '安全审批' : '澄清问题', exact: true }).waitFor({ timeout: 30_000 });
   return until(async () => (await snapshot(page, sessionId))?.interactions?.find(value => value.kind === kind), 'interaction in authoritative snapshot');
 }
-export async function settled(page, sessionId) { return until(async () => { const value = await snapshot(page, sessionId); return value && ['completed','failed','cancelled'].includes(value.state) ? value : null; }, 'run settled', 60_000); }
+export async function settled(page, sessionId) { return until(async () => { const value = await snapshot(page, sessionId); return value && ['completed','failed','cancelled','interrupted'].includes(value.state) ? value : null; }, 'run settled', 60_000); }
 async function late(page, value, changes = {}) {
   const response = await page.evaluate(command => window.dataAgent.request(command), { type: 'interaction.answer', interactionId: value.id, sessionId: value.sessionId, runId: value.runId, hostEpoch: value.hostEpoch, digest: value.digest, answer: { kind: value.kind, ...(value.kind === 'approval' ? { decision: 'allow_once' } : { answer: 'late' }) }, ...changes });
   assert.equal(response.ok, false); assert.equal(response.error.code, 'INTERACTION_EXPIRED');
@@ -44,7 +44,7 @@ export const cases = {
       const final = await until(async () => {
         const value = await snapshot(app.page, sessionId);
         if (value?.interactions?.length) throw new Error('Live fixture unexpectedly requires interaction; inspect local evidence before approving.');
-        return value && ['completed','failed','cancelled'].includes(value.state) ? value : null;
+        return value && ['completed','failed','cancelled','interrupted'].includes(value.state) ? value : null;
       }, 'actual DeepSeek write/bash/read complete', 240_000);
       assert.equal(final.state, 'completed', final.error ?? 'live task failed');
       for (const name of ['write','bash','read']) assert(final.tools.some(tool => tool.name === name && tool.status === 'completed'), `Missing successful ${name}`);
@@ -117,7 +117,7 @@ print(json.dumps({'python':sys.executable,'libraries':{n:importlib.metadata.vers
           await page.getByRole('button', { name: '允许这一次', exact: true }).click();
         }
         const final = await settled(page, sessionId);
-        if (action === 'host_exit') assert.equal(final.state, 'failed');
+        if (action === 'host_exit') assert.equal(final.state, 'interrupted');
         if (action === 'cancel') assert.equal(final.state, 'cancelled');
         await late(page, pending);
         assert.equal(existsSync(target), action === 'close_reopen');
