@@ -11,6 +11,8 @@ import { cases as p3 } from '../../tests/e2e/p3.mjs';
 import { cases as p4 } from '../../tests/e2e/p4.mjs';
 import { cases as p5 } from '../../tests/e2e/p5.mjs';
 import { cases as p6 } from '../../tests/e2e/p6.mjs';
+import { cases as p7 } from '../../tests/e2e/p7.mjs';
+import { verifyRelease } from '../build/verify-release.mjs';
 
 const args = process.argv.slice(2).filter(x => x !== '--');
 const phase = args.find(a => /^P\d+$/.test(a));
@@ -36,7 +38,23 @@ function nativeCase(id) {
   if (matches.length !== 1 || matches[0].status !== 'passed') throw new Error('Native case missing, skipped or failed');
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
-const cases = { ...p0, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
+const cases = { ...p0, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...Object.fromEntries(nativeIds.map(id => [id, async () => nativeCase(id)])), 'P0-CHECK': async () => { command('typecheck', ['check']); command('unit', ['test:unit']); return { commands: ['pnpm check', 'pnpm test:unit'] }; } };
+cases['P7-ALL'] = async () => {
+  if (phase !== 'P7' || !manifest) throw new Error('P7-ALL requires the complete P7 gate');
+  const expected = manifest.required.filter(id => id !== 'P7-ALL');
+  if (summary.cases.length !== expected.length || expected.some(id => !summary.cases.some(c => c.id === id && c.status === 'passed'))) throw new Error('Not all required cases passed');
+  const probe = execFileSync(resolve('runtime/darwin-arm64/python/bin/python3'), ['-I','-B','-c', `import psutil,sys,os,json
+root=sys.argv[1];found=[]
+for p in psutil.process_iter(['pid','cmdline','cwd']):
+ if p.pid in (os.getpid(),os.getppid()):continue
+ try:
+  args=p.info['cmdline'] or [];cwd=p.info['cwd'] or '';home=p.environ().get('DATA_AGENT_HOME','')
+  if cwd.startswith(root+'/') or home.startswith(root+'/') or any(root+'/' in arg for arg in args):found.append({'pid':p.pid,'name':p.name()})
+ except (psutil.NoSuchProcess,psutil.AccessDenied):pass
+print(json.dumps(found))`,dir], {encoding:'utf8'});
+  const residuals=JSON.parse(probe);if(residuals.length)throw new Error(`Test process residuals: ${JSON.stringify(residuals)}`);
+  return { requiredCasesPassed: expected.length, residuals, release: verifyRelease() };
+};
 function save() {
   summary.finished = new Date().toISOString(); summary.total = summary.cases.length;
   summary.passed = summary.cases.filter(c => c.status === 'passed').length;
@@ -61,10 +79,11 @@ try {
   if (caseIndex >= 0 && !selected) throw new Error('--case requires a case ID');
   if (phase && selected) throw new Error('A phase gate must run all required cases; use test:e2e -- --case for targeted testing');
 
-  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--live') ? Object.keys(p2) : args.includes('--integration') ? nativeIds : args.includes('--packaged') ? ['P0-PACKAGE'] : [...Object.keys(p0).filter(id => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
+  let ids = manifest?.required ?? (selected ? [selected] : args.includes('--packaged') ? args.includes('--live') ? ['P7-LIVE'] : ['P7-PACKAGE', 'P7-OFFLINE', 'P7-CDP', 'P7-DEFAULTS'] : args.includes('--live') ? Object.keys(p2) : args.includes('--integration') ? nativeIds : [...Object.keys(p0).filter(id => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
   if (!ids.length || ids.some(id => !cases[id])) throw new Error('Missing or unknown required test');
   if (!args.includes('--no-build')) command('build', ['build']);
-  if (ids.some(id => ['P0-PACKAGE', 'P3-RUNTIME'].includes(id))) { command('runtime', ['runtime:verify']); command('package', ['exec', 'electron-builder', '--mac', 'dir', '--arm64']); }
+  if (args.includes('--no-package')) { if (!selected) throw new Error('--no-package is only for targeted checks'); verifyRelease(); }
+  if (!args.includes('--no-package') && ids.some(id => ['P0-PACKAGE', 'P3-RUNTIME'].includes(id) || id.startsWith('P7-') && id !== 'P7-USABILITY')) { command('runtime', ['runtime:verify']); command('package', ['exec', 'electron-builder', '--mac', 'dir', '--arm64']); }
   for (const id of ids) {
     const started = Date.now();
     try { const detail = await cases[id]({ dir }); summary.cases.push({ id, status: 'passed', ms: Date.now() - started, detail }); }

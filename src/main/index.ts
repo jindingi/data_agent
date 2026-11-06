@@ -31,6 +31,8 @@ if (!automation) {
 const paths = getAppPaths(process.env, automation);
 ensureAppPaths(paths);
 if (process.env.DATA_AGENT_USER_DATA) app.setPath('userData', process.env.DATA_AGENT_USER_DATA);
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) { console.log('Data Agent already running'); app.exit(0); }
 const here = fileURLToPath(new URL('.', import.meta.url));
 const rendererFile = join(here, '../renderer/index.html');
 const rendererURL = !app.isPackaged && process.env.ELECTRON_RENDERER_URL ? process.env.ELECTRON_RENDERER_URL : pathToFileURL(rendererFile).href;
@@ -53,7 +55,7 @@ function createWindow() {
   window.on('closed', () => { window = null; });
   void window.loadURL(rendererURL);
 }
-app.whenReady().then(() => {
+if (primaryInstance) void app.whenReady().then(() => {
   db = openDatabase(paths.database);
   const sessions = new SessionService(db, paths);
   sessions.reconcile();
@@ -96,6 +98,7 @@ app.whenReady().then(() => {
   console.log('Data Agent ready');
   if (automation) writeFileSync(join(paths.home, 'automation.json'), JSON.stringify({ pid: process.pid, userData: app.getPath('userData'), paths, debugPort: app.commandLine.getSwitchValue('remote-debugging-port'), packaged: app.isPackaged }));
 }).catch((error) => { console.error('Startup failed:', error.message); app.exit(1); });
+app.on('second-instance', () => { if (!window && db) createWindow(); if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 app.on('activate', () => { if (!window && db) createWindow(); });
 app.on('window-all-closed', () => { /* macOS background tasks remain active. */ });
 app.on('before-quit', event => {

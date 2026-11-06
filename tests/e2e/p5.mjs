@@ -38,11 +38,14 @@ async function concurrentLifecycle(dir) {
       const bLive=await runningTool(page,b);const heartbeat=join(bLive.outputDirectory,'heartbeat.txt');await until(()=>existsSync(heartbeat)&&statSync(heartbeat).size>0,'B heartbeat');
       const c=await submit(page,'SESSION_C_MARKER');await rpc(page,{type:'sessions.rename',sessionId:c,title:'C queued'});
       assert.equal((await rpc(page,{type:'runtime.snapshot',sessionId:c})).state,'queued');assert.equal(fixture.requests.length,2);
+      for (const [name, status] of [['A approval','waiting_approval'],['B heartbeat','running'],['C queued','queued']]) await page.getByRole('button',{name:`打开会话 ${name}`,exact:true}).locator(`[data-session-activity="${status}"]`).waitFor();
       assert.equal(await page.getByRole('region',{name:'安全审批',exact:true}).count(),0);
       await page.getByRole('button',{name:'打开会话 A approval',exact:true}).click();await page.getByRole('region',{name:'安全审批',exact:true}).waitFor();
       const old=page;await rpc(page,{type:'automation.control',action:'close_reopen'});await until(()=>old.isClosed(),'last window closed');const size=statSync(heartbeat).size;
       page=await until(()=>app.browser.contexts()[0].pages().find(p=>p!==old&&!p.isClosed()),'native activate reopened');app.page=page;
       await page.getByRole('textbox',{name:'分析需求'}).waitFor();await until(()=>statSync(heartbeat).size>size,'B continues while window closed');
+      await page.getByRole('button',{name:'打开会话 A approval',exact:true}).locator('[data-session-activity="waiting_approval"]').waitFor();
+      await page.getByRole('button',{name:'打开会话 B heartbeat',exact:true}).locator('[data-session-activity="running"]').waitFor();
       const reopened=await rpc(page,{type:'runtime.snapshot',sessionId:a});assert.equal(reopened.interactions[0].id,approval.id);assert(!existsSync(outside));
       await page.getByRole('button',{name:'打开会话 A approval',exact:true}).click();await page.getByRole('button',{name:'停止',exact:true}).click();assert.equal((await settled(page,a)).state,'cancelled');
       const cPending=await until(async()=>{const x=await rpc(page,{type:'runtime.snapshot',sessionId:c});return x?.interactions?.[0];},'C gets released permit');

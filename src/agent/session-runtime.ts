@@ -76,7 +76,9 @@ export class SessionRuntime {
       }]],
       ['context_with_system', [async (event: unknown) => {
         const messages = (event as ContextWithSystemEvent).messages;
-        return { messages: instance.outputDirectory ? [...messages, { role: 'system' as const, content: `当前输入的产物输出目录和工具默认工作目录：${instance.outputDirectory}。此前目录仅供读取；新的报告、图表和脚本写到当前目录。此路径更新优先于历史中的输出目录。`, timestamp: 0 }] : messages };
+        const output = instance.outputDirectory ? `当前输入的产物输出目录和工具默认工作目录：${instance.outputDirectory}。此前目录仅供读取；新的报告、图表和脚本写到当前目录。此路径更新优先于历史中的输出目录。` : '';
+        const budget = `执行预算：本次持续执行最多20次模型请求，已发出${instance.requests}次（重试也计入），剩余最多${Math.max(0, 20 - instance.requests)}次。先交付用户要求的核心文件，再做可选美化；预留最后一次回复用于说明结果或未完成事项，不要用重复检查耗尽预算。`;
+        return { messages: [...messages, { role: 'system' as const, content: `${output}\n${budget}`, timestamp: 0 }] };
       }]],
       ['before_provider_request', [async (event: unknown) => {
         const payload = (event as BeforeProviderRequestEvent).payload;

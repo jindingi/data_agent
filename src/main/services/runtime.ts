@@ -28,6 +28,9 @@ export class RuntimeService {
     db.prepare("UPDATE runs SET state='interrupted',ended_at=? WHERE state IN ('queued','starting','running','waiting_approval','waiting_input')").run(new Date().toISOString());
     db.prepare("UPDATE run_inputs SET state='unknown' WHERE state='pending'").run();
   }
+  activeStates(): Record<string, RuntimeSnapshot['state']> {
+    return Object.fromEntries([...this.tasks.values()].filter(task => isActive(task.snapshot.state)).map(task => [task.snapshot.sessionId, task.snapshot.state]));
+  }
   snapshot(sessionId: string) {
     this.sessions.get(sessionId);
     const value = this.tasks.get(sessionId)?.snapshot ?? this.recovered.get(sessionId);

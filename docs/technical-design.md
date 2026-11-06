@@ -6,7 +6,7 @@
 
 本产品是支持数据分析工作的通用 AI 工作台。应用管理执行、交互、文件与状态；CSV 解析、分析代码、业务口径和结论由 Agent 负责，不实现业务结果验证器或运行时 Judge。
 
-采用单仓库、单 pnpm package 的 TypeScript Electron 应用。React + shadcn/ui + Tailwind + Zustand/reducer；流式 Markdown 使用 Streamdown；pi coding-agent SDK 直接运行于 utilityProcess；Main 使用 better-sqlite3 单写；Python/pandas/NumPy/Matplotlib/Seaborn、字体及通用搜索二进制随包提供。通用工具保持 read/write/edit/bash/grep/find/ls/ask_clarification。
+采用单仓库、单 pnpm package 的 TypeScript Electron 应用。React + shadcn/ui + Tailwind，界面状态使用 React hooks，运行快照按身份/序号合并；流式 Markdown 使用 Streamdown；pi coding-agent SDK 直接运行于 utilityProcess；Main 使用 better-sqlite3 单写；Python/pandas/NumPy/Matplotlib/Seaborn、字体及通用搜索二进制随包提供。通用工具保持 read/write/edit/bash/grep/find/ls/ask_clarification。
 
 electron-vite 构建 main/agent 两个 Node 入口，以及 preload/renderer；electron-builder 生成本机 `.app`。Python 可执行文件、标准库、扩展和字体放入真实资源目录，不塞进 ASAR。产品不要求用户安装 Node、Python、pip 或 Homebrew。
 
@@ -47,7 +47,7 @@ flowchart LR
 - InteractionBroker：按 sessionId/runId/toolCallId 绑定审批与澄清；关闭窗口不取消，Cmd+Q/停止/崩溃取消。
 - CredentialService：BYOK 加密持久化，只发送当前模型凭证到对应 Host；Renderer 不接收已保存的明文 key。
 - FileReferenceService：获取所选文件路径，检查真实路径、存在性、大小和合计大小。不读取 CSV 内容、不解析、不生成数据预览；不复制源文件、不监测外部替换、不维护数据版本。
-- ArtifactService：登记候选文件、分配/核对 artifact 身份，检查访问权限和展示条件，提供受控读取与导出；文件监听只提示重扫。不检查报告数值、关联键或分析结论。
+- ArtifactService：登记候选文件、分配/核对 artifact 身份，检查访问权限和展示条件，提供受控读取与导出；在任务收束时扫描登记本轮文件。不检查报告数值、关联键或分析结论。
 
 ### Agent Host
 
@@ -69,34 +69,32 @@ data_agent/
   electron.vite.config.ts / electron-builder.yml
   src/
     main/
-      index.ts / application.ts
+      index.ts                  # 启动、单实例、窗口和退出生命周期
       ipc/handlers.ts
-      services/                 # sessions, admission, supervisor, interactions,
-                                # credentials, file-references, artifacts
-      storage/database.ts
-      storage/repositories.ts
-      storage/migrations/*.sql
-      artifact-protocol.ts
+      services/                 # sessions, runtime, agent-process, interactions,
+                                # credentials, file-picker, artifacts, tools,
+                                # policy, deletion, logs
+      storage/database.ts       # schema、migration 和 SQLite 连接
     preload/index.ts
     agent/
       index.ts / session-runtime.ts
       input-identity.ts / event-adapter.ts / history.ts
-      model-runtime.ts / resource-loader.ts
+      models.ts / resource-loader.ts / redact.ts
       tools/ / tool-client.ts
     renderer/
-      app/ / components/ui/ / state/ / styles/
-      features/                 # sessions, chat, execution, inputs, artifacts,
-                                # interactions, settings
+      app/ / components/ui/ / lib/ / styles/
+      features/                 # sessions、runtime、artifacts；各自使用 hooks
     shared/contracts/           # Zod schemas + 可序列化命令/事件 DTO
     shared/models.ts / errors.ts
-    node/                       # app-paths, resource-paths, logging, process-runner
+    node/                       # app-paths, runtime-paths, path-policy, read-text,
+                                # output-budget, process-runner, session-integrity
   resources/
     skills/<name>/SKILL.md
     python/                     # 执行监督器等可信固定脚本，不含 CSV 预览/解析服务
     runtime-lock.json / requirements.hashed.lock
   runtime/darwin-arm64/          # 固定版本构建资源，生成物不提交
-  scripts/build/ / scripts/test/
-  tests/unit/ / integration/ / e2e/ / fixtures/ / phases/
+  scripts/build/ / scripts/test/ / scripts/eval/
+  tests/unit/ / integration/ / e2e/ / phases/  # 小型样本在测试中生成
   evaluations/fixtures/ / rubrics/ / results/  # 独立 Judge 效果评测，不接产品运行时
   validation/                   # 本次已执行的独立技术验证，不作为产品运行入口
   test-results/ / out/ / release/
@@ -105,7 +103,7 @@ data_agent/
 
 Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host 通过 shared contracts 通信，不能互相 import 实现；shared 不依赖 Node/Electron/pi；node 是可复用基础设施。TypeScript 不能替代 IPC 运行时校验。依赖方向用 lint 检查。
 
-P2 的具体实现将准入/进程路由放在 `main/services/runtime.ts`，进程传输放在 `agent-process.ts`，凭证在 `credentials.ts`；Host 使用 `agent/session-runtime.ts`、`input-identity.ts`、`event-adapter.ts`、`models.ts` 和固定 `resource-loader.ts`。Renderer 的 `features/runtime/` 提供快照订阅、模型设置和 Streamdown 过程展示。SQLite migrations 当前集中在 `storage/database.ts`，无需为小型初始 schema 拆出空模块；以上目录树同时列出了后续阶段的职责位置。
+具体实现将准入/进程路由放在 `main/services/runtime.ts`，进程传输放在 `agent-process.ts`，凭证在 `credentials.ts`；Host 使用 `agent/session-runtime.ts`、`input-identity.ts`、`event-adapter.ts`、`models.ts` 和固定 `resource-loader.ts`。Renderer 的 `features/runtime/` 提供快照订阅、模型设置和 Streamdown 过程展示。SQLite migrations 集中在 `storage/database.ts`；上面的目录树对应实际工程，没有为规划职责额外创建空模块。
 
 P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可信 `resources/python/inspect_policy.py` 做非执行式检查，`interactions.ts` 负责一次性授权和澄清。Host 的 `tool-client.ts` 只传输工具请求/输出/交互，`tool.interaction` 进入 Host 快照后沿同一 seq 通道更新 UI，避免 Main/Host 各自递增状态序号。取消先由 Host 标记 SDK 中止，再等待 Main 的实际工具进程清理；普通用户停止不误报为模型失败。
 
@@ -149,7 +147,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 - retry/compaction 显示状态；`agent_end` 不一律代表最终完成。
 - `agent_settled` 表示已经启动的持续执行收束；prompt/preflight rejection 也必须单独处理。
 
-运行状态：queued → starting → running / waiting_approval / waiting_input → cancelling 或终态 completed/failed/cancelled/interrupted。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
+运行状态：queued → starting → running / waiting_approval / waiting_input → 终态 completed/failed/cancelled/interrupted。取消过程中等待实际工具回收，不单独持久化 cancelling 状态。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
 
 运行终态与文件展示状态分开：`runs.state` / `RuntimeSnapshot.state` 记录 SDK/进程是否完成；P4 的 `ArtifactRecord.state` 使用 ready/empty/too_large/invalid/changed/missing 描述文件访问和展示条件（类型还预留 unsupported）。输出版本状态为 open/published，登记错误另存 error。ready 不表示内容正确，普通文件仍可能需要导出后用其他应用打开；缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
 
@@ -235,6 +233,8 @@ Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载�
 ## 10. 执行限额与可观察性
 
 初始产品默认值：单工具执行 180 秒；单 run 活跃执行时间 10 分钟、最多 20 次模型请求；HTTP 暂时性失败最多重试 2 次且计入限额。工作台不判定业务错误或统计“业务自修复次数”；Agent 可在总预算内自行修复代码或解释无法完成的原因。等待用户审批/澄清不计活跃执行计时，但继续占会话名额，可显式停止。截断日志不截断错误状态。
+
+每次 `context_with_system` 给模型提供当前输出目录和剩余请求预算，内置 skill 引导先交付核心文件、再做可选美化并预留最终回复。提示只是帮助 Agent 规划；20 次硬上限及错误状态不因模型声称完成而改变。
 
 工具单次 UI 文本有界，进程输出保留前 60 KiB 加截断提示（低于 64 KiB）；进程日志每 run 合计最多保留最早 10 MiB，超出部分不再写盘。`logs.list/page` 按 sessionId 与登记 logId 读取，每页 32 KiB、保留 UTF-8 字符边界，不接受任意路径。会话界面每页至多 20 条可见消息，正文/思考每段约 8 KiB，可翻到末尾；正文和思考不再在 Host 投影处丢弃长文本，原生 JSONL 仍保存完整消息。报告面板可展开。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；初始 run 产物目录上限 500 MiB（含同一 run 的各个输出版本）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
 

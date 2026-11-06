@@ -19,12 +19,14 @@
     "test:integration": "node scripts/test/verify.mjs --integration",
     "test:e2e": "node scripts/test/verify.mjs --e2e",
     "test:e2e:packaged": "node scripts/test/verify.mjs --packaged",
+    "test:e2e:packaged:live": "node scripts/test/verify.mjs --packaged --live",
     "verify:phase": "node scripts/test/verify.mjs",
     "test:integration:live": "node scripts/test/verify.mjs --live",
     "runtime:prepare": "node scripts/build/prepare-runtime.mjs",
     "runtime:verify": "node scripts/build/verify-runtime.mjs",
     "eval:prepare": "pnpm build && node scripts/eval/prepare.mjs",
-    "test:e2e:live": "node scripts/test/verify.mjs --live"
+    "test:e2e:live": "node scripts/test/verify.mjs --live",
+    "verify:release": "node scripts/build/verify-release.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.5.0",

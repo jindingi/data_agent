@@ -1,6 +1,6 @@
 # MVP 分阶段开发、程序验收与 Agent 效果评测计划
 
-更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列 pnpm 产品命令仍需在对应阶段实现，不能与现有探针命令混淆。
+更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列 pnpm 产品命令已在正式工程实现；它们与独立探针入口分开维护。
 
 ## 1. 两类验证与完成规则
 
@@ -20,7 +20,7 @@
 - 修复失败后重跑相关用例；完整保留前次失败记录。不能无限重试模型直到碰巧通过文件交付断言；Judge 质量评价另行保留，不用重复采样隐藏差评。
 - 所有自动验收都运行于独立临时数据根目录，禁止使用或清理真实 `~/.data_agent`。
 
-当前逐阶段状态见 [实施进度](implementation-status.md)，完整 P0–P7 交付尚未完成；技术前置验证单独记录为实际通过/失败及限制。不得把已验证能力写成“以后再研究”，也不得把探针通过写成产品 E2E 已通过。
+当前逐阶段状态见 [实施进度](implementation-status.md)，P0–P7 已完成本机交付验收；技术前置验证单独记录为实际通过/失败及限制。不得把已验证能力写成“以后再研究”，也不得把探针通过写成产品 E2E 已通过。
 
 现有可执行入口（实际存在）：`python3 validation/policy/probe.py`、`validation/pi/` 的 SDK/live runner、`validation/runtime/` 的运行时准备与哈希/工具验证脚本、`validation/electron/` 的真实 CDP/打包 runner。精确环境、命令及证据见 [验证入口与证据说明](../validation/README.md)。产品开发应复用已验证机制，仅将工作台流程断言移入正式测试；旧探针的业务 oracle、metrics schema 和数值断言不迁移为产品门禁。只在集成发生变化时再验证相应边界。
 
@@ -28,7 +28,7 @@
 
 ### 阶段完成后的 Git 提交
 
-**P0–P7 每个阶段完成后必须提交代码。** 验收通过后，同步实现、测试和文档，检查暂存区无凭证、生成物或临时结果，再创建明确标注阶段的 commit；提交说明记录验收命令与结果。允许阶段内小步提交，但未通过必需验收只能标为 WIP，不能宣称阶段完成。阶段完成提交后核对 commit ID 与工作区状态，再进入下一阶段。详见 [版本管理规则](repository-workflow.md)。当前初始规划提交不计为 P0 完成，阶段提交也不自动 push。
+**P0–P7 每个阶段完成后必须提交代码。** 验收通过后，同步实现、测试和文档，检查暂存区无凭证、生成物或临时结果，再创建明确标注阶段的 commit；提交说明记录验收命令与结果。允许阶段内小步提交，但未通过必需验收只能标为 WIP，不能宣称阶段完成。阶段完成提交后核对 commit ID 与工作区状态，再进入下一阶段。详见 [版本管理规则](repository-workflow.md)。初始规划提交不计为 P0 完成，阶段提交也不自动 push。
 
 ## 2. 本地 DeepSeek 真实集成测试
 
@@ -83,7 +83,7 @@ pnpm verify:phase -- P2
 | `pnpm test:e2e:packaged` | 对明确指定的 .app 执行关键 CDP 用例，默认确定性模型 |
 | `pnpm test:e2e:packaged:live` | 对同一 .app 用固定 DeepSeek 完成分析与恢复 |
 | `pnpm verify:phase -- Pn` | 执行阶段清单，汇总结果；不得因未实现或 skip 返回成功 |
-| `pnpm verify:release` | 验证指定发布产物、完整必需程序回归；签名公证仅属未来公开分发检查 |
+| `pnpm verify:release` | 核对实际 .app 与当前构建/资源的 hash、架构、许可证和打包范围；必须与完整 P7 程序门禁一起通过，静态检查不能代替运行回归 |
 | `pnpm eval:prepare` | 执行/收集固定 Agent 任务，打包 Judge 所需证据；仅表示证据准备结果，不自动给出质量分数 |
 
 程序测试命令提供统一 `--case <case-id>` 过滤能力，由项目 runner 解析并转给对应测试框架；阶段门禁使用显式 ID 清单，避免模糊 grep 漏测。下文 case ID 是需要落实的验收合同。
@@ -266,12 +266,17 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 
 | Case ID | 自动成功标准 |
 | --- | --- |
+| P7-USABILITY | 真实磁盘 File 经 CDP 拖拽进入 preload 并登记原路径；不解析 CSV；输入区思考设置持久化；复制 Markdown 与文件内容一致；窄窗口可展开阅读报告并返回输入 |
 | P7-PACKAGE | 全新临时用户数据目录、移除开发者工具 PATH 后启动 .app；无本地源码绝对路径，所有必需资源/库存在且 hash/架构匹配 |
 | P7-OFFLINE | 测试启动器阻断外网、仅保留 loopback，使用本地确定性响应源完成导入/分析/绘图/恢复；无 pip/npm/二进制自动下载；该用例与需要联网的 P7-LIVE 分开运行 |
 | P7-CDP | 对实际 .app 经 CDP 完成导入→图表/报告→多轮→重启恢复→审批拒绝→停止；日志无未处理异常 |
 | P7-LIVE | 同一 .app 使用 DEEPSEEK_API_KEY 与 deepseek-flash 完成 P4-LIVE-ANALYSIS、P5-LIVE-RESUME；不能只测试开发服务器 |
 | P7-DEFAULTS | 正常启动无 CDP 端口、无测试 adapter/fixture 模型自动启用；用户需显式配置 BYOK，未附带开发密钥 |
 | P7-ALL | 所有必需确定性回归与本阶段 live 通过；阶段清单无必需 skip/todo，运行残留进程为 0 |
+
+P7 清单汇总 P0–P6 全部确定性检查，加上本阶段打包用例；真实模型采用同一 .app 的 J1 初次分析与 J5 重启追问，并分别完成独立 Judge。侧栏并发/排队/待审批状态由 P5-SWITCH/P5-WINDOW 覆盖，正常启动的单实例保护由 P7-DEFAULTS 覆盖。
+
+离线检查由测试启动器用 macOS Seatbelt 阻断应用进程树的外网，仅允许本地响应源和 IPC；固定 Python 探针及其子进程对保留测试 IP 的连接均须返回 EPERM。macOS 不支持在该外层测试策略内再次初始化 Chromium Seatbelt，因此仅 P7-OFFLINE 启动参数包含 `--no-sandbox`。该用例证明离线依赖完整性，不证明 Renderer 隔离；P7-CDP 与正常生产启动仍使用 `sandbox: true`、contextIsolation 和 CSP。产品的 Agent 工具执行不使用沙箱，维持已确认的规则/审批策略。
 
 **门禁：** `pnpm verify:phase -- P7` + `pnpm verify:release`；此处 release 指本机可用 `.app` 的交付检查。签名、公证和安装弹窗不纳入本期必需通过项，不用缺证书阻塞 MVP。视觉观感可补充人工检查，不代替自动门禁。
 

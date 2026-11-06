@@ -57,5 +57,12 @@ export function useSessions(search: string, archived: boolean, onError: (message
     if (!selected) return;
     await request({ type: 'files.remove', sessionId: selected, fileId }); await load();
   }
-  return { list, selected, detail, select, create, rename, archiveCurrent, pickFiles, removeFile, refresh, load };
+  async function addFiles(files: File[]) {
+    const sessionId = selectedRef.current ?? (await create())?.id;
+    if (!sessionId) return;
+    const result = await window.dataAgent.addFiles(sessionId, files);
+    if (!result.ok) throw new Error(result.error.message);
+    await load();
+  }
+  return { list, selected, detail, select, create, rename, archiveCurrent, pickFiles, addFiles, removeFile, refresh, load };
 }

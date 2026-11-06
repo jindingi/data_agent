@@ -4,17 +4,22 @@
 
 ## 当前状态
 
-正式工程已实现桌面骨架、会话存储和 pi 通用工具链路：可管理会话、选择工作区、引用多个 CSV、配置内置模型与 BYOK、流式显示正文/思考/工具过程，并恢复原生 JSONL 历史。Python 执行、写入审批和澄清已接入，P4 已通过完整验收：支持版本化产物、Markdown/PNG 预览和整版导出，已跑通真实 DeepSeek 多 CSV 分析链路并完成独立 Judge 记录。P5 已通过多轮、并发、后台与崩溃恢复验收，并保留未发送输入；P6 已加入可恢复删除、完整日志与长会话分页、模型思考级别设置，并通过 100 MB 定向基准；完整阶段门禁和最终交付仍待 P6–P7 完成，当前不是完整 MVP。阶段状态见 [实施进度](docs/implementation-status.md)。`validation/` 仅为独立技术参考。
+本机 macOS arm64 MVP 已完成 P0–P7。最终 P7 为 **61/61 通过**：全部前置确定性回归、实际 `.app` 的移动目录/离线运行、真实 DeepSeek 多 CSV 分析与重启追问、审批/停止/恢复及零残留进程；发布资源校验通过。阶段与证据见 [实施进度](docs/implementation-status.md)。
+
+打开 `release/mac-arm64/Data Agent.app`，在设置中填写 BYOK，即可引用 CSV 开始分析。支持多轮、插话、双会话并发、原生 JSONL 历史、Markdown/PNG 展示、复制及导出，Python 与常用库随包提供。详细操作见 [本机使用说明](docs/usage.md)。
+
+Agent 效果独立评测，结果不保证正确：最终 J1/J5 为 8/12、10/12，记录了主图裁切和解释不严谨等问题。前期 J4/J6 曾耗尽请求预算，失败保留。其他模型、Intel/其他系统和公开签名公证尚未验收；本次交付是本机可用 `.app`。
 
 ## 文档
 
 - [产品说明](docs/mvp-plan.md)
+- [本机使用说明](docs/usage.md)
 - [技术设计与目录结构](docs/technical-design.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)
 
-正式工程采用 pnpm；独立 Node 验证工程各用自己的 npm lockfile。正式工程按下方命令开发；尚未实现的阶段门禁会明确失败。运行结果、旧调研和一次性实验仅保留本地，不是检出仓库的前置依赖。
+正式工程采用 pnpm；独立 Node 验证工程各用自己的 npm lockfile。正式工程按下方命令开发；阶段门禁遇到失败或缺失用例会明确失败。运行结果、旧调研和一次性实验仅保留本地，不是检出仓库的前置依赖。
 
 ## 正式工程开发
 
@@ -38,12 +43,14 @@ pnpm verify:phase -- P3  # 工具/审批/CDP/内置运行时及真实模型
 pnpm verify:phase -- P4  # 产物登记、预览、导出与真实多 CSV 链路
 pnpm verify:phase -- P5  # 多轮、并发、后台与恢复
 pnpm verify:phase -- P6  # 边界、设置、性能、删除及真实多轮回归
+pnpm verify:phase -- P7  # 全部确定性回归及实际 .app 的真实模型分析/恢复
+pnpm verify:release     # 核对 .app 资源、hash、架构与许可证；与 P7 门禁组合使用
 pnpm dev:cdp
 ```
 
 阶段门禁会构建并实际启动 Electron，结果位于被忽略的 `test-results/`。`dev:cdp` 为开发助手开启独立测试实例，输出 CDP endpoint 和临时数据目录，Ctrl+C 退出；正常产品启动不开放 CDP。
 
-本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。打包前会校验内置运行时完整清单。现阶段含通用工具、内置 Python、审批及产物展示；最终交付仍以 P7 验收为准。
+本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。打包前会校验内置运行时完整清单。P7 已验证本机包内资源、实际 UI 流程与真实模型链路。
 
 P2 的真实测试可单独运行 `pnpm test:integration:live`。测试脚本从继承环境或 `~/.zshrc` 的单条字面量赋值取得 `DEEPSEEK_API_KEY`，不会 source shell；通过实际设置页保存到隔离测试实例的系统加密存储。生产应用始终由用户在设置中填写 BYOK，不读取开发者 shell 文件。
 

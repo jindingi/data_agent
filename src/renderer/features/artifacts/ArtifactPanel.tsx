@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
-import { Download, Maximize2, Minimize2, ExternalLink, FileText, FolderOpen, Image as ImageIcon, X } from 'lucide-react';
+import { Copy, Download, Maximize2, Minimize2, ExternalLink, FileText, FolderOpen, Image as ImageIcon, X } from 'lucide-react';
 import { request } from '../../lib/desktop';
 import { Button } from '../../components/ui/button';
 import type { FileReference } from '../../../shared/models';
@@ -39,6 +39,7 @@ function Report({ preview, files, choose, onError }: { preview: ArtifactPreview;
 }
 export function ArtifactPanel({ sessionId, inputs, close, onError }: { sessionId: string | null; inputs: FileReference[]; close: () => void; onError: (error: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<'files' | 'reports'>('files');
   const [listing, setListing] = useState<ArtifactListing>({ versions: [], files: [] });
   const [versionId, setVersionId] = useState<string>(); const [selected, setSelected] = useState<string>();
@@ -60,7 +61,7 @@ export function ArtifactPanel({ sessionId, inputs, close, onError }: { sessionId
   const files = listing.files.filter(file => file.versionId === versionId);
   const chosen = files.find(file => file.id === selected) ?? files.find(file => file.kind === 'markdown') ?? files.find(file => file.kind === 'png');
   useEffect(() => {
-    let mounted = true; setPreview(undefined); setPreviewError('');
+    let mounted = true; setPreview(undefined); setPreviewError(''); setCopied(false);
     if (sessionId && chosen) void request<ArtifactPreview>({ type: 'artifacts.preview', sessionId, artifactId: chosen.id }).then(value => { if (mounted) setPreview(value); }).catch(error => { if (mounted) setPreviewError(error.message); });
     return () => { mounted = false; };
   }, [sessionId, chosen?.id, chosen?.state]);
@@ -68,12 +69,18 @@ export function ArtifactPanel({ sessionId, inputs, close, onError }: { sessionId
     if (!sessionId || !versionId) return; setExporting(true);
     try { const value = await request<string | null>({ type: 'artifacts.export', sessionId, versionId }); if (value) setExported(value); } catch (error) { onError((error as Error).message); } finally { setExporting(false); }
   }
+  async function copyReport() {
+    if (!sessionId || !chosen) return;
+    try { await request({ type: 'artifacts.copy', sessionId, artifactId: chosen.id }); setCopied(true); }
+    catch (error) { onError((error as Error).message); }
+  }
   return <aside className={`result-panel${expanded ? ' expanded' : ''}`} aria-label="结果面板">
     <div className="result-header"><strong>文件与产物</strong><Button size="icon" variant="ghost" aria-label={expanded ? '缩小结果面板' : '展开结果面板'} onClick={() => setExpanded(!expanded)}>{expanded ? <Minimize2 /> : <Maximize2 />}</Button><Button size="icon" variant="ghost" aria-label="关闭结果面板" onClick={close}><X /></Button></div>
     <div className="tabs" role="tablist" aria-label="产物类别"><button role="tab" aria-selected={tab === 'files'} onClick={() => setTab('files')}>文件</button><button role="tab" aria-selected={tab === 'reports'} onClick={() => setTab('reports')}>报告</button></div>
     {listing.versions.length > 0 && <div className="artifact-toolbar"><select aria-label="选择产物版本" value={versionId} onChange={event => { setVersionId(event.target.value); setSelected(undefined); setExported(''); }}>{listing.versions.map((version, index) => <option key={version.id} value={version.id}>{index === 0 ? '最新 · ' : ''}{new Date(version.createdAt).toLocaleString()} · {version.id.slice(0, 6)}</option>)}</select><Button size="sm" variant="outline" disabled={exporting || listing.versions.find(version => version.id === versionId)?.state !== 'published'} onClick={() => void exportFiles()}><Download size={13} />导出这一版</Button></div>}
     {sessionId && <button className="open-workspace" onClick={() => { void request({ type: 'workspace.open', sessionId }).catch(error => onError(error.message)); }}><FolderOpen size={13} />打开工作区</button>}
     {exported && <p role="status" className="artifact-notice">已导出：{exported}</p>}
+    {tab === 'reports' && preview?.text !== undefined && preview.artifact.state === 'ready' && <div className="report-actions"><Button size="sm" variant="ghost" onClick={() => void copyReport()}><Copy size={13} />复制 Markdown</Button>{copied && <span role="status">已复制 Markdown</span>}</div>}
     {listing.versions.find(version => version.id === versionId)?.error && <p role="alert" className="artifact-notice">{listing.versions.find(version => version.id === versionId)?.error}</p>}
     <div className="artifact-scroll">
       {tab === 'files' ? <>

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
-import { mkdirSync, openSync, closeSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, openSync, closeSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
@@ -15,23 +15,30 @@ export async function freePort() {
   const server = createServer(); await new Promise(r => server.listen(0, '127.0.0.1', r));
   const port = server.address().port; await new Promise(r => server.close(r)); return port;
 }
-export async function startApp(root, { packaged = false, automation = true, port: selectedPort, pickFiles, pickDirectory, exportDirectory, testModelBaseUrl } = {}) {
+export async function startApp(root, { packaged = false, packagedPath, offline = false, minimalEnvironment = false, automation = true, port: selectedPort, pickFiles, pickDirectory, exportDirectory, testModelBaseUrl } = {}) {
   root = resolve(root); mkdirSync(root, { recursive: true });
   const port = selectedPort ?? await freePort();
-  const executable = packaged ? resolve('release/mac-arm64/Data Agent.app/Contents/MacOS/Data Agent') : require('electron');
+  const executable = packaged ? join(resolve(packagedPath ?? 'release/mac-arm64/Data Agent.app'), 'Contents/MacOS/Data Agent') : require('electron');
   if (!existsSync(executable)) throw new Error(`Missing executable: ${executable}`);
-  const args = [...(packaged ? [] : [resolve('.')]), ...(automation ? ['--data-agent-automation'] : []), `--remote-debugging-port=${port}`];
-  const env = { ...process.env, DATA_AGENT_HOME: join(root, 'data'), DATA_AGENT_USER_DATA: join(root, 'userData') };
+  const args = [...(packaged ? [] : [resolve('.')]), ...(automation ? ['--data-agent-automation'] : []), ...(offline ? ['--no-sandbox'] : []), `--remote-debugging-port=${port}`];
+  const env = { ...(minimalEnvironment ? { HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: 'en_US.UTF-8', PATH: '/usr/bin:/bin' } : process.env), DATA_AGENT_HOME: join(root, 'data'), DATA_AGENT_USER_DATA: join(root, 'userData') };
   delete env.DATA_AGENT_TEST_EXPORT_DIRECTORY;
   if (automation && exportDirectory) env.DATA_AGENT_TEST_EXPORT_DIRECTORY = exportDirectory;
   delete env.DATA_AGENT_TEST_MODEL_BASE_URL;
-  if (automation && testModelBaseUrl) env.DATA_AGENT_TEST_MODEL_BASE_URL = testModelBaseUrl;
+  // Deliberately pass this even in the normal-startup test: Main must ignore it
+  // without the explicit automation flag, rather than the harness hiding it.
+  if (testModelBaseUrl) env.DATA_AGENT_TEST_MODEL_BASE_URL = testModelBaseUrl;
   delete env.DATA_AGENT_TEST_PICK_FILES; delete env.DATA_AGENT_TEST_PICK_DIRECTORY;
   if (automation && pickFiles) env.DATA_AGENT_TEST_PICK_FILES = JSON.stringify(pickFiles);
   if (automation && pickDirectory) env.DATA_AGENT_TEST_PICK_DIRECTORY = pickDirectory;
   delete env.ELECTRON_RUN_AS_NODE; delete env.DEEPSEEK_API_KEY;
   const logFile = join(root, 'electron.log'); const fd = openSync(logFile, 'a');
-  const child = spawn(executable, args, { env, stdio: ['ignore', fd, fd] }); closeSync(fd);
+  // Test-only OS network denial; the product itself never uses sandbox-exec.
+  // macOS cannot nest Chromium Seatbelt under this profile, so only this offline
+  // test uses --no-sandbox. Normal packaged CDP/defaults cases retain Chromium sandbox.
+  const profile = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*") (remote unix-socket))';
+  if (offline) writeFileSync(join(root, 'offline.sb'), profile);
+  const child = spawn(offline ? '/usr/bin/sandbox-exec' : executable, offline ? ['-p', profile, executable, ...args] : args, { env, stdio: ['ignore', fd, fd] }); closeSync(fd);
   // Scope the idle/display sleep assertion to this real test instance, including failures.
   const awake = spawn('/usr/bin/caffeinate', ['-di', '-w', String(child.pid)], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
   const awakeExit = new Promise(resolve => { awake.once('exit', resolve); awake.once('error', resolve); });

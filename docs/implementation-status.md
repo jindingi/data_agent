@@ -11,9 +11,9 @@
 | P4 | 已通过 | run/version 输出目录、产物索引、Markdown/PNG 预览、整版导出和内置分析 skill；完整门禁 13 项通过，含确定性双 CSV/CDP、实际 .app 运行时及 DeepSeek 分析。J1/J2 独立 Judge 记录已完成，质量分数不作为程序门禁 |
 | P5 | 已通过 | 原生 steer/followUp、连续追问版本切换、两会话并发/FIFO、关窗口继续与 Cmd+Q 停止、崩溃恢复、未发送输入持久恢复、retry/compaction 状态。完整门禁 19 项通过，含真实 DeepSeek 重启追问；J5 独立 Judge 已完成 |
 | P6 | 已通过程序验收；效果评测已记录 | 删除重试、完整日志/长文本分页、模型能力设置、资源上限及边界测试；完整程序门禁 33/33 通过。J3/J4/J6 独立 Judge 完成，J4/J6 的请求预算失败如实保留 |
-| P7 | 待实施 | 完整本机应用交付与最终验收 |
+| P7 | 已通过；本机 MVP 已交付 | 完整门禁 61/61、零残留进程，实际 .app 移动目录/离线/CDP/生产默认设置/DeepSeek 初次分析及重启追问通过；静态发布校验与独立 J1/J5 Judge 完成 |
 
-P0 验证使用 macOS 15.7.4 / Apple M4 / arm64，Electron 45.2.3 / ABI 150。第一轮设置按钮因快捷键混入可访问名称导致定位失败，修正明确标签后全量门禁通过；失败记录保留。P0 验收时未进行真实模型调用或 Judge 评测；后续模型验证见 P2。完整分析功能尚未完成。
+P0 验证使用 macOS 15.7.4 / Apple M4 / arm64，Electron 45.2.3 / ABI 150。第一轮设置按钮因快捷键混入可访问名称导致定位失败，修正明确标签后全量门禁通过；失败记录保留。P0 验收时未进行真实模型调用或 Judge 评测；后续模型验证见 P2；这段仅描述 P0 当时范围。
 
 P1 验证使用实际 SQLite 与 pi 1.5.0 的 SessionManager，原生模块测试在 Electron 自带 Node 下运行，避免 ABI 混用。首轮两个 UI 用例因“新会话”和“选择新会话工作区”的模糊定位失败，修复明确标签并等待选中状态后全量通过。CSV 引用用无法作为正常 CSV 解析的合成字节验证工作台不做内容解析；原文件移除后显示缺失，不复制或重建。
 
@@ -23,7 +23,7 @@ P2 通过真实 Electron 窗口保存 BYOK、选择多份原文件、提问、�
 
 P2 首轮完整门禁的凭证哨兵发现 EventAdapter 将完整配置对象展开进 Host 快照：Main 的 schema 过滤已阻止额外字段进入 Renderer，但 Host 不应发送这些字段。修正为显式身份白名单、严格快照 schema，并在流式投影和原生 message_end 持久化前脱敏。失败记录保留；修复后完整门禁通过。补充测试覆盖模型/凭证前置失败不占运行名额、两个活跃会话与 FIFO 排队、排队任务绑定提交时凭证、同文本 steer/follow-up 快照恢复、磁盘写入早于 ACK 的恢复不重放，以及第 21 次模型调用不进入提供方。
 
-P3 已开放受控通用工具并完成阶段验收；P4 已通过产物登记/图表/报告展示的完整验收；P5 已通过后台/异常恢复验收；P6–P7 仍需边界与完整交付验收。定向测试已覆盖实际工具进程组停止和 10 秒无新增写入，审批取消、Host 退出、关闭/重开窗口及退出应用；P5 的异常恢复已另行验收，最终打包回归仍按 P7 执行。J1/J2 已完成独立判读；执行证据与 Judge 文件仅留本地。
+P3 已开放受控通用工具并完成阶段验收；P4 已通过产物登记/图表/报告展示的完整验收；P5 已通过后台/异常恢复验收；P6 已完成边界验收，P7 最终交付已通过，见文末。定向测试已覆盖实际工具进程组停止和 10 秒无新增写入，审批取消、Host 退出、关闭/重开窗口及退出应用；P5 的异常恢复已另行验收，最终打包回归仍按 P7 执行。J1/J2 已完成独立判读；执行证据与 Judge 文件仅留本地。
 
 P3 验收实际经过主进程工具服务、私有 Host 通道、SDK 工具续传和真实文件/子进程。审批绑定任务身份、参数、解析路径和脚本摘要，覆盖一次批准、拒绝写删、变更后失效、取消、Host 退出、窗口关闭/重开与 Cmd+Q 路径；澄清回答、拒绝及取消单独验证。子进程和后代在 5 秒内退出，随后 10 秒无新增心跳。开发态与实际 .app 的 7,042 个运行时文件/链接校验通过，实际导入固定库并生成中文 PNG，工具环境不含 API key。
 
@@ -35,7 +35,7 @@ J1 使用完整门禁中的销售分析结果，J2 使用本地 `evaluations/res
 
 P4 测试还验证了外部只读 cd、带引号 heredoc、Python 常见 `__file__` 路径拼接的有限静态识别及对应外部写/敏感读取负例。不能解析的循环路径或条件命令仍可能保守地要求审批。这是尽力检测机制，不是沙箱证明。J1/J2 中固定 `/tmp` 写入请求被拒绝后，Agent 自行继续交付。
 
-P5 已完成多轮/插话版本切换与崩溃恢复；后续仍需按 P6–P7 完成资源限额、交互边界和完整交付。P6 已给文本 read 增加 PNG/二进制及无效 UTF-8 的明确工具错误；工作台不解析 CSV，Agent 可改用 Python 指定编码。文本 read 不提供视觉能力，不能将其当成 Agent 已看过图表。
+P5 已完成多轮/插话版本切换与崩溃恢复；资源限额和交互边界已在 P6 验收，完整交付已按 P7 验收，见文末。P6 已给文本 read 增加 PNG/二进制及无效 UTF-8 的明确工具错误；工作台不解析 CSV，Agent 可改用 Python 指定编码。文本 read 不提供视觉能力，不能将其当成 Agent 已看过图表。
 
 
 P5 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P5` 为 19/19 通过，证据在本地 `test-results/2026-11-06T21-24-21.459Z/summary.json`。真实窗口完成连续提问、同批工具之后 steer、两条同文本 follow-up 分别消费并生成三份独立版本。强杀 Host/Main 后工具进程树分别在 78/22 ms 内结束，随后 10 秒无新增心跳；原任务 interrupted、部分产物可见、旧批准失效，未消费文字可恢复且不自动重发。关闭窗口保留审批与后台任务，Cmd+Q 停止所有任务，全局排队提问在重启后仍保留未发送。
@@ -46,8 +46,32 @@ P5 的 J5 由真实 DeepSeek 完成第一轮、实际退出/重启应用，再�
 
 P6 审批摘要已明确标为“SHA256（JSON 编码脚本文本）”，与原始文件字节 hash 区分；内容变更仍使绑定失效。报告阅读面板已可展开。
 
-P6 定向 100 MB 基准已通过：单任务约 3.40 秒，两并发各约 3.48 秒，单任务 Python 进程树峰值 321–330 MiB，聚合 Python（含监督器）峰值约 677 MiB；30 次交互均发生于任务尚在执行期间，p95 28.7 ms。证据位于本地 `test-results/2026-11-06T22-16-18.357Z/p6-100mb/benchmark.json`。较早尝试停在循环变量读路径的保守审批；手动停止并保留失败记录后，将固定基准的两条 read_csv 路径显式列出重测，未更改安全策略或性能阈值。这些定向结果尚不等于 P6 完成。
+P6 定向 100 MB 基准已通过：单任务约 3.40 秒，两并发各约 3.48 秒，单任务 Python 进程树峰值 321–330 MiB，聚合 Python（含监督器）峰值约 677 MiB；30 次交互均发生于任务尚在执行期间，p95 28.7 ms。证据位于本地 `test-results/2026-11-06T22-16-18.357Z/p6-100mb/benchmark.json`。较早尝试停在循环变量读路径的保守审批；手动停止并保留失败记录后，将固定基准的两条 read_csv 路径显式列出重测，未更改安全策略或性能阈值。该定向结果本身不代表 P6 完成；后续完整门禁见下文。
 
 P6 最终完整门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P6` 为 **33/33 通过**，证据在本地 `test-results/2026-11-06T22-53-57.055Z/summary.json`。包含实际 100 MB 单任务/双并发、删除中停止与恢复、日志分页、输入草稿隔离、BYOK 保存/轮换/清除、思考强度、受控 Markdown/PNG，以及真实 DeepSeek 重启追问。首次完整门禁为31/32，设置用例因 macOS 进入约962秒维护休眠超过测试等待时限；核对系统睡眠日志后，测试启动器增加绑定测试 PID 的 caffeinate，定向复测及完整门禁通过。未放宽断言或超时，失败证据保留。
 
 P6 的独立 Judge：J3 10/12（程序交付通过，混合编码/特殊字段正确，报告存在数量与编码唯一性表述问题）；J4 7/12（脚本与三张图已生成，但在反复图形检查后耗尽20次模型请求，未生成 report.md）；J6 9/12（解释报告和图表已生成，但重复校验耗尽20次请求，执行未正常收束）。J4/J6 的 `eval:prepare` 均为 failed，不能作为成功流程证据；对应 Judge 已阅读现有产物及错误，不为获得通过而重跑。本地记录分别位于 `evaluations/results/2026-11-06T22-40-58.662Z-J3-CSV/`、`2026-11-06T22-57-56.811Z-J4-DATA-QUALITY/`、`2026-11-06T22-59-13.314Z-J6-EXPLANATION/`。P6 最终多轮回归追问版本另评10/12。以上无质量通过线，不回写产品状态。后续改善方向是明确传达执行预算、先交付核心报告再做可选美化；资源上限保持不变。
+
+
+P7 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7` 为 **61/61 通过**，本地证据 `test-results/2026-11-06T23-30-02.576Z/summary.json`。清单包含 P0–P6 全部54个确定性检查与7个P7检查；P7-ALL 检查进程残留为0。`pnpm verify:release` 与 `pnpm check` 通过，静态结果在同目录 `release-verification.json`：7,042个运行时条目、80份许可证材料、arm64及SQLite原生模块，包内代码/资源与当前构建hash匹配。实际 .app 位于 `release/mac-arm64/Data Agent.app`，未签名公证，符合本机交付范围。
+
+首轮完整P7在 `2026-11-06T23-23-03.101Z` 为59/61：新增输入区思考选择器使旧P6设置测试的模糊标签同时命中两个控件，P7-ALL因此拒绝通过。精确定位后P6设置定向通过，再运行完整门禁通过；未放宽断言或选择更好的模型答案。首轮J1/J5程序通过、Judge9/12与10/12，失败门禁及样本均保留。
+
+最终P7的J1/J5在同一 `.app` 中执行，分别用9次与6次模型请求完成。工具审批由助手逐条阅读后通过真实CDP按钮处理。独立Judge分别为 **8/12、10/12**，记录位于该门禁目录的 `p7-live/initial/judge.json` 与 `p7-live/judge.json`（各附Markdown）。已阅读完整任务、原CSV、脚本、表格、报告、工具过程并实际查看PNG：J1主要问题为金额/比例共轴且坐标裁切、描述过强；J5核心计算与新图可读，但端点比较解释、上一轮内容及排序规则描述不严谨。没有质量通过线，也没有把这些评价写入工作台状态。
+
+### 最终需求覆盖
+
+| 已确认需求 | 实现与最终验收覆盖 |
+| --- | --- |
+| CSV只登记原路径、多文件、合计100MB、不解析 | SessionService、preload拖拽桥；P1-INPUT-REF、P4-IMPORT/MULTIFILE、P6-FILE-BOUNDARY、P7-USABILITY |
+| 直接pi SDK、模型/BYOK、流式过程 | SessionRuntime/EventAdapter/CredentialService；P2全部确定性检查、P6-SETTINGS、P7-LIVE |
+| SQLite元数据、原生JSONL会话树、会话管理 | database/SessionService/InputIdentity/DeletionService；P1全部、P2-IDENTITY、P6-DELETE与DELETE-STORAGE |
+| 多轮、steer/follow-up、2并发/FIFO、窗口后台与退出 | RuntimeService与原生pi队列；P5全部确定性检查、P7-LIVE重启追问 |
+| 通用工具、内置skills/Python/库/字体 | tools、ResourceLoader及runtime manifest；P3全部确定性检查、P7-PACKAGE/OFFLINE/CDP |
+| 外部写删/联网审批、敏感路径拒绝、停止回收 | Policy/InteractionBroker/监督器；P3-POLICY/READ-POLICY/NETWORK/CANCEL/APPROVAL/QUESTION、P5-CRASH、P7-CDP |
+| 图表/Markdown、安全显示、历史产物、复制导出 | ArtifactService/ArtifactPanel/Transcript；P4全部确定性检查、P6-RENDER/LOG-UI、P7-USABILITY/CDP |
+| 长日志、资源限制、100MB双并发体验 | LogService/资源监督器/分页UI；P6完整确定性回归 |
+| 实际本机.app、脱离开发目录/系统Python、无首次下载 | P7-PACKAGE移动真实.app且精简PATH；P7-OFFLINE进程树外网阻断；P7-DEFAULTS正常启动无CDP/自动凭证及单实例 |
+| 程序验证与Judge分离、阶段提交、可重跑CDP | verify:phase显式清单、J1–J6独立记录、repository-workflow；原始证据均gitignore，仅正式源码/文档/可复用脚本入库 |
+
+新增的本机操作入口与限制见 [使用说明](usage.md)。本次不声明其他平台/模型已验收，也不将图表能展示或报告存在等同于分析准确。

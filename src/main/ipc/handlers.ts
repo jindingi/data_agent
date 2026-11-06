@@ -1,4 +1,4 @@
-import { ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
+import { ipcMain, shell, clipboard, type IpcMainInvokeEvent } from 'electron';
 import { commandSchema, type Result, type SystemInfo } from '../../shared/contracts/ipc';
 import { IPC_COMMAND } from '../../shared/channels';
 import { AppError } from '../../shared/errors';
@@ -27,6 +27,11 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         }
         case 'artifacts.list': return { ok: true, value: artifacts!.list(parsed.data.sessionId) };
         case 'artifacts.preview': return { ok: true, value: await artifacts!.preview(parsed.data.sessionId, parsed.data.artifactId) };
+        case 'artifacts.copy': {
+          const preview = await artifacts!.preview(parsed.data.sessionId, parsed.data.artifactId);
+          if (preview.artifact.kind !== 'markdown' || preview.artifact.state !== 'ready' || preview.text === undefined) throw new AppError('REPORT_UNAVAILABLE', '当前文件不是可复制的 Markdown 报告');
+          clipboard.writeText(preview.text); return { ok: true, value: null };
+        }
         case 'artifacts.export': {
           const parent = await picker.chooseExportDirectory();
           return { ok: true, value: parent ? await artifacts!.exportVersion(parsed.data.sessionId, parsed.data.versionId, parent) : null };
@@ -42,6 +47,7 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'models.thinking': await catalogReady; return { ok: true, value: credentials.setThinking(parsed.data.level) };
         case 'models.key': await catalogReady; return { ok: true, value: credentials.save(parsed.data.provider, parsed.data.key) };
         case 'runtime.submit': await catalogReady; return { ok: true, value: await runtime.submit(parsed.data.sessionId, parsed.data.input) };
+        case 'runtime.activeStates': return { ok: true, value: runtime.activeStates() };
         case 'runtime.snapshot': return { ok: true, value: await runtime.restoreSnapshot(parsed.data.sessionId) };
         case 'runtime.discardDraft': runtime.discardDraft(parsed.data.sessionId, parsed.data.inputId); return { ok: true, value: null };
         case 'runtime.cancel': await runtime.cancel(parsed.data.sessionId); return { ok: true, value: null };
@@ -72,6 +78,7 @@ export function registerHandlers(trusted: (event: IpcMainInvokeEvent) => boolean
         case 'sessions.rename': { const value = sessions.rename(parsed.data.sessionId, parsed.data.title); changed(); return { ok: true, value }; }
         case 'sessions.archive': { const value = sessions.archive(parsed.data.sessionId, parsed.data.archived); changed(); return { ok: true, value }; }
         case 'files.pick': { const value = sessions.addFiles(parsed.data.sessionId, await picker.chooseFiles()); changed(); return { ok: true, value }; }
+        case 'files.add': { const value = sessions.addFiles(parsed.data.sessionId, parsed.data.paths); changed(); return { ok: true, value }; }
         case 'files.remove': { const value = sessions.removeFile(parsed.data.sessionId, parsed.data.fileId); changed(); return { ok: true, value }; }
       }
     } catch (error) {
