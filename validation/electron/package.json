@@ -1,0 +1,76 @@
+{
+  "name": "data-agent-electron-validation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reusable architecture harness; not the product application",
+  "author": "Data Agent",
+  "main": "main.cjs",
+  "scripts": {
+    "test": "node run.cjs",
+    "build:dir": "electron-builder --mac dir --arm64",
+    "test:packaged": "node run.cjs --packaged",
+    "build:renderer": "node build-renderer.cjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "streamdown": "2.7.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "4.2.1",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.25.12",
+    "playwright-core": "1.65.0"
+  },
+  "build": {
+    "appId": "local.dataagent.validation",
+    "productName": "Data Agent Validation",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "*.cjs",
+      "index.html",
+      "markdown-bundle.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resource-probe.txt",
+        "to": "resource-probe.txt"
+      },
+      {
+        "from": "supervisor.py",
+        "to": "supervisor.py"
+      },
+      {
+        "from": "../runtime/python/cpython-3.12.12-macos-aarch64-none",
+        "to": "python"
+      },
+      {
+        "from": "../runtime/fonts",
+        "to": "fonts"
+      },
+      {
+        "from": "../runtime/tools",
+        "to": "tools"
+      },
+      {
+        "from": "../pi/pi-smoke.mjs",
+        "to": "pi/pi-smoke.mjs"
+      },
+      {
+        "from": "../pi/node_modules",
+        "to": "pi/node_modules"
+      }
+    ],
+    "mac": {
+      "identity": null,
+      "target": "dir",
+      "category": "public.app-category.developer-tools"
+    },
+    "electronDist": "node_modules/electron/dist"
+  }
+}

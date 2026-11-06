@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'"><title>Architecture verification</title></head><body>
+<h1>Electron architecture verification</h1><p>This is a test harness, not the application UI.</p>
+<button id="pi-smoke">Run real pi SDK in utilityProcess</button><pre id="pi-events"></pre><pre id="pi-result"></pre>
+<button id="probe">Verify native SQLite and preload IPC</button><pre id="probe-output"></pre>
+<button id="start-A">Start A</button><button id="start-B">Start B</button><button id="start-C">Queue C</button><button id="stop-A">Stop A</button>
+<pre id="state">[]</pre><div id="markdown-root"></div><script src="renderer.cjs"></script><script src="markdown-bundle.js"></script></body></html>
