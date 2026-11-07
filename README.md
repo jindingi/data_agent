@@ -10,11 +10,16 @@
 
 Agent 效果独立评测，结果不保证正确：最终 J1/J5 为 8/12、10/12，记录了主图裁切和解释不严谨等问题。前期 J4/J6 曾耗尽请求预算，失败保留。其他模型、Intel/其他系统和公开签名公证尚未验收；本次交付是本机可用 `.app`。
 
+交付后发现的预览滚动、空会话、附件状态、历史阅读与控件提示问题，见 [UX 修复计划](docs/ux-remediation-plan.md)。UX0–UX5 目前仅完成规划，尚未实施；原 P0–P7 通过记录不代表这些体验问题已修复。
+
 ## 文档
 
 - [产品说明](docs/mvp-plan.md)
 - [本机使用说明](docs/usage.md)
 - [技术设计与目录结构](docs/technical-design.md)
+- [AI 开发指南](AGENTS.md)
+- [设计原则与 AI 实施规范](docs/design-principles.md)
+- [UX 修复阶段与验收计划（尚未实施）](docs/ux-remediation-plan.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)
