@@ -114,7 +114,6 @@ export const cases = {
       fixture.set({ text: 'I claim the report is correct, but no files were created.' });
       let id = await submit(page);
       assert.equal((await settled(page, id)).state, 'completed');
-      await page.getByRole('complementary', { name: '结果面板' }).waitFor();
       await openPreview(page, '预览');
       await page.getByRole('heading', { name: '还没有预览' }).waitFor();
       fixture.set(
@@ -148,6 +147,7 @@ export const cases = {
       );
       id = await submit(page);
       await settled(page, id);
+      await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'Intentionally wrong answer' }).waitFor();
       assert((await page.locator('.artifact-markdown').innerText()).includes('1 + 1 = 9'));
       assert.deepEqual(app.errors, []);
@@ -233,7 +233,6 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
       assert(
         !fixture.requests[0].messages.some((message) => String(message.content).includes('N,10')),
       );
-      await page.getByRole('complementary', { name: '结果面板' }).waitFor();
       await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'Delivery report', exact: true }).waitFor();
       const image = page.getByRole('img', { name: '地区销售', exact: true });

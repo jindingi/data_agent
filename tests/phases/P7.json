@@ -63,6 +63,11 @@
     "P7-CDP",
     "P7-DEFAULTS",
     "P7-LIVE",
+    "UX-DRAFTS",
+    "UX-READING",
+    "R-WRITES",
+    "R-EXPORT",
+    "R-RESOURCE-RELEASE",
     "P7-ALL"
   ],
   "requiresBuild": true,

@@ -1,3 +1,4 @@
+import { submissionDigest } from '../../node/submission-digest';
 import { RunLedger } from './runtime/run-ledger';
 import { RunAdmission } from './runtime/admission';
 import { RunLifecycle } from './runtime/lifecycle';
@@ -63,9 +64,9 @@ interface RuntimeDependencies {
   reader: { readHistory(file: string, workspace: string, piSessionId: string): Promise<unknown> };
   publish: (snapshot: RuntimeSnapshot) => void;
   changed: () => void;
-  tools?: ToolService | undefined;
+  tools: ToolService;
   testBaseUrl?: string | undefined;
-  artifacts?: ArtifactService | undefined;
+  artifacts: ArtifactService;
   skillsDirectory?: string | undefined;
 }
 /** Global admission only; pi owns each conversation's steer/follow-up queue. */
@@ -88,9 +89,9 @@ export class RuntimeService {
   };
   private publish: (snapshot: RuntimeSnapshot) => void;
   private changed: () => void;
-  private tools: ToolService | undefined;
+  private tools: ToolService;
   private testBaseUrl: string | undefined;
-  private artifacts: ArtifactService | undefined;
+  private artifacts: ArtifactService;
   private skillsDirectory: string | undefined;
   constructor(dependencies: RuntimeDependencies) {
     this.db = dependencies.db;
@@ -157,7 +158,7 @@ export class RuntimeService {
     this.publish(snapshot);
     if (!isActive(snapshot.state)) {
       task.apiKey = undefined;
-      this.tools?.cancelRun(snapshot.runId);
+      this.tools.cancelRun(snapshot.runId);
       const host = task.host;
       task.host = undefined;
       task.starting = false;
@@ -186,11 +187,11 @@ export class RuntimeService {
     if (pending)
       return pending.then(async (accepted) => {
         const receipt = this.db
-          .prepare('SELECT payload FROM submission_receipts WHERE input_id=?')
-          .get(input.inputId) as { payload: string } | undefined;
+          .prepare('SELECT digest FROM submission_receipts WHERE input_id=?')
+          .get(input.inputId) as { digest: string } | undefined;
         if (
           (sessionId && sessionId !== accepted.sessionId) ||
-          receipt?.payload !== JSON.stringify(input)
+          receipt?.digest !== submissionDigest(input)
         )
           throw new AppError('INPUT_CONFLICT', '提交身份已用于不同内容');
         return accepted;
@@ -202,12 +203,12 @@ export class RuntimeService {
   }
   private async acceptConversation(input: RunInput, sessionId?: string, parent?: string) {
     const receipt = this.db
-      .prepare('SELECT session_id,payload FROM submission_receipts WHERE input_id=?')
-      .get(input.inputId) as { session_id: string; payload: string } | undefined;
+      .prepare('SELECT session_id,digest FROM submission_receipts WHERE input_id=?')
+      .get(input.inputId) as { session_id: string; digest: string } | undefined;
     if (receipt) {
       if (
         (sessionId && sessionId !== receipt.session_id) ||
-        receipt.payload !== JSON.stringify(input)
+        receipt.digest !== submissionDigest(input)
       )
         throw new AppError('INPUT_CONFLICT', '提交身份已用于不同内容');
       const snapshot = await this.restoreSnapshot(receipt.session_id);
@@ -438,7 +439,7 @@ export class RuntimeService {
     return advance;
   }
   private async performAdvanceOutput(task: Task, inputId: string) {
-    if (this.closing || !task.host || !isActive(task.snapshot.state) || !this.artifacts)
+    if (this.closing || !task.host || !isActive(task.snapshot.state))
       throw new Error('Run unavailable');
     const input = this.db
       .prepare('SELECT kind FROM run_inputs WHERE id=? AND run_id=?')
@@ -496,14 +497,12 @@ export class RuntimeService {
     try {
       const apiKey = task.apiKey;
       if (!apiKey) throw new AppError('MISSING_KEY', '运行凭证已失效');
-      if (this.artifacts) {
-        const version = await this.artifacts.createVersion(session.id, task.snapshot.runId);
-        task.versionId = version.id;
-        task.outputDirectory = version.directory;
-        if (this.closing || task.snapshot.state !== 'starting') {
-          void this.artifacts.publish(version.id);
-          return;
-        }
+      const version = await this.artifacts.createVersion(session.id, task.snapshot.runId);
+      task.versionId = version.id;
+      task.outputDirectory = version.directory;
+      if (this.closing || task.snapshot.state !== 'starting') {
+        void this.artifacts.publish(version.id);
+        return;
       }
       task.host = this.createHost(
         (status) => {
@@ -516,7 +515,7 @@ export class RuntimeService {
         },
         (snapshot) => this.update(task, snapshot),
         async (toolCallId, operation, observers) => {
-          if (!this.tools || !task.host?.pid || !isActive(task.snapshot.state))
+          if (!task.host?.pid || !isActive(task.snapshot.state))
             return { output: '当前任务无法执行工具', isError: true };
           return this.tools.execute(
             {
@@ -534,14 +533,14 @@ export class RuntimeService {
                 this.paths.logs,
               ],
               inputs: task.filePaths,
-              published: this.artifacts?.publishedPaths(session.id) ?? [],
+              published: this.artifacts.publishedPaths(session.id),
             },
             toolCallId,
             operation,
             observers,
           );
         },
-        (toolCallId) => this.tools?.cancelTool(task.snapshot.runId, toolCallId),
+        (toolCallId) => this.tools.cancelTool(task.snapshot.runId, toolCallId),
         (inputId) => this.advanceOutput(task, inputId),
       );
       await task.host.request({
@@ -593,7 +592,7 @@ export class RuntimeService {
     const task = this.tasks.get(sessionId);
     if (!task || !isActive(task.snapshot.state)) return;
     if (task.snapshot.state === 'queued' || task.snapshot.state === 'starting') {
-      this.tools?.cancelRun(task.snapshot.runId);
+      this.tools.cancelRun(task.snapshot.runId);
       this.update(task, {
         ...task.snapshot,
         seq: task.snapshot.seq + 1,
@@ -608,7 +607,7 @@ export class RuntimeService {
     try {
       await task.host?.request({ type: 'runtime.cancel' });
     } catch {
-      this.tools?.cancelRun(task.snapshot.runId);
+      this.tools.cancelRun(task.snapshot.runId);
       this.fail(task, '停止时 Agent 未响应，进程已结束。');
     }
     await task.finalizePromise;
@@ -633,12 +632,12 @@ export class RuntimeService {
         task.stopPromise,
         task.finalizePromise,
       ]);
-      await this.tools?.settled(task.snapshot.runId);
+      await this.tools.settled(task.snapshot.runId);
     }
     // An interrupted prior process can leave an open output version to inventory.
-    for (const version of this.artifacts?.list(sessionId).versions ?? [])
-      if (version.state === 'open') await this.artifacts?.publish(version.id);
-    await this.artifacts?.settled();
+    for (const version of this.artifacts.list(sessionId).versions)
+      if (version.state === 'open') await this.artifacts.publish(version.id);
+    await this.artifacts.settled();
   }
   forget(sessionId: string) {
     const task = this.tasks.get(sessionId);
@@ -653,7 +652,7 @@ export class RuntimeService {
   async stop() {
     this.closing = true;
     await Promise.allSettled([...this.tasks.keys()].map((id) => this.cancel(id)));
-    this.tools?.stop();
+    this.tools.stop();
     for (const task of this.tasks.values()) {
       if (isActive(task.snapshot.state))
         this.update(task, {
@@ -671,6 +670,6 @@ export class RuntimeService {
     }
     await Promise.allSettled([...this.startingTasks, ...this.advancingTasks]);
     await this.lifecycle.settled();
-    await this.tools?.settled();
+    await this.tools.settled();
   }
 }

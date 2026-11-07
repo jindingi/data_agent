@@ -450,9 +450,11 @@ export const cases = {
           'Uncertain input must not automatically repeat.',
         );
         await app.page.getByRole('button', { name: '放回输入框', exact: true }).click();
-        assert.equal(
-          await app.page.getByRole('textbox', { name: '分析需求' }).inputValue(),
-          'Uncertain input must not automatically repeat.',
+        await until(
+          async () =>
+            (await app.page.getByRole('textbox', { name: '分析需求' }).inputValue()) ===
+            'Uncertain input must not automatically repeat.',
+          'unconsumed input restored after metadata inspection',
         );
         fixture.set({ text: 'An explicitly sent new prompt after recovery.' });
         await send(app.page, 'A new explicit prompt, not a replay.');

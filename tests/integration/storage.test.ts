@@ -11,7 +11,9 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import Database from 'better-sqlite3';
+import { submissionDigest } from '../../src/node/submission-digest';
 import {
   SessionManager,
   createAgentSession,
@@ -73,6 +75,50 @@ describe('native storage acceptance', () => {
       db.prepare('SELECT version FROM schema_migrations WHERE version=999').get(),
     ).toBeUndefined();
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    // Upgrade an actual v8 receipt without retaining a second permanent message copy.
+    const legacy = new Database(':memory:');
+    try {
+      migrate(
+        legacy,
+        migrations.filter((migration) => migration.version <= 8),
+      );
+      const input = {
+        inputId: randomUUID(),
+        kind: 'prompt' as const,
+        text: 'private receipt body',
+        paths: ['/tmp/input.csv'],
+      };
+      const legacySession = new SessionService(legacy, paths).create();
+      const runId = randomUUID();
+      legacy
+        .prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)')
+        .run(
+          runId,
+          legacySession.id,
+          randomUUID(),
+          'completed',
+          'test',
+          'test',
+          new Date().toISOString(),
+        );
+      legacy
+        .prepare('INSERT INTO run_inputs VALUES (?,?,?,?,NULL)')
+        .run(input.inputId, runId, 'prompt', 'committed');
+      legacy
+        .prepare('INSERT INTO submission_receipts VALUES (?,?,?)')
+        .run(input.inputId, legacySession.id, JSON.stringify(input));
+      migrate(legacy);
+      migrate(legacy);
+      const receipt = legacy.prepare('SELECT * FROM submission_receipts').get();
+      expect(receipt).toEqual({
+        input_id: input.inputId,
+        session_id: legacySession.id,
+        digest: submissionDigest(input),
+      });
+      expect(JSON.stringify(receipt)).not.toContain(input.text);
+    } finally {
+      legacy.close();
+    }
   });
   it('P1-TREE native JSONL round-trips through the production history reader', async () => {
     const { row, manager } = nativeHistory();

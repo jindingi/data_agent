@@ -3,7 +3,7 @@ import type { ArtifactService } from '../artifacts';
 /** Terminal cleanup owns writer ordering; permits are released only when this settles. */
 export class RunLifecycle {
   private pending = new Set<Promise<void>>();
-  constructor(private dependencies: { tools?: ToolService; artifacts?: ArtifactService }) {}
+  constructor(private dependencies: { tools: ToolService; artifacts: ArtifactService }) {}
   finish(
     runId: string,
     versionId: string | undefined,
@@ -12,11 +12,11 @@ export class RunLifecycle {
   ) {
     const task = (async () => {
       await Promise.allSettled(writers);
-      await this.dependencies.tools?.settled(runId);
+      await this.dependencies.tools.settled(runId);
       try {
-        if (versionId) await this.dependencies.artifacts?.publish(versionId);
+        if (versionId) await this.dependencies.artifacts.publish(versionId);
       } finally {
-        this.dependencies.tools?.releaseRun(runId);
+        this.dependencies.tools.releaseRun(runId);
       }
     })().finally(() => {
       this.pending.delete(task);

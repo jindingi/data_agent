@@ -206,7 +206,7 @@ try {
   }
   if (args.includes('--no-package')) {
     if (!selected) throw new Error('--no-package is only for targeted checks');
-    verifyRelease();
+    if (requirements.packaged) verifyRelease();
   }
   if (!args.includes('--no-package') && requirements.packaged) {
     command('runtime', ['runtime:verify']);

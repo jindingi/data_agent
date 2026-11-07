@@ -91,8 +91,8 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     evidence.artifacts = files;
     assert(report, `nonempty ${reportName} required by fixture`);
     if (chartRequired) assert(chart, 'displayable PNG required by fixture');
-    await page.getByRole('complementary', { name: '结果面板' }).waitFor();
     await openPreview(page, '预览');
+    await page.getByLabel('选择产物版本').selectOption(report.versionId);
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     assert((await page.locator('.artifact-markdown').innerText()).length > 0);
@@ -102,7 +102,7 @@ export async function runScenario(id, root, { packaged = false } = {}) {
       await until(
         () =>
           page
-            .locator('.artifact-scroll > .artifact-image')
+            .getByRole('img', { name: chart.relativePath, exact: true })
             .evaluate((element) => element.complete && element.naturalWidth > 0),
         'actual chart preview',
         30_000,

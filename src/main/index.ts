@@ -22,6 +22,9 @@ import type { SystemInfo } from '../shared/contracts/ipc';
 
 app.setName('Data Agent');
 const automation = process.argv.includes('--data-agent-automation');
+// Presentation only: this flag never enables automation IPC or test credentials.
+const background = process.argv.includes('--data-agent-background');
+if (background && process.platform === 'darwin') app.setActivationPolicy('accessory');
 if (!automation) {
   app.commandLine.removeSwitch('remote-debugging-port');
   app.commandLine.removeSwitch('remote-debugging-pipe');
@@ -55,6 +58,7 @@ let quitting = false;
 
 function createWindow() {
   window = new BrowserWindow({
+    show: !background,
     width: 1360,
     height: 900,
     minWidth: 940,
@@ -68,6 +72,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !background,
     },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -229,6 +234,9 @@ if (primaryInstance)
             paths,
             debugPort: app.commandLine.getSwitchValue('remote-debugging-port'),
             packaged: app.isPackaged,
+            background,
+            windowVisible: window?.isVisible(),
+            windowFocused: window?.isFocused(),
           }),
         );
     })
@@ -237,6 +245,7 @@ if (primaryInstance)
       app.exit(1);
     });
 app.on('second-instance', () => {
+  if (background) return;
   if (!window && db) createWindow();
   if (window) {
     if (window.isMinimized()) window.restore();

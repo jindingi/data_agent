@@ -39,6 +39,7 @@ export async function startDevApp(root) {
       String(port),
       '--',
       '--data-agent-automation',
+      '--data-agent-background',
     ],
     { env, detached: true, stdio: ['ignore', fd, fd] },
   );

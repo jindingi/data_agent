@@ -1,8 +1,11 @@
+import { submissionDigest } from '../../node/submission-digest';
+import { inputSchema } from '../../shared/runtime';
 import Database from 'better-sqlite3';
 
 export interface Migration {
   version: number;
   sql: string;
+  after?: (db: Database.Database) => void;
 }
 export const migrations: Migration[] = [
   {
@@ -113,6 +116,22 @@ export const migrations: Migration[] = [
     );
   `,
   },
+  {
+    version: 9,
+    sql: 'ALTER TABLE submission_receipts RENAME COLUMN payload TO digest;',
+    after: (db) => {
+      for (const row of db.prepare('SELECT input_id,digest FROM submission_receipts').all() as {
+        input_id: string;
+        digest: string;
+      }[]) {
+        const input = inputSchema.parse(JSON.parse(row.digest));
+        db.prepare('UPDATE submission_receipts SET digest=? WHERE input_id=?').run(
+          submissionDigest(input),
+          row.input_id,
+        );
+      }
+    },
+  },
 ];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec(
@@ -125,6 +144,7 @@ export function migrate(db: Database.Database, pending = migrations) {
       continue;
     db.transaction(() => {
       db.exec(migration.sql);
+      migration.after?.(db);
       db.prepare('INSERT INTO schema_migrations VALUES (?, ?)').run(
         migration.version,
         new Date().toISOString(),

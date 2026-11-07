@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -6,6 +6,10 @@ import { randomUUID, createCipheriv, createDecipheriv, randomBytes } from 'node:
 import { openDatabase } from '../../src/main/storage/database';
 import { SessionService } from '../../src/main/services/sessions';
 import { CredentialService } from '../../src/main/services/credentials';
+import { ToolService } from '../../src/main/services/tools';
+import { ArtifactService } from '../../src/main/services/artifacts';
+import { InteractionBroker } from '../../src/main/services/interactions';
+import { getRuntimePaths } from '../../src/node/runtime-paths';
 import { RuntimeService } from '../../src/main/services/runtime';
 import { ensureAppPaths, getAppPaths } from '../../src/node/app-paths';
 import type { RuntimeSnapshot } from '../../src/shared/runtime';
@@ -101,6 +105,17 @@ it('P2-PREFLIGHT credentials and model errors leave no run or permit; later inpu
     reader: { readHistory: async () => ({ messages: [] }) },
     publish: (event) => events.push(event),
     changed: () => {},
+    tools: new ToolService(
+      getRuntimePaths(process.cwd(), '', false),
+      paths.logs,
+      new InteractionBroker(db),
+    ),
+    artifacts: new ArtifactService(
+      db,
+      sessions,
+      () => false,
+      () => {},
+    ),
   });
   cleanups.push(() => service.stop());
   const session = sessions.create();
@@ -120,17 +135,17 @@ it('P2-PREFLIGHT credentials and model errors leave no run or permit; later inpu
   expect(JSON.stringify(credentials.settings())).not.toContain(sentinel);
   expect(JSON.stringify(db.prepare('SELECT * FROM app_metadata').all())).not.toContain(sentinel);
   await service.submit(session.id, makeInput());
-  expect(starts).toBe(1);
+  await vi.waitFor(() => expect(starts).toBe(1));
   const b = sessions.create(),
     c = sessions.create();
   await service.submit(b.id, makeInput());
   await service.submit(c.id, makeInput());
-  expect(starts).toBe(2);
+  await vi.waitFor(() => expect(starts).toBe(2));
   expect(service.snapshot(c.id)?.state).toBe('queued');
   credentials.save('deepseek', 'sk-rotated-after-queue');
   await service.cancel(session.id);
   expect(service.snapshot(session.id)?.state).toBe('cancelled');
-  expect(starts).toBe(3);
+  await vi.waitFor(() => expect(starts).toBe(3));
   expect(service.snapshot(c.id)?.state).toBe('running');
   expect(usedKeys).toEqual([sentinel, sentinel, sentinel]);
   await service.cancel(b.id);

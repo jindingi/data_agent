@@ -63,7 +63,7 @@ export function SessionHeader({
           {theme === 'dark' ? <Sun /> : <Moon />}
         </Button>
         {current && (
-          <Menu.Root>
+          <Menu.Root modal={false}>
             <Menu.Trigger asChild>
               <Button size="icon" variant="ghost" aria-label="会话操作">
                 <MoreHorizontal />

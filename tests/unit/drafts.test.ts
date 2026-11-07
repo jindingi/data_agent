@@ -23,6 +23,12 @@ describe('composer acknowledgement', () => {
     expect(result.text).toBe('first');
     expect(result.files).toHaveLength(1);
   });
+  it('enforces the aggregate limit against the latest draft without mutating it', () => {
+    const current = addFiles(emptyDraft(), [{ ...a, size: 80_000_000 }]);
+    expect(() => addFiles(current, [{ ...b, size: 30_000_000 }])).toThrow('100 MB');
+    expect(current.files).toHaveLength(1);
+    expect(addFiles(emptyDraft(), [a, a]).files).toHaveLength(1);
+  });
   it('clears accepted snapshots and deduplicates original paths', () => {
     const sent = addFiles(addFiles(editText(emptyDraft(), 'first'), [a]), [a]);
     expect(sent.files).toHaveLength(1);

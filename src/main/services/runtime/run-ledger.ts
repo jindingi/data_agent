@@ -1,3 +1,4 @@
+import { submissionDigest } from '../../../node/submission-digest';
 import type Database from 'better-sqlite3';
 import { AppError } from '../../../shared/errors';
 import { isActive, type RunInput, type RuntimeSnapshot } from '../../../shared/runtime';
@@ -16,7 +17,7 @@ export class RunLedger {
         .run(input.inputId, input.text, JSON.stringify(input.paths ?? []));
       this.db
         .prepare('INSERT INTO submission_receipts VALUES (?,?,?)')
-        .run(input.inputId, sessionId, JSON.stringify(input));
+        .run(input.inputId, sessionId, submissionDigest(input));
     })();
   }
   transition(previous: RuntimeSnapshot, next: RuntimeSnapshot) {

@@ -1,4 +1,4 @@
-import { testBundle } from '../../scripts/test/run-context.mjs';
+import { testAppDir, testBundle } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -118,7 +118,7 @@ export const cases = {
       const root = resolve(dir, packaged ? 'p3-runtime-app' : 'p3-runtime-dev');
       const runtimeRoot = packaged
         ? join(testBundle(), 'Contents/Resources/runtime')
-        : resolve('runtime/darwin-arm64');
+        : join(testAppDir(), 'runtime/darwin-arm64');
       const inventory = verifyRuntime(runtimeRoot),
         fixture = await modelFixture();
       const app = await startApp(root, { packaged, testModelBaseUrl: fixture.baseUrl });

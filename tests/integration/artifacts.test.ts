@@ -159,6 +159,11 @@ it('R-EXPORT streams large artifacts in bounded chunks, preserves exports and cl
   expect(total).toBe(20 * 1024 * 1024);
   expect(readHash.digest('hex')).toBe(hash.digest('hex'));
   const exported = await artifacts.exportVersion(sessionId, v.id, root);
+  expect(await artifacts.exportLocation(sessionId, exported)).toBe(exported);
+  await expect(artifacts.exportLocation(sessionId, root)).rejects.toThrow('不属于当前会话');
+  await expect(artifacts.exportLocation(sessions.create().id, exported)).rejects.toThrow(
+    '不属于当前会话',
+  );
   expect((await stat(join(exported, 'large.bin'))).size).toBe(total);
   await expect(artifacts.exportVersion(sessionId, v.id, root)).rejects.toThrow();
   const broken = await version();

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { SelectedFile } from '../../../shared/models';
+import { MAX_INPUT_BYTES, type SelectedFile } from '../../../shared/models';
 export const draftSchema = z.object({
   text: z.string().max(100_000),
   revision: z.number().int().nonnegative(),
@@ -21,16 +21,20 @@ export function editText(draft: Draft, text: string): Draft {
 }
 export function addFiles(draft: Draft, files: SelectedFile[]): Draft {
   const paths = new Set(draft.files.map((f) => f.path));
-  return {
-    ...draft,
-    inputId: crypto.randomUUID(),
-    files: [
-      ...draft.files,
-      ...files
-        .filter((f) => !paths.has(f.path))
-        .map((file) => ({ ...file, token: crypto.randomUUID() })),
-    ],
-  };
+  const merged = [
+    ...draft.files,
+    ...files
+      .filter((f) => {
+        if (paths.has(f.path)) return false;
+        paths.add(f.path);
+        return true;
+      })
+      .map((file) => ({ ...file, token: crypto.randomUUID() })),
+  ];
+  if (merged.reduce((sum, file) => sum + file.size, 0) > MAX_INPUT_BYTES)
+    throw new Error('所选文件总量不能超过 100 MB');
+  if (merged.length > 100) throw new Error('最多选择 100 个文件');
+  return { ...draft, inputId: crypto.randomUUID(), files: merged };
 }
 /** Acknowledgement clears only the accepted text revision and attachment instances. */
 export function acknowledge(current: Draft, submitted: Draft): Draft {

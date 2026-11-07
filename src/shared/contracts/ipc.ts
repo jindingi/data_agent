@@ -64,6 +64,14 @@ export const commandSchema = z.discriminatedUnion('type', [
       versionId: z.string().uuid(),
     })
     .strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('artifacts.revealExport'),
+      sessionId: z.string().uuid(),
+      path: z.string().min(1).max(4096),
+    })
+    .strict(),
   z.object({ ...base, type: z.literal('workspace.open'), sessionId: z.string().uuid() }).strict(),
   z.object({ ...base, type: z.literal('link.open'), url: z.string().url().max(4096) }).strict(),
   z.object({ ...base, type: z.literal('system.info') }).strict(),
@@ -253,6 +261,7 @@ export interface CommandResponses {
   'artifacts.preview': ArtifactPreview;
   'artifacts.copy': null;
   'artifacts.export': string | null;
+  'artifacts.revealExport': null;
   'workspace.open': null;
   'link.open': null;
   'logs.list': ToolLog[];

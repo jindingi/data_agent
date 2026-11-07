@@ -9,7 +9,7 @@ import { SessionHeader } from '../features/sessions/SessionHeader';
 import { useEffect, useRef, useState } from 'react';
 import { ChartNoAxesCombined, FileChartColumn, Table2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog';
+import { RenameSessionDialog } from '../features/sessions/RenameSessionDialog';
 import { DeleteSessionDialog } from '../features/sessions/DeleteSessionDialog';
 import { useSessions } from '../features/sessions/use-sessions';
 import { isActive } from '../../shared/runtime';
@@ -41,7 +41,6 @@ export function App() {
   const [archived, setArchived] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
   const activity = useActivity(setError);
   const modelSettings = useModelSettings();
   const [dragging, setDragging] = useState(false);
@@ -157,7 +156,6 @@ export function App() {
               setTheme(value);
             }}
             onRename={() => {
-              setTitle(current!.title);
               setRenaming(true);
             }}
             onArchive={() => act(sessions.archiveCurrent())}
@@ -166,9 +164,14 @@ export function App() {
           {error && (
             <div role="alert" className="error-banner">
               {error}
-              <button aria-label="关闭错误" onClick={() => setError('')}>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="关闭错误"
+                onClick={() => setError('')}
+              >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
           )}
           {current?.error && (
@@ -252,6 +255,7 @@ export function App() {
           sessionId={deleting}
           close={() => setDeleting(null)}
           deleted={() => {
+            composer.forget(deleting);
             sessions.select(null);
             setDeleting(null);
             setError('');
@@ -259,30 +263,13 @@ export function App() {
           }}
         />
       )}
-      <Dialog open={renaming} onOpenChange={setRenaming}>
-        <DialogContent>
-          <DialogTitle className="text-lg font-semibold">重命名会话</DialogTitle>
-          <DialogDescription className="mt-2 text-sm text-muted-foreground">
-            为这个分析起一个容易找到的名字。
-          </DialogDescription>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              act(sessions.rename(title).then(() => setRenaming(false)));
-            }}
-          >
-            <input
-              className="rename-input"
-              aria-label="会话标题"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={120}
-              required
-            />
-            <Button type="submit">保存名称</Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {renaming && current && (
+        <RenameSessionDialog
+          initialTitle={current.title}
+          rename={sessions.rename}
+          close={() => setRenaming(false)}
+        />
+      )}
       <SettingsDialog open={settings} onOpenChange={setSettings} modelSettings={modelSettings} />
     </div>
   );

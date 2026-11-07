@@ -6,9 +6,9 @@
 
 1. 读相关文档及代码，检查 `git status --short`，保留用户已有修改。
 2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。
-3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX1 已定向验证，其他阶段实施/验收状态见计划。不要将计划写成现状。
+3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中本轮 UX 修复已完成，验收范围及证据见计划与实施进度。
 4. 验收与交付见 [开发计划](docs/development-plan.md)、[实施进度](docs/implementation-status.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
-5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R2 已完成，R3 实施中，R4–R6 尚未实施，不用格式化替代职责重构。
+5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R6 已完成，最终完整 P7 为 68/68 通过，不用格式化替代职责重构。
 
 ## 产品边界
 
@@ -50,7 +50,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - 检查 components.json、现有 Radix/shadcn 组件及 globals.css；保留语义 tokens、data-theme 和现有图标体系，不引入第二套主题状态。
 - 明确空态、加载、失败、审批、禁用、hover/focus 的行为；纯图标按钮同时提供可访问名称和 Tooltip。
 - 校验独立滚动、长 Markdown、局部横滚、焦点恢复和三种窗口尺寸；流式消息不得抢阅读位置。
-- 新会话草稿与附件生命周期按 UX 计划实施；在对应阶段完成前，描述为待修复项，不用文档声明替代代码。
+- 新会话只打开首页草稿，接收第一条输入后创建正式会话；附件按提交快照清除，不清掉期间新增内容。
 
 ## 测试与验证
 
@@ -71,6 +71,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 
 - **不要覆写用户正在使用的应用包或构建目录。** `pnpm build`、`package:dir` 和某些测试会写 out/release。先检查在用实例与输出路径，使用独立输出及匹配验证路径，或已停止的目标；不能自行杀掉用户任务来方便测试。正式 runner 已将 build/package 放入独立测试上下文；不要绕过它使用共享目录。
 - `--no-build`/`--no-package` 只用于匹配当前代码的已验证产物；不以旧包结果验证新代码。优先采用已有隔离 harness，不伪称未实现的参数可用。
+- **自动测试默认后台隐藏窗口，不抢焦点。** harness 传 `--data-agent-background`，真实 dev 测试同样使用；关闭后台节流以支持 CDP 交互/截图。仅显式视觉调试可在 startApp 指定 background:false；不得为了测试自动显示或聚焦用户窗口。此显示参数不授予 automation IPC 或凭证能力。
 - 正式测试使用合成 fixture、独立 userData/业务目录，通过真实 CDP 点击、键盘、滚动及状态/存储断言；mock 模型可用于确定性分支，不能替代规定的 live 用例。
 - UI 修复要看实际截图和阅读尾部、焦点、滚动行为；按钮存在或截图成功生成不等于体验通过。仅文档改动运行静态/链接检查，不启动无关 live/打包测试。
 - 程序验证看工作台流程与交付（例如 report.md 存在且非空）；分析准确性由独立 LLM-as-a-judge 评价。UX 视觉评审另记，三者不能互相冒充。

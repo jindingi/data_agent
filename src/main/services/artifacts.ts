@@ -25,6 +25,7 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 /** File delivery and display checks only. No CSV parsing or analytical result oracle. */
 export class ArtifactService {
   private scanning = new Map<string, Promise<void>>();
+  private exports = new Map<string, string>();
   constructor(
     private db: Database.Database,
     private sessions: SessionService,
@@ -302,7 +303,17 @@ export class ArtifactService {
       await rmdir(root).catch(() => {});
       throw error;
     }
+    this.exports.set(root, sessionId);
+    while (this.exports.size > 64) this.exports.delete(this.exports.keys().next().value!);
     return root;
+  }
+  async exportLocation(sessionId: string, path: string) {
+    this.sessions.get(sessionId);
+    if (this.exports.get(path) !== sessionId)
+      throw new AppError('EXPORT_UNAVAILABLE', '该导出位置不属于当前会话或已过期');
+    if (!(await lstat(path)).isDirectory() || (await realpath(path)) !== path)
+      throw new AppError('EXPORT_UNAVAILABLE', '导出目录已移动或被替换');
+    return path;
   }
   async settled() {
     await Promise.all([...this.scanning.values()]);

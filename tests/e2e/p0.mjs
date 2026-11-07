@@ -73,6 +73,10 @@ export const cases = {
     const app = await startApp(join(dir, 'desktop'));
     try {
       const { page } = app;
+      const startup = JSON.parse(readFileSync(join(app.root, 'data/automation.json'), 'utf8'));
+      assert.equal(startup.background, true);
+      assert.equal(startup.windowVisible, false);
+      assert.equal(startup.windowFocused, false);
       await page.getByRole('textbox', { name: '分析需求' }).fill('分析地区销售变化');
       assert.equal(
         await page.getByRole('textbox', { name: '分析需求' }).inputValue(),

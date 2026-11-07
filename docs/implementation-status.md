@@ -87,3 +87,17 @@ P7 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7` 为 **61/61 �
 2026-11-07 用 `pnpm test:e2e -- --case P0-DEV --no-build` 在隔离目录启动真实 `pnpm dev`，复现主框架 `http://localhost:5173/` 被拒绝为 UNTRUSTED_SENDER。electron-vite 注入的地址没有末尾 `/`，原代码按字符串比较，错误拒绝 Chromium 规范化后的 URL。Main 现先规范化预期 URL，仍严格检查当前窗口、主框架和完整 URL。
 
 失败证据 `test-results/2026-11-07T00-24-29.765Z/summary.json`；修复后同一用例在 `test-results/2026-11-07T00-25-12.474Z/summary.json` 通过，包括系统 IPC、设置连接检查、新建会话、刷新恢复及同源不同查询参数页面的拒绝验证。`pnpm check` 与现有单元测试通过。构建输出与用户数据位于独立 test-results 目录，本次未覆盖 out/ 或 release/，无需重新生成 .app。P0/P7 清单新增 P0-DEV，当前 P7 共63项；本次未重跑完整门禁。
+
+## UX 修复、工程重构与后台验收（2026-11-07）
+
+本轮完成 UX1–UX4 与 R1–R5，UX5/R6 收束：**完整 P7 68/68 通过，失败 0，测试进程残留 0**。命令为 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7`；证据在本机 `test-results/2026-11-07T02-18-35.380Z/summary.json`。测试源码指纹为 `d7e9973dc7bfbe50b0287afcc21eb81e0b394f3e855f0f1017cd35171aeb9c50`，记录的 Git 基线为 de2ecaf，包含待提交的 R6 收尾修复；验收后只补文档，再提交。9 个 unit 与 3 个 tooling 正反例通过，quality/提交门禁通过。
+
+交付行为：预览独立滚动、拖拽/键盘调宽、窄窗覆盖阅读；顶栏单层，移除无用途常驻文案；新会话只打开草稿，首次接收才创建；附件提交后进入消息/文件区，旧 ACK 不清新草稿；回答连续展示、顶部按需加载旧消息、独立下箭头回最新；图标 Tooltip、菜单/Tabs/焦点、设置/重命名错误、导出反馈完善。App 拆出功能组件/hooks，运行账本/FIFO/终态收束、Host 预算/上下文、工具操作和流式完整性导出分离。提交回执只保留摘要，SQLite 不新增永久聊天正文副本。
+
+最终真实 DeepSeek 首轮/重启追问分别使用 8/6 次模型请求，通过原生历史恢复、报告/PNG 非空且展示、旧报告 hash 保留、输入不变与没有重复历史。首轮 2 次审批逐条审阅脚本及命令后由 CDP 点击，追问没有审批。Judge 状态为 not_reviewed：本轮没有变更分析 skill，没有重做或借用旧质量评分作为本次结论。
+
+100 MB 合成输入的确定性基准：单会话约 4.76 秒，双并发分别约 4.59/4.35 秒；交互响应 P95 约 56.1 ms，应用进程树采样峰值约 1.42 GiB，Python 合计约 659 MiB。该数字是当前机器/fixture 的工作台基准，不是任意 Agent 任务的完成时限或性能保证。
+
+实际查看最终三尺寸×两主题截图及真实 PNG 预览；完整覆盖映射与未覆盖的人工验证范围见 [UX 计划](ux-remediation-plan.md)，实际模块结构见 [技术设计](technical-design.md)。失败记录 `test-results/2026-11-07T01-57-08.563Z/`、`2026-11-07T02-10-09.689Z/` 及中止的 `2026-11-07T02-16-31.937Z/` 保留；发现并修复了菜单关闭后的指针阻塞，以及旧测试的自动预览/构建路径/DOM 定位假设。
+
+最终已验收的 .app：`test-results/2026-11-07T02-18-35.380Z/release/mac-arm64/Data Agent.app`。没有覆盖用户正在使用的共享 out/release。源代码可用 pnpm dev 启动；构建和原生模块准备要求不变。测试启动器默认隐藏窗口、不抢焦点，仍执行真实 CDP 交互和截图；最终及此前中止的测试均复查无进程残留。

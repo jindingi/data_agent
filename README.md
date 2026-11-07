@@ -8,9 +8,9 @@
 
 打开 `release/mac-arm64/Data Agent.app`，在设置中填写 BYOK，即可引用 CSV 开始分析。支持多轮、插话、双会话并发、原生 JSONL 历史、Markdown/PNG 展示、复制及导出，Python 与常用库随包提供。详细操作见 [本机使用说明](docs/usage.md)。
 
-Agent 效果独立评测，结果不保证正确：最终 J1/J5 为 8/12、10/12，记录了主图裁切和解释不严谨等问题。前期 J4/J6 曾耗尽请求预算，失败保留。其他模型、Intel/其他系统和公开签名公证尚未验收；本次交付是本机可用 `.app`。
+Agent 效果独立评测，结果不保证正确：首轮交付的 J1/J5 为 8/12、10/12，记录了主图裁切和解释不严谨等问题。前期 J4/J6 曾耗尽请求预算，失败保留。其他模型、Intel/其他系统和公开签名公证尚未验收；本次交付是本机可用 `.app`。
 
-交付后发现的预览滚动、空会话、附件状态、历史阅读与控件提示问题，见 [UX 修复计划](docs/ux-remediation-plan.md)。UX0–UX5 目前仅完成规划，尚未实施；原 P0–P7 通过记录不代表这些体验问题已修复。
+交付后发现的预览滚动、空会话、附件状态、历史阅读与控件提示问题，见 [UX 修复计划](docs/ux-remediation-plan.md)。本轮 UX 修复与 R1–R6 重构已完成，最终 P7 为 **68/68 通过**，包括后台 CDP、实际 .app 和真实模型重启追问。测试默认隐藏窗口、不抢焦点。最终验收包保留在独立 test-results 目录，路径见实施进度；没有覆盖用户正在使用的 release 包。
 
 ## 文档
 
@@ -21,7 +21,7 @@ Agent 效果独立评测，结果不保证正确：最终 J1/J5 为 8/12、10/12
 - [代码格式、Lint 与强制提交门禁](docs/code-quality.md)
 - [软件工程审查与重构计划](docs/refactoring-plan.md)
 - [设计原则与 AI 实施规范](docs/design-principles.md)
-- [UX 修复阶段与验收计划（尚未实施）](docs/ux-remediation-plan.md)
+- [UX 修复阶段与验收计划](docs/ux-remediation-plan.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)
@@ -51,7 +51,7 @@ pnpm verify:phase -- P3  # 工具/审批/CDP/内置运行时及真实模型
 pnpm verify:phase -- P4  # 产物登记、预览、导出与真实多 CSV 链路
 pnpm verify:phase -- P5  # 多轮、并发、后台与恢复
 pnpm verify:phase -- P6  # 边界、设置、性能、删除及真实多轮回归
-pnpm verify:phase -- P7  # 全部确定性回归及实际 .app 的真实模型分析/恢复
+DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7  # 全部确定性回归及实际 .app 的真实模型分析/恢复
 pnpm verify:release     # 核对 .app 资源、hash、架构与许可证；与 P7 门禁组合使用
 pnpm dev:cdp
 ```
@@ -65,3 +65,5 @@ pnpm dev:cdp
 P2 的真实测试可单独运行 `pnpm test:integration:live`。测试脚本从继承环境或 `~/.zshrc` 的单条字面量赋值取得 `DEEPSEEK_API_KEY`，不会 source shell；通过实际设置页保存到隔离测试实例的系统加密存储。生产应用始终由用户在设置中填写 BYOK，不读取开发者 shell 文件。
 
 P4 真实模型可能触发命令审批，含人工审核的运行使用 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P4`。审核模式不会预先批准未知代码，详见 [评测说明](evaluations/README.md)。程序检查与 Judge 质量评价分开记录，评分不进入产品执行状态。
+
+自动验收默认隐藏窗口，不抢占桌面焦点；CDP 仍执行真实交互与截图。测试专用 `--data-agent-background` 仅改变窗口呈现，不授予自动化权限。

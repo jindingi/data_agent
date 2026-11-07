@@ -68,6 +68,10 @@ export async function dispatchCommand(
         parent ? await artifacts.exportVersion(command.sessionId, command.versionId, parent) : null,
       );
     }
+    case 'artifacts.revealExport': {
+      shell.showItemInFolder(await artifacts.exportLocation(command.sessionId, command.path));
+      return success(command.type, null);
+    }
     case 'workspace.open': {
       const error = await shell.openPath(sessions.get(command.sessionId).workspace);
       if (error) throw new AppError('OPEN_FAILED', '无法打开工作区');

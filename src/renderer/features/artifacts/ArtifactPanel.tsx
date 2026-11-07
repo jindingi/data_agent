@@ -245,6 +245,18 @@ export function ArtifactPanel({
         {exported && (
           <p role="status" className="artifact-notice">
             已导出：{exported}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                if (sessionId)
+                  void request({ type: 'artifacts.revealExport', sessionId, path: exported }).catch(
+                    (error) => onError(error.message),
+                  );
+              }}
+            >
+              打开导出位置
+            </Button>
           </p>
         )}
         {copied && (

@@ -1,10 +1,10 @@
 # 软件工程审查与重构计划
 
-更新：2026-11-07。依据前端与主进程/Agent/测试两个 subagent 的源码审查，并结合主 agent 核对。**本轮实施格式与 lint 门禁；R1 隔离验证基础已实施；R2 契约与入口重构已实施；R3–R6 尚未实施。** 竞态与性能影响除另有说明外是源码推导的风险，不是已经复现的事故。
+更新：2026-11-07。依据前端与主进程/Agent/测试两个 subagent 的源码审查，并结合主 agent 核对。**R0–R6 已完成；最终完整 P7 为 68/68 通过。** 竞态与性能影响除另有说明外是源码推导的风险，不是已经复现的事故。
 
 本计划与 [UX 修复计划](ux-remediation-plan.md) 协调执行，不重新设计产品范围。现有 Electron Main / preload / Renderer / pi utilityProcess 分层合理，保留 SQLite 单写、pi 原生 JSONL、通用工具、安全策略和两会话准入。不要引入 ACP、新状态框架或通用 Repository 基类解决当前具体问题。
 
-## 1. 审查结论与证据
+## 1. 实施前审查结论与证据
 
 引用路径和符号而非行数，避免本轮格式化导致定位失效。详细一次性审查笔记在本机忽略目录，下面保留可随仓库维护的结论。
 
@@ -33,7 +33,9 @@
 - 行为保持的提取与产品行为调整分别记录。兼容既有 SQLite migration、JSONL、inputId/epoch/seq 和错误语义，不顺手重写协议。
 - 测试通过模块接口观察行为；避免主要靠访问 private 状态。先用确定性交错/故障注入捕获风险，再提取实现。
 
-## 3. 目标结构（规划，不是当前目录）
+## 3. 结构选择
+
+下面保留最初目标结构；实际模块见 [技术设计](technical-design.md)。实现未创建无独立行为的 WorkbenchLayout/ConversationView，也未为拆文件增加 controller。预览状态由 ArtifactPanel 单一持有，日志与回答共用的安全链接原语保持场景权限；运行账本最终命名 run-ledger.ts，完整性 I/O 为 artifacts-io.ts。
 
 ```text
 src/renderer/
@@ -68,7 +70,7 @@ scripts/test/
 
 ## 4. 阶段与自动验收
 
-R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接口时独立推进；R5 依赖 R4 的生命周期契约；R6 汇总。所有 R-* 测试编号是待实现验收合同，必须注册后才能运行，不是现有 case ID。
+R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接口时独立推进；R5 依赖 R4 的生命周期契约；R6 汇总。下列 R-* 名称是原计划的验收目标，不全是独立 runner ID；已注册 R-WRITES、R-EXPORT、R-RESOURCE-RELEASE，其余目标映射至 unit 与 P0–P7/UX 用例，正式清单以 case-registry 和 tests/phases/P7.json 为准。
 
 ### R0 — 格式基线和提交门禁（本轮）
 
@@ -157,10 +159,10 @@ R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接
 | R0       | 已完成；quality、unit、真实 hook 正反例、P0-DEV 均通过 | 所有后续提交的基础门禁，不等于任何 UX 问题已修复  |
 | R1       | 已完成                                                 | 与 UX0 合并安全验证基础设施                       |
 | R2       | 已完成                                                 | 为跨进程草稿/提交改造提供类型契约                 |
-| R3       | 未实施                                                 | 提取后承载 UX1–UX4；具体行为以 UX 计划为准        |
-| R4       | 未实施                                                 | 影响 UX2 输入身份、并发与恢复，不改变产品范围     |
-| R5       | 未实施                                                 | 保证工具/产物生命周期，独立于视觉改造             |
-| R6       | 未实施                                                 | 可与 UX5 共享同一轮完整回归证据，覆盖范围必须注明 |
+| R3       | 已完成；完整回归通过                                   | 提取后承载 UX1–UX4；具体行为以 UX 计划为准        |
+| R4       | 已完成；完整回归通过                                   | 影响 UX2 输入身份、并发与恢复，不改变产品范围     |
+| R5       | 已完成；完整回归通过                                   | 保证工具/产物生命周期，独立于视觉改造             |
+| R6       | 已完成；68/68 通过                                     | 可与 UX5 共享同一轮完整回归证据，覆盖范围必须注明 |
 
 每阶段通过必要验收后创建本地 commit，不自动 push。遇到与现有行为不一致的需求，应在对应 UX 行为提交中处理；纯模块提取阶段不得静默改变用户流程。
 
@@ -174,14 +176,24 @@ R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接
 
 ### R3 实施进展（2026-11-07）
 
-App 已拆出 SessionSidebar、SessionHeader、Composer/useComposer、RunControls/useActivity、SettingsDialog/useModelSettings、Report/ZoomImage/usePanelSize。草稿、模型写入与预览请求各自有状态所有者；布局组合留在 App，不迁移为全能 controller。草稿 revision/token 单元正反例及 UX-DRAFTS、UX-READING、P6-DRAFTS、P6-SETTINGS 通过。新增模型搜索/提供方分组、弹窗错误、焦点返回、图片放大与输入框自增高。旧测试已迁移调用方式，完整旧门禁仍待运行，R3 最终验收与 R6 一并收束。
+App 已拆出 SessionSidebar、SessionHeader、Composer/useComposer、RunControls/useActivity、SettingsDialog/useModelSettings、Report/ZoomImage/usePanelSize。草稿、模型写入与预览请求各自有状态所有者；布局组合留在 App，不迁移为全能 controller。草稿 revision/token 单元正反例及 UX-DRAFTS、UX-READING、P6-DRAFTS、P6-SETTINGS 通过。新增模型搜索/提供方分组、弹窗错误、焦点返回、图片放大与输入框自增高。旧测试已迁移调用方式，完整旧门禁已在 R6 通过。
 
 ### R4 实施记录（2026-11-07）
 
-运行账本 RunLedger、FIFO/许可 RunAdmission、终态写者收束 RunLifecycle 已提取，RuntimeService 改用命名依赖。元数据仅在运行状态/输入 ACK 变化时写入，JSONL 继续由 pi 写；R-WRITES 证明连续文本 snapshot 不增加 SQL 写入，ACK/终态仍耐久。停止等待 Host、工具及版本发布后释放许可；终态缓存最多保留 8 个 task 和 8 个恢复 snapshot，历史仍可按需从 JSONL 读取。工具计数在写者结束后显式释放（与 R5 共用）。R-WRITES、P2-PREFLIGHT、P5-SWITCH、unit 和 quality 通过，完整 P5/删除/崩溃门禁留待最终汇总。
+运行账本 RunLedger、FIFO/许可 RunAdmission、终态写者收束 RunLifecycle 已提取，RuntimeService 改用命名依赖。元数据仅在运行状态/输入 ACK 变化时写入，JSONL 继续由 pi 写；R-WRITES 证明连续文本 snapshot 不增加 SQL 写入，ACK/终态仍耐久。停止等待 Host、工具及版本发布后释放许可；终态缓存最多保留 8 个 task 和 8 个恢复 snapshot，历史仍可按需从 JSONL 读取。工具计数在写者结束后显式释放（与 R5 共用）。R-WRITES、P2-PREFLIGHT、P5-SWITCH、unit 和 quality 通过，完整 P5/删除/崩溃门禁已在 R6 通过。
 
 ### R5 实施记录（2026-11-07）
 
 SessionRuntime 保留唯一 pi 生命周期，system/current context、请求证据和请求/活跃时间预算已分别提取。ToolService 继续拥有 policy→审批→重新检查→取消的统一外壳，ToolOperations 只执行已检查的通用操作。releaseRun 显式释放工具 closed/tails 与进程日志计数。
 
-导出使用同一已验证文件描述符、64 KiB chunk 和 SHA256 校验，先在独占目标目录的隐藏 staging 中写入/同步，全部校验后提交；失败清理本次 staging/新导出，已有同名导出拒绝覆盖。预览仍按已有 Markdown/PNG 上限有界读取。R-EXPORT（20 MiB）、R-RESOURCE-RELEASE（5 轮）、P2-REQUEST-LIMIT、P3-CANCEL、unit 和 quality 通过。完整安全策略/产物门禁在 R6 继续验证。
+导出使用同一已验证文件描述符、64 KiB chunk 和 SHA256 校验，先在独占目标目录的隐藏 staging 中写入/同步，全部校验后提交；失败清理本次 staging/新导出，已有同名导出拒绝覆盖。预览仍按已有 Markdown/PNG 上限有界读取。R-EXPORT（20 MiB）、R-RESOURCE-RELEASE（5 轮）、P2-REQUEST-LIMIT、P3-CANCEL、unit 和 quality 通过。完整安全策略/产物门禁已在 R6 通过。
+
+### R6 最终验收（2026-11-07）
+
+完整命令 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7`：68/68 通过，测试进程残留为 0。证据在 `test-results/2026-11-07T02-18-35.380Z/summary.json`；该目录包含独立构建、实际 .app、资源 hash 清单、CDP 截图与真实模型执行证据。测试源码指纹 `d7e9973dc7bfbe50b0287afcc21eb81e0b394f3e855f0f1017cd35171aeb9c50`；随后只补充验收文档，不改产品代码。quality、9 个 unit、3 个 tooling 检查通过，最终提交继续经过真实 Husky 门禁。
+
+收尾修复包括菜单→对话框残留的指针拦截、重命名错误就地呈现、危险删除样式、删除后的本地草稿清理、文件选择迟到响应与合计大小、导出位置受控打开；迁移 9 将旧 receipt 正文变为摘要，输入内容仍以 pi JSONL 为永久事实源。Runtime 的工具/产物依赖改为必需，准入测试使用真实服务并等待实际异步状态。
+
+全部自动窗口默认隐藏，不激活、不抢焦点，后台 CDP 操作/截图仍可用；普通启动不受影响。旧自动打开面板、旧构建路径及旧图片 DOM 结构的测试假设已迁移为显式打开/选择版本和语义定位。失败及中止记录保留，没有用 skip 或降低有效生命周期断言换取通过。
+
+实际重构提交：R1 `9f30b74`、R2 `2765ea8`、UX1 `69e475b`、UX2 `afa447e`、R3 `0334daf`、R4 `debe1e8`、R5 `de2ecaf`；本节与最后修复由 R6 提交收束。原结构图中的纯布局包装未机械创建，实际所有权与文件位置见技术设计。业务分析准确性没有被当作程序门禁，本轮未修改分析 skill，也未新增 Judge 质量分数。

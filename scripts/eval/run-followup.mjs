@@ -89,6 +89,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
     assert(final.requests[0].userMessages >= 2);
     assert(final.requests[0].toolResultHashes.length > 0);
     await openPreview(page, '预览');
+    await page.getByLabel('选择产物版本').selectOption(report.versionId);
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     await page.screenshot({ path: join(root, 'followup-report.png'), fullPage: true });
@@ -96,7 +97,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
     await until(
       () =>
         page
-          .locator('.artifact-scroll > .artifact-image')
+          .getByRole('img', { name: chart.relativePath, exact: true })
           .evaluate((i) => i.complete && i.naturalWidth > 0),
       'followup chart shown',
     );

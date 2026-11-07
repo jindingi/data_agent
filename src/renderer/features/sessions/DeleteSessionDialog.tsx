@@ -105,7 +105,7 @@ export function DeleteSessionDialog({
           <Button variant="outline" disabled={busy} onClick={close}>
             取消
           </Button>
-          <Button disabled={busy || !preview} onClick={() => void remove()}>
+          <Button variant="destructive" disabled={busy || !preview} onClick={() => void remove()}>
             {busy ? '正在停止并清理…' : preview?.pending ? '继续清理' : '确认删除会话'}
           </Button>
         </div>

@@ -31,6 +31,7 @@ export async function startApp(
     offline = false,
     minimalEnvironment = false,
     automation = true,
+    background = true,
     port: selectedPort,
     pickFiles,
     pickDirectory,
@@ -48,6 +49,7 @@ export async function startApp(
   const args = [
     ...(packaged ? [] : [testAppDir()]),
     ...(automation ? ['--data-agent-automation'] : []),
+    ...(background ? ['--data-agent-background'] : []),
     ...(offline ? ['--no-sandbox'] : []),
     `--remote-debugging-port=${port}`,
   ];

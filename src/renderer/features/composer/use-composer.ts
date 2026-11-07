@@ -40,12 +40,8 @@ export function useComposer(
   const change = (update: (draft: Draft) => Draft) =>
     write((current) => ({ ...current, [key]: update(current[key] ?? fallback.current) }));
   async function attach(files: SelectedFile[]) {
-    const current = store.current[key] ?? fallback.current;
-    const checked = await request({
-      type: 'files.inspect',
-      paths: [...current.files.map((f) => f.path), ...files.map((f) => f.path)],
-    });
-    // Picker responses belong to their original draft even if the user navigated meanwhile.
+    // Validate only new selections; a late response must not restore files removed meanwhile.
+    const checked = await request({ type: 'files.inspect', paths: files.map((f) => f.path) });
     change((value) => addFiles(value, checked));
   }
   async function pickFiles() {
@@ -105,6 +101,12 @@ export function useComposer(
     pickFiles,
     dropFiles,
     chooseWorkspace,
+    forget: (sessionId: string) =>
+      write((current) => {
+        const next = { ...current };
+        delete next[sessionId];
+        return next;
+      }),
     send,
     restore: async (input: RunInput) => {
       const files = await request({ type: 'files.inspect', paths: input.paths ?? [] });

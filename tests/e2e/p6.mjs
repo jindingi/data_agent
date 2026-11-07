@@ -383,7 +383,10 @@ export const cases = {
         await chat.hover();
         await page.mouse.wheel(0, -1000000);
       }
-      await page.getByText('FIRST_USER_MESSAGE_PAGINATION', { exact: true }).waitFor();
+      await page
+        .getByLabel('会话消息')
+        .getByText('FIRST_USER_MESSAGE_PAGINATION', { exact: true })
+        .waitFor();
       await page.getByRole('button', { name: '回到最新消息', exact: true }).click();
       await page.getByText('SECOND_RUN_END', { exact: true }).waitFor();
       assert.equal(await page.evaluate(() => window.__p6Executed), false);
@@ -467,6 +470,9 @@ export const cases = {
       await rpc(page, { type: 'sessions.rename', sessionId: b, title: 'Keep B' });
       const bRun = await running(b);
       await page.getByRole('button', { name: '打开会话 Delete A', exact: true }).click();
+      await page
+        .getByRole('textbox', { name: '分析需求' })
+        .fill('discard this unsent draft with session A');
       await page.getByRole('button', { name: '会话操作', exact: true }).click();
       await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
       await page.getByRole('checkbox').check();
@@ -479,6 +485,13 @@ export const cases = {
             .count()
             .then((n) => n === 0),
         'delete dialog closed',
+      );
+      assert.equal(
+        await page.evaluate(
+          (id) => JSON.parse(localStorage.getItem('composer-drafts-v1') ?? '{}')[id],
+          a,
+        ),
+        undefined,
       );
       assert(!existsSync(aSession.sessionFile));
       assert(!existsSync(join(aRun.outputDirectory, 'report.md')));
