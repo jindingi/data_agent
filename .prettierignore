@@ -1,0 +1,22 @@
+# Generated artifacts, dependencies, credentials and local evidence
+node_modules/
+/out/
+/dist/
+/release/
+/runtime/
+/test-results/
+/coverage/
+/playwright-report/
+/blob-report/
+/.data_agent/
+/.local/
+.env*
+*.log
+*.tsbuildinfo
+/pnpm-lock.yaml
+/docs/research/
+/docs/validation-report.md
+/evaluations/results/
+# Independent legacy probe packages retain their own baseline and locks.
+/validation/
+/.husky/_/

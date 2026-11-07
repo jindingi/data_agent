@@ -179,13 +179,13 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 本地真实测试固定：
 
-| 配置 | 值 |
-| --- | --- |
-| 显示名称 | DeepSeek-V41-Flash |
-| provider / model | deepseek / deepseek-flash |
-| base URL | https://api.deepseek.com |
-| key 来源 | `~/.zshrc` 中的 `DEEPSEEK_API_KEY` |
-| 思考配置 | enabled / high，由实际 SDK 请求验证 |
+| 配置             | 值                                  |
+| ---------------- | ----------------------------------- |
+| 显示名称         | DeepSeek-V41-Flash                  |
+| provider / model | deepseek / deepseek-flash           |
+| base URL         | https://api.deepseek.com            |
+| key 来源         | `~/.zshrc` 中的 `DEEPSEEK_API_KEY`  |
+| 思考配置         | enabled / high，由实际 SDK 请求验证 |
 
 `deepseek-flash` 为服务端可更新别名，记录请求/响应模型和日期；thinking+tools 后续请求由 SDK 保留 reasoning_content，不从 UI 重建。[DeepSeek 官方](https://api-docs.deepseek.com/)、[thinking/tools](https://api-docs.deepseek.com/guides/thinking_mode/)
 
@@ -195,18 +195,18 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 统一入口先做 schema、真实路径和命令/脚本检查，再 allow/ask/deny。文件路径使用 realpath/最近现存父目录，按目录归属判断，不用字符串前缀。源/目标均检查；执行前复核解析路径和脚本摘要，仍不声称消除所有竞态。
 
-| 规则 | 决定 |
-| --- | --- |
-| 普通外部读、正常内部读 | allow |
-| 普通 workspace 内新文件写入 | allow |
-| 已声明源 CSV 的可识别修改 | ask，即使源文件恰好位于 workspace 内也不默写；默认分析写新产物 |
-| 已发布产物的可识别修改 | deny；产物修改请求写新版本 |
-| state/sessions/凭证配置、敏感路径 | deny 读写 |
-| 检测到 workspace 外写删 | ask |
-| 已识别 curl/wget/requests/httpx 等联网 | ask；说明可识别的目标和动作 |
-| 明确破坏系统、安装依赖/修改内置运行时 | deny |
-| 可识别动态执行、无法解析的写入目标 | ask |
-| 检查器异常 | deny/error，不静默放行 |
+| 规则                                   | 决定                                                           |
+| -------------------------------------- | -------------------------------------------------------------- |
+| 普通外部读、正常内部读                 | allow                                                          |
+| 普通 workspace 内新文件写入            | allow                                                          |
+| 已声明源 CSV 的可识别修改              | ask，即使源文件恰好位于 workspace 内也不默写；默认分析写新产物 |
+| 已发布产物的可识别修改                 | deny；产物修改请求写新版本                                     |
+| state/sessions/凭证配置、敏感路径      | deny 读写                                                      |
+| 检测到 workspace 外写删                | ask                                                            |
+| 已识别 curl/wget/requests/httpx 等联网 | ask；说明可识别的目标和动作                                    |
+| 明确破坏系统、安装依赖/修改内置运行时  | deny                                                           |
+| 可识别动态执行、无法解析的写入目标     | ask                                                            |
+| 检查器异常                             | deny/error，不静默放行                                         |
 
 敏感路径基线覆盖应用凭证/控制文件、用户 SSH/云凭证、shell 启动文件及 `.env` 等显式凭证文件；在规则版本和样例表中列出具体模式。外部读取默认允许不等于允许读取这些文件。模型 API 为应用已配置行为，不通过工具联网审批反复询问。
 

@@ -8,6 +8,7 @@
 2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。
 3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX0–UX5 尚未实施。不要将计划写成现状。
 4. 验收与交付见 [开发计划](docs/development-plan.md)、[实施进度](docs/implementation-status.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
+5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R6 尚未实施，不用格式化替代职责重构。
 
 ## 产品边界
 
@@ -19,17 +20,17 @@
 
 ## 架构与目录
 
-| 目录 | 职责与依赖 |
-| --- | --- |
-| `src/main/` | 窗口、受控 IPC、SQLite 单写、凭证、会话准入、工具执行/策略/审批、产物与进程生命周期 |
-| `src/agent/` | utilityProcess 中的 pi session、JSONL、事件/输入身份适配、工具代理；不直接写 SQLite |
-| `src/preload/` | sandboxed、context-isolated 的窄接口桥；不暴露任意 IPC 或 Node |
-| `src/renderer/` | React app、features/sessions/runtime/artifacts、components/ui、styles；不导入 Node、Electron、pi 或 Main 实现 |
-| `src/shared/` | 可序列化模型与 Zod contracts；不依赖各进程实现或 Node |
-| `src/node/` | 仅 Node 侧路径、进程、运行时等公共能力 |
-| `resources/` | 内置 skills、可信 Python 辅助脚本、运行时锁定与许可配置 |
-| `scripts/build/`、`scripts/test/`、`tests/` | 构建、正式测试 runner、unit/integration/e2e 与阶段必需清单 |
-| `evaluations/`、`validation/` | 独立 Agent 效果评测、可复用技术探针；不是产品入口 |
+| 目录                                        | 职责与依赖                                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `src/main/`                                 | 窗口、受控 IPC、SQLite 单写、凭证、会话准入、工具执行/策略/审批、产物与进程生命周期                           |
+| `src/agent/`                                | utilityProcess 中的 pi session、JSONL、事件/输入身份适配、工具代理；不直接写 SQLite                           |
+| `src/preload/`                              | sandboxed、context-isolated 的窄接口桥；不暴露任意 IPC 或 Node                                                |
+| `src/renderer/`                             | React app、features/sessions/runtime/artifacts、components/ui、styles；不导入 Node、Electron、pi 或 Main 实现 |
+| `src/shared/`                               | 可序列化模型与 Zod contracts；不依赖各进程实现或 Node                                                         |
+| `src/node/`                                 | 仅 Node 侧路径、进程、运行时等公共能力                                                                        |
+| `resources/`                                | 内置 skills、可信 Python 辅助脚本、运行时锁定与许可配置                                                       |
+| `scripts/build/`、`scripts/test/`、`tests/` | 构建、正式测试 runner、unit/integration/e2e 与阶段必需清单                                                    |
+| `evaluations/`、`validation/`               | 独立 Agent 效果评测、可复用技术探针；不是产品入口                                                             |
 
 Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信。IPC 必须验证参数、发送窗口、主 frame 与可信完整 URL；不能为了修复 dev 问题放宽成任意 localhost/任意 frame。优先查锁定依赖、本地源码和配置，不照抄最新框架模板。
 
@@ -55,16 +56,18 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 
 先读 package.json、相关 runner 与用例清单，确认命令实际执行内容与副作用。基本入口：
 
-| 命令 | 用途 / 限制 |
-| --- | --- |
-| `pnpm check` | TypeScript、依赖边界与正式文档链接；当前链接扫描不含根 AGENTS.md，改本文件需另查链接 |
-| `pnpm test:unit` | 确定性单元测试；不能替代 UI/进程验收 |
-| `pnpm test:integration` | 通过正式 runner 验证集成；原生 SQLite 需 Electron ABI |
-| `pnpm test:e2e -- --case <已注册 ID>` | 定向 Electron/CDP；查 runner 是否自动构建或打包 |
-| `pnpm test:e2e -- --case P0-DEV --no-build` | 已有真实 pnpm dev 隔离启动/IPC 用例 |
-| `pnpm dev:cdp` | 构建后 Electron 的测试入口；不是 Vite HMR 模式 |
-| `pnpm verify:phase -- Pn` | 对应阶段完整门禁；部分阶段会调用真实模型，P7 会打包 |
-| `pnpm verify:release` | 包资源/完整性校验，不能替代实际 .app UI 验收 |
+日常先运行 `pnpm quality`（格式检查、ESLint 零警告、类型/架构/链接检查）。`pnpm format` 自动格式化，`pnpm lint:fix` 修复可自动处理的 lint 问题；工具正反例验收使用 `pnpm test:tooling`。这些静态门禁不能替代相关功能测试。
+
+| 命令                                        | 用途 / 限制                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm check`                                | TypeScript、依赖边界与正式文档链接；当前链接扫描不含根 AGENTS.md，改本文件需另查链接 |
+| `pnpm test:unit`                            | 确定性单元测试；不能替代 UI/进程验收                                                 |
+| `pnpm test:integration`                     | 通过正式 runner 验证集成；原生 SQLite 需 Electron ABI                                |
+| `pnpm test:e2e -- --case <已注册 ID>`       | 定向 Electron/CDP；查 runner 是否自动构建或打包                                      |
+| `pnpm test:e2e -- --case P0-DEV --no-build` | 已有真实 pnpm dev 隔离启动/IPC 用例                                                  |
+| `pnpm dev:cdp`                              | 构建后 Electron 的测试入口；不是 Vite HMR 模式                                       |
+| `pnpm verify:phase -- Pn`                   | 对应阶段完整门禁；部分阶段会调用真实模型，P7 会打包                                  |
+| `pnpm verify:release`                       | 包资源/完整性校验，不能替代实际 .app UI 验收                                         |
 
 - **不要覆写用户正在使用的应用包或构建目录。** `pnpm build`、`package:dir` 和某些测试会写 out/release。先检查在用实例与输出路径，使用独立输出及匹配验证路径，或已停止的目标；不能自行杀掉用户任务来方便测试。测试数据隔离不等于构建输出隔离。
 - `--no-build`/`--no-package` 只用于匹配当前代码的已验证产物；不以旧包结果验证新代码。优先采用已有隔离 harness，不伪称未实现的参数可用。
@@ -78,5 +81,6 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 
 - 产品行为变更同步产品/技术/使用文档；新增计划注明目标与现状，不篡改旧验证记录。
 - 每阶段完成验收后必须创建本地 commit，记录范围与检查；未完成只能如实标 WIP。检查 staged diff 与 `git diff --cached --check`，不混入他人改动、不自动 push。
+- 每次 commit 必须通过 Husky：lint-staged 对暂存代码执行 ESLint/Prettier，再跑全量 lint 和 check；安装依赖时 prepare 自动配置 hooks。禁止 `--no-verify`、`HUSKY=0`、更改 hooksPath 或关闭整套规则绕过。局部例外必须解释原因；全量质量工作流另见 .github/workflows/quality.yml。
 - 长期文档、正式源码、可复用脚本、测试与 lockfile 入 Git；密钥、SQLite/JSONL、下载运行时、out/release、截图、临时研究与测试结果仅留忽略目录。不用 `git add -f` 绕过规则。
 - 优先 MCP、Skill、CLI、API、代码/文件；禁止滥用 Computer Use。例如设计工具优先使用其 API/MCP/CLI，而非手动操纵桌面。产品 UI 验收优先既有 Electron/CDP harness。

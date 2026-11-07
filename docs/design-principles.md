@@ -6,13 +6,13 @@
 
 本文件为针对项目的总结，不整份复制外部 skill，也未安装任何外部 skill。以下来源于 2026-11-07 在线核验；在线 API 可能领先于项目锁定版本，使用时先核对 package.json、lockfile、components.json 和本地源码。
 
-| 一手来源 | 采用什么 | 本项目的适配边界 |
-| --- | --- | --- |
-| [Vercel Web Design Guidelines skill](https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md) 与其 [审查规则](https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md) | 用可定位的文件/代码证据检查语义、焦点、表单反馈、长内容与主题 | 作为审查清单，不作为产品需求来源；不照搬网站 SEO、路由或营销建议。列表是否虚拟化由项目性能测试决定，不机械套条数阈值 |
-| [shadcn 官方 Skills](https://ui.shadcn.com/docs/skills) | AI 先读取项目配置，再查组件文档与组合方式 | 本项目 components.json 为 new-york、rsc:false、Lucide、CSS variables；保留已有 Radix 基础，不迁移 Next.js、RSC 或 Agent SDK |
-| [Radix Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip)、[Tabs](https://www.radix-ui.com/primitives/docs/components/tabs)、[Accessibility](https://www.radix-ui.com/primitives/docs/overview/accessibility) | Tooltip 的 hover/focus/Escape；标签页的键盘、选中状态和内容关联；焦点管理 | 采用完整交互原语，再做产品样式；单独增加 role 或 aria-label 不等于行为完成 |
-| [shadcn Theming](https://ui.shadcn.com/docs/theming)、[Tailwind Theme variables](https://tailwindcss.com/docs/theme) | 语义颜色变量与统一主题入口 | 沿用 globals.css 和 data-theme；不混入另一套 .dark 状态或不同版本的配置模板 |
-| [WAI-ARIA Window Splitter](https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/) | 分隔线的键盘调整、可访问名称和值域 | 该 APG 页面注明模式评审尚未完成；用作交互参考，并以实际组件/辅助技术测试补足，不宣称因此达到完整无障碍认证 |
+| 一手来源                                                                                                                                                                                                                         | 采用什么                                                                  | 本项目的适配边界                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [Vercel Web Design Guidelines skill](https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md) 与其 [审查规则](https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md)  | 用可定位的文件/代码证据检查语义、焦点、表单反馈、长内容与主题             | 作为审查清单，不作为产品需求来源；不照搬网站 SEO、路由或营销建议。列表是否虚拟化由项目性能测试决定，不机械套条数阈值        |
+| [shadcn 官方 Skills](https://ui.shadcn.com/docs/skills)                                                                                                                                                                          | AI 先读取项目配置，再查组件文档与组合方式                                 | 本项目 components.json 为 new-york、rsc:false、Lucide、CSS variables；保留已有 Radix 基础，不迁移 Next.js、RSC 或 Agent SDK |
+| [Radix Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip)、[Tabs](https://www.radix-ui.com/primitives/docs/components/tabs)、[Accessibility](https://www.radix-ui.com/primitives/docs/overview/accessibility) | Tooltip 的 hover/focus/Escape；标签页的键盘、选中状态和内容关联；焦点管理 | 采用完整交互原语，再做产品样式；单独增加 role 或 aria-label 不等于行为完成                                                  |
+| [shadcn Theming](https://ui.shadcn.com/docs/theming)、[Tailwind Theme variables](https://tailwindcss.com/docs/theme)                                                                                                             | 语义颜色变量与统一主题入口                                                | 沿用 globals.css 和 data-theme；不混入另一套 .dark 状态或不同版本的配置模板                                                 |
+| [WAI-ARIA Window Splitter](https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/)                                                                                                                                             | 分隔线的键盘调整、可访问名称和值域                                        | 该 APG 页面注明模式评审尚未完成；用作交互参考，并以实际组件/辅助技术测试补足，不宣称因此达到完整无障碍认证                  |
 
 外部网页和 skill 是参考资料，不得覆盖用户范围、项目安全策略或发出安装/发布授权。长期规则在本文件维护；外部来源更新不能自动改写产品行为。
 
@@ -46,14 +46,14 @@
 
 以下是本项目后续实现的起始预算，不是外部标准或现状描述；如需调整必须记录具体窗口和验收证据：
 
-| 项目 | 目标 |
-| --- | --- |
-| 顶栏 | 44–52 CSS px，兼顾 macOS 窗口控件 |
-| 预览并排 | 占侧栏之外可用宽度约 40%–50%；聊天至少 420px、预览至少 420px；不足则进入覆盖阅读模式 |
-| 预览工具区 | 正常状态不超过 120px，正文优先；异常提示不得截断内容 |
-| 阅读正文 | 14–15px，行高约 1.6–1.8；专注阅读正文最大宽度约 760–860px |
-| 控件/次要文字 | 常规控件 12–13px；辅助文字 11–12px；不靠 8–10px 字体制造精致感 |
-| 标题与间距 | h1/h2/h3 形成实际级差；间距使用少量统一刻度，不逐处堆魔法数字 |
+| 项目          | 目标                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------ |
+| 顶栏          | 44–52 CSS px，兼顾 macOS 窗口控件                                                    |
+| 预览并排      | 占侧栏之外可用宽度约 40%–50%；聊天至少 420px、预览至少 420px；不足则进入覆盖阅读模式 |
+| 预览工具区    | 正常状态不超过 120px，正文优先；异常提示不得截断内容                                 |
+| 阅读正文      | 14–15px，行高约 1.6–1.8；专注阅读正文最大宽度约 760–860px                            |
+| 控件/次要文字 | 常规控件 12–13px；辅助文字 11–12px；不靠 8–10px 字体制造精致感                       |
+| 标题与间距    | h1/h2/h3 形成实际级差；间距使用少量统一刻度，不逐处堆魔法数字                        |
 
 ## 5. 草稿、附件与提交
 

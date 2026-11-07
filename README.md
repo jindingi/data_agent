@@ -18,6 +18,8 @@ Agent 效果独立评测，结果不保证正确：最终 J1/J5 为 8/12、10/12
 - [本机使用说明](docs/usage.md)
 - [技术设计与目录结构](docs/technical-design.md)
 - [AI 开发指南](AGENTS.md)
+- [代码格式、Lint 与强制提交门禁](docs/code-quality.md)
+- [软件工程审查与重构计划](docs/refactoring-plan.md)
 - [设计原则与 AI 实施规范](docs/design-principles.md)
 - [UX 修复阶段与验收计划（尚未实施）](docs/ux-remediation-plan.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
@@ -40,7 +42,8 @@ pnpm dev
 `pnpm native:rebuild` 确保 better-sqlite3 对应 Electron ABI，不使用系统 Node ABI 的二进制替代。默认安装下载官方 Electron，网络受限时应修复连接或使用已核对版本/hash 的官方缓存，不修改锁文件跳过完整性验证。
 
 ```sh
-pnpm check
+pnpm quality          # 格式、ESLint、TypeScript、依赖与文档检查
+pnpm test:tooling     # 验证真实 Husky 提交钩子的通过/拒绝/部分暂存行为
 pnpm verify:phase -- P0
 pnpm verify:phase -- P1
 pnpm verify:phase -- P2  # 包含真实 DeepSeek 请求
@@ -54,6 +57,8 @@ pnpm dev:cdp
 ```
 
 阶段门禁会构建并实际启动 Electron，结果位于被忽略的 `test-results/`。`dev:cdp` 为开发助手开启独立测试实例，输出 CDP endpoint 和临时数据目录，Ctrl+C 退出；正常产品启动不开放 CDP。
+
+依赖安装的 prepare 会设置 Husky。每次提交自动格式化/检查暂存文件，再跑全量 lint 和类型/架构检查；失败阻断提交。开发时可用 `pnpm format`、`pnpm lint:fix` 提前处理。Git hooks 不可用作跳过功能验收的理由，也不得用 `--no-verify` 绕过。现有代码已建立格式基线，App 与运行协调模块的职责拆分仍在重构计划中。
 
 本机打包：`pnpm package:dir`，产物位于 `release/mac-arm64/Data Agent.app`。打包前会校验内置运行时完整清单。P7 已验证本机包内资源、实际 UI 流程与真实模型链路。
 

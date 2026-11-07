@@ -1,0 +1,24 @@
+name: Code quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+          cache: pnpm
+      # Static checks need neither Electron downloads nor native rebuilds.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm quality
+      - run: pnpm test:unit
+      - run: pnpm test:tooling

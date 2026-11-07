@@ -2,16 +2,16 @@
 
 此表记录已验收能力；阶段要求以 [开发计划](development-plan.md) 为准，不能用本表缩小范围。每阶段通过后创建完成提交。原始日志、截图和机器结果只留本地 `test-results/`。
 
-| 阶段 | 当前状态 | 实现与验证 |
-| --- | --- | --- |
-| P0 | 已通过 | 正式四入口构建、React/shadcn/Tailwind 界面、窄 IPC、utilityProcess ping/退出、SQLite、CDP 隔离和本机 .app。`pnpm verify:phase -- P0` 的 5 项必需用例通过，内含 2 项单元测试；实际构建后的未打包态和打包态均运行；当时未覆盖 Vite 开发服务 |
-| P1 | 已通过 | SQLite 会话/原路径引用、新建/重命名/搜索/归档/恢复、自选新会话父目录、pi 原生 JSONL 只读预检与读取、可信 ResourceLoader、创建/历史落盘对账。`pnpm verify:phase -- P1` 的 10 项检查通过，包含 P0 前置回归和 7 项 P1 必需检查 |
-| P2 | 已通过 | 独立 Host 的真实 pi SessionRuntime、白名单快照/seq/epoch、原生输入身份与落盘恢复、模型选择/BYOK、受控 read、thinking/text/tool/Markdown 展示、基本并发准入与停止。`pnpm verify:phase -- P2` 的 15 项必需检查通过，含 4 个真实 DeepSeek/CDP 检查与前置回归 |
-| P3 | 已通过 | 7 个通用工具及澄清、内置 Python/rg/fd/中文字体、Main 策略审批与进程监督器。`pnpm verify:phase -- P3` 的 19 项检查通过，含真实 CDP、开发及 .app 运行时、DeepSeek 写入/执行/读取和 P2 核心 live 回归 |
-| P4 | 已通过 | run/version 输出目录、产物索引、Markdown/PNG 预览、整版导出和内置分析 skill；完整门禁 13 项通过，含确定性双 CSV/CDP、实际 .app 运行时及 DeepSeek 分析。J1/J2 独立 Judge 记录已完成，质量分数不作为程序门禁 |
-| P5 | 已通过 | 原生 steer/followUp、连续追问版本切换、两会话并发/FIFO、关窗口继续与 Cmd+Q 停止、崩溃恢复、未发送输入持久恢复、retry/compaction 状态。完整门禁 19 项通过，含真实 DeepSeek 重启追问；J5 独立 Judge 已完成 |
-| P6 | 已通过程序验收；效果评测已记录 | 删除重试、完整日志/长文本分页、模型能力设置、资源上限及边界测试；完整程序门禁 33/33 通过。J3/J4/J6 独立 Judge 完成，J4/J6 的请求预算失败如实保留 |
-| P7 | 已通过；本机 MVP 已交付 | 完整门禁 61/61、零残留进程，实际 .app 移动目录/离线/CDP/生产默认设置/DeepSeek 初次分析及重启追问通过；静态发布校验与独立 J1/J5 Judge 完成 |
+| 阶段 | 当前状态                       | 实现与验证                                                                                                                                                                                                                                                |
+| ---- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0   | 已通过                         | 正式四入口构建、React/shadcn/Tailwind 界面、窄 IPC、utilityProcess ping/退出、SQLite、CDP 隔离和本机 .app。`pnpm verify:phase -- P0` 的 5 项必需用例通过，内含 2 项单元测试；实际构建后的未打包态和打包态均运行；当时未覆盖 Vite 开发服务                 |
+| P1   | 已通过                         | SQLite 会话/原路径引用、新建/重命名/搜索/归档/恢复、自选新会话父目录、pi 原生 JSONL 只读预检与读取、可信 ResourceLoader、创建/历史落盘对账。`pnpm verify:phase -- P1` 的 10 项检查通过，包含 P0 前置回归和 7 项 P1 必需检查                               |
+| P2   | 已通过                         | 独立 Host 的真实 pi SessionRuntime、白名单快照/seq/epoch、原生输入身份与落盘恢复、模型选择/BYOK、受控 read、thinking/text/tool/Markdown 展示、基本并发准入与停止。`pnpm verify:phase -- P2` 的 15 项必需检查通过，含 4 个真实 DeepSeek/CDP 检查与前置回归 |
+| P3   | 已通过                         | 7 个通用工具及澄清、内置 Python/rg/fd/中文字体、Main 策略审批与进程监督器。`pnpm verify:phase -- P3` 的 19 项检查通过，含真实 CDP、开发及 .app 运行时、DeepSeek 写入/执行/读取和 P2 核心 live 回归                                                        |
+| P4   | 已通过                         | run/version 输出目录、产物索引、Markdown/PNG 预览、整版导出和内置分析 skill；完整门禁 13 项通过，含确定性双 CSV/CDP、实际 .app 运行时及 DeepSeek 分析。J1/J2 独立 Judge 记录已完成，质量分数不作为程序门禁                                                |
+| P5   | 已通过                         | 原生 steer/followUp、连续追问版本切换、两会话并发/FIFO、关窗口继续与 Cmd+Q 停止、崩溃恢复、未发送输入持久恢复、retry/compaction 状态。完整门禁 19 项通过，含真实 DeepSeek 重启追问；J5 独立 Judge 已完成                                                  |
+| P6   | 已通过程序验收；效果评测已记录 | 删除重试、完整日志/长文本分页、模型能力设置、资源上限及边界测试；完整程序门禁 33/33 通过。J3/J4/J6 独立 Judge 完成，J4/J6 的请求预算失败如实保留                                                                                                          |
+| P7   | 已通过；本机 MVP 已交付        | 完整门禁 61/61、零残留进程，实际 .app 移动目录/离线/CDP/生产默认设置/DeepSeek 初次分析及重启追问通过；静态发布校验与独立 J1/J5 Judge 完成                                                                                                                 |
 
 P0 验证使用 macOS 15.7.4 / Apple M4 / arm64，Electron 45.2.3 / ABI 150。第一轮设置按钮因快捷键混入可访问名称导致定位失败，修正明确标签后全量门禁通过；失败记录保留。P0 验收时未进行真实模型调用或 Judge 评测；后续模型验证见 P2；这段仅描述 P0 当时范围。
 
@@ -37,7 +37,6 @@ P4 测试还验证了外部只读 cd、带引号 heredoc、Python 常见 `__file
 
 P5 已完成多轮/插话版本切换与崩溃恢复；资源限额和交互边界已在 P6 验收，完整交付已按 P7 验收，见文末。P6 已给文本 read 增加 PNG/二进制及无效 UTF-8 的明确工具错误；工作台不解析 CSV，Agent 可改用 Python 指定编码。文本 read 不提供视觉能力，不能将其当成 Agent 已看过图表。
 
-
 P5 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P5` 为 19/19 通过，证据在本地 `test-results/2026-11-06T21-24-21.459Z/summary.json`。真实窗口完成连续提问、同批工具之后 steer、两条同文本 follow-up 分别消费并生成三份独立版本。强杀 Host/Main 后工具进程树分别在 78/22 ms 内结束，随后 10 秒无新增心跳；原任务 interrupted、部分产物可见、旧批准失效，未消费文字可恢复且不自动重发。关闭窗口保留审批与后台任务，Cmd+Q 停止所有任务，全局排队提问在重启后仍保留未发送。
 
 P5 新增 SQLite input_drafts 暂存输入投递文字；原生 JSONL 确认 committed 后删除，未知/取消输入跨 run 保留，可放回输入框或显式移除。JSONL 仍是唯一永久聊天内容。实际 SDK 重试、停止重试、自动压缩、压缩后继续请求均经 CDP 验证。最初检查发现重启只剩输入元数据、重试中停止可能误报失败，均已修复并补回归。中间全量复测因 CDP 把前次会话切换误认新建会话而失败；核对 SQLite 确认产品实际排队正确后修正定位条件，再跑完整门禁通过，失败记录保留。
@@ -52,7 +51,6 @@ P6 最终完整门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P6` 为 **3
 
 P6 的独立 Judge：J3 10/12（程序交付通过，混合编码/特殊字段正确，报告存在数量与编码唯一性表述问题）；J4 7/12（脚本与三张图已生成，但在反复图形检查后耗尽20次模型请求，未生成 report.md）；J6 9/12（解释报告和图表已生成，但重复校验耗尽20次请求，执行未正常收束）。J4/J6 的 `eval:prepare` 均为 failed，不能作为成功流程证据；对应 Judge 已阅读现有产物及错误，不为获得通过而重跑。本地记录分别位于 `evaluations/results/2026-11-06T22-40-58.662Z-J3-CSV/`、`2026-11-06T22-57-56.811Z-J4-DATA-QUALITY/`、`2026-11-06T22-59-13.314Z-J6-EXPLANATION/`。P6 最终多轮回归追问版本另评10/12。以上无质量通过线，不回写产品状态。后续改善方向是明确传达执行预算、先交付核心报告再做可选美化；资源上限保持不变。
 
-
 P7 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7` 为 **61/61 通过**，本地证据 `test-results/2026-11-06T23-30-02.576Z/summary.json`。清单包含 P0–P6 全部54个确定性检查与7个P7检查；P7-ALL 检查进程残留为0。`pnpm verify:release` 与 `pnpm check` 通过，静态结果在同目录 `release-verification.json`：7,042个运行时条目、80份许可证材料、arm64及SQLite原生模块，包内代码/资源与当前构建hash匹配。实际 .app 位于 `release/mac-arm64/Data Agent.app`，未签名公证，符合本机交付范围。
 
 首轮完整P7在 `2026-11-06T23-23-03.101Z` 为59/61：新增输入区思考选择器使旧P6设置测试的模糊标签同时命中两个控件，P7-ALL因此拒绝通过。精确定位后P6设置定向通过，再运行完整门禁通过；未放宽断言或选择更好的模型答案。首轮J1/J5程序通过、Judge9/12与10/12，失败门禁及样本均保留。
@@ -61,18 +59,18 @@ P7 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7` 为 **61/61 �
 
 ### 最终需求覆盖
 
-| 已确认需求 | 实现与最终验收覆盖 |
-| --- | --- |
-| CSV只登记原路径、多文件、合计100MB、不解析 | SessionService、preload拖拽桥；P1-INPUT-REF、P4-IMPORT/MULTIFILE、P6-FILE-BOUNDARY、P7-USABILITY |
-| 直接pi SDK、模型/BYOK、流式过程 | SessionRuntime/EventAdapter/CredentialService；P2全部确定性检查、P6-SETTINGS、P7-LIVE |
-| SQLite元数据、原生JSONL会话树、会话管理 | database/SessionService/InputIdentity/DeletionService；P1全部、P2-IDENTITY、P6-DELETE与DELETE-STORAGE |
-| 多轮、steer/follow-up、2并发/FIFO、窗口后台与退出 | RuntimeService与原生pi队列；P5全部确定性检查、P7-LIVE重启追问 |
-| 通用工具、内置skills/Python/库/字体 | tools、ResourceLoader及runtime manifest；P3全部确定性检查、P7-PACKAGE/OFFLINE/CDP |
-| 外部写删/联网审批、敏感路径拒绝、停止回收 | Policy/InteractionBroker/监督器；P3-POLICY/READ-POLICY/NETWORK/CANCEL/APPROVAL/QUESTION、P5-CRASH、P7-CDP |
-| 图表/Markdown、安全显示、历史产物、复制导出 | ArtifactService/ArtifactPanel/Transcript；P4全部确定性检查、P6-RENDER/LOG-UI、P7-USABILITY/CDP |
-| 长日志、资源限制、100MB双并发体验 | LogService/资源监督器/分页UI；P6完整确定性回归 |
-| 实际本机.app、脱离开发目录/系统Python、无首次下载 | P7-PACKAGE移动真实.app且精简PATH；P7-OFFLINE进程树外网阻断；P7-DEFAULTS正常启动无CDP/自动凭证及单实例 |
-| 程序验证与Judge分离、阶段提交、可重跑CDP | verify:phase显式清单、J1–J6独立记录、repository-workflow；原始证据均gitignore，仅正式源码/文档/可复用脚本入库 |
+| 已确认需求                                        | 实现与最终验收覆盖                                                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| CSV只登记原路径、多文件、合计100MB、不解析        | SessionService、preload拖拽桥；P1-INPUT-REF、P4-IMPORT/MULTIFILE、P6-FILE-BOUNDARY、P7-USABILITY              |
+| 直接pi SDK、模型/BYOK、流式过程                   | SessionRuntime/EventAdapter/CredentialService；P2全部确定性检查、P6-SETTINGS、P7-LIVE                         |
+| SQLite元数据、原生JSONL会话树、会话管理           | database/SessionService/InputIdentity/DeletionService；P1全部、P2-IDENTITY、P6-DELETE与DELETE-STORAGE         |
+| 多轮、steer/follow-up、2并发/FIFO、窗口后台与退出 | RuntimeService与原生pi队列；P5全部确定性检查、P7-LIVE重启追问                                                 |
+| 通用工具、内置skills/Python/库/字体               | tools、ResourceLoader及runtime manifest；P3全部确定性检查、P7-PACKAGE/OFFLINE/CDP                             |
+| 外部写删/联网审批、敏感路径拒绝、停止回收         | Policy/InteractionBroker/监督器；P3-POLICY/READ-POLICY/NETWORK/CANCEL/APPROVAL/QUESTION、P5-CRASH、P7-CDP     |
+| 图表/Markdown、安全显示、历史产物、复制导出       | ArtifactService/ArtifactPanel/Transcript；P4全部确定性检查、P6-RENDER/LOG-UI、P7-USABILITY/CDP                |
+| 长日志、资源限制、100MB双并发体验                 | LogService/资源监督器/分页UI；P6完整确定性回归                                                                |
+| 实际本机.app、脱离开发目录/系统Python、无首次下载 | P7-PACKAGE移动真实.app且精简PATH；P7-OFFLINE进程树外网阻断；P7-DEFAULTS正常启动无CDP/自动凭证及单实例         |
+| 程序验证与Judge分离、阶段提交、可重跑CDP          | verify:phase显式清单、J1–J6独立记录、repository-workflow；原始证据均gitignore，仅正式源码/文档/可复用脚本入库 |
 
 新增的本机操作入口与限制见 [使用说明](usage.md)。本次不声明其他平台/模型已验收，也不将图表能展示或报告存在等同于分析准确。
 

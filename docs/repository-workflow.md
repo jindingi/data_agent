@@ -10,18 +10,20 @@
 
 ## 仅留本地，由 .gitignore 排除
 
-| 内容 | 路径/示例 | 原因 |
-| --- | --- | --- |
-| 临时源码调研与当次结论 | `docs/research/`、`docs/validation-report.md` | 包含本机 checkout 路径、日期与一次性证据；长期结论已归入技术设计 |
-| 临时旧业务实验 | `validation/pi/verify-analysis.mjs`、`collect-results.mjs`；runtime 的 run/probe/offline、销售 schemas/fixtures | 原先混合业务 oracle 与流程的实验，不作为工作台回归合同 |
-| 验证结果与本机状态 | results/runs/artifacts、results.json、截图、数据库、JSONL、Judge 报告、构建日志 | 每次执行生成，可能含本机路径或用户数据 |
-| 下载、依赖与构建产物 | node_modules、Python、fonts、rg/fd、缓存、relocated、dist/.app、markdown-bundle.js | 可按锁定配置重建，体积较大 |
-| 本地凭证与环境 | `.env*`（模板除外）、`.data_agent/`、`.local/` | 不属于项目源码；真实 key 不得提交 |
-| 其他一次性材料 | `validation/local-notes/`、临时脚本/历史 README、release API 响应 | 仅用于本机回溯 |
+| 内容                   | 路径/示例                                                                                                       | 原因                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 临时源码调研与当次结论 | `docs/research/`、`docs/validation-report.md`                                                                   | 包含本机 checkout 路径、日期与一次性证据；长期结论已归入技术设计 |
+| 临时旧业务实验         | `validation/pi/verify-analysis.mjs`、`collect-results.mjs`；runtime 的 run/probe/offline、销售 schemas/fixtures | 原先混合业务 oracle 与流程的实验，不作为工作台回归合同           |
+| 验证结果与本机状态     | results/runs/artifacts、results.json、截图、数据库、JSONL、Judge 报告、构建日志                                 | 每次执行生成，可能含本机路径或用户数据                           |
+| 下载、依赖与构建产物   | node_modules、Python、fonts、rg/fd、缓存、relocated、dist/.app、markdown-bundle.js                              | 可按锁定配置重建，体积较大                                       |
+| 本地凭证与环境         | `.env*`（模板除外）、`.data_agent/`、`.local/`                                                                  | 不属于项目源码；真实 key 不得提交                                |
+| 其他一次性材料         | `validation/local-notes/`、临时脚本/历史 README、release API 响应                                               | 仅用于本机回溯                                                   |
 
 `validation/` 使用源码允许清单，避免临时生成物被意外加入。新增长期维护脚本时应同时更新允许清单及 README；正式产品 `src/`、`tests/`、`scripts/` 不受该清单限制。不要使用 `git add -f` 绕过排除规则。文件留本地，不因初始化 Git 而删除。
 
 ## 每阶段完成后提交
+
+所有提交先通过 [代码质量门禁](code-quality.md)：Husky 执行暂存文件的 ESLint/Prettier、全量 lint 和 check；失败即中止。首次安装依赖会自动安装 hook，不允许通过禁用 hook 绕过。格式基线与行为重构分开提交，具体模块调整见 [重构计划](refactoring-plan.md)。
 
 P0–P7 的每个阶段必须在规定程序验收通过、对应 Judge 记录按计划完成后创建一次明确的阶段完成 commit。Judge 分数不属于程序门禁，结果与证据仍只留本地。允许在阶段内提交较小的实现 commit，但它们不能代替完成提交。
 

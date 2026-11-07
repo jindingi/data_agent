@@ -26,7 +26,14 @@
     "runtime:verify": "node scripts/build/verify-runtime.mjs",
     "eval:prepare": "pnpm build && node scripts/eval/prepare.mjs",
     "test:e2e:live": "node scripts/test/verify.mjs --live",
-    "verify:release": "node scripts/build/verify-release.mjs"
+    "verify:release": "node scripts/build/verify-release.mjs",
+    "prepare": "husky",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "quality": "pnpm format:check && pnpm lint && pnpm check",
+    "test:tooling": "node --test tests/tooling/*.test.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.5.0",
@@ -46,6 +53,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "4.2.1",
+    "@eslint/js": "10.0.1",
     "@tailwindcss/vite": "4.1.17",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "24.10.1",
@@ -55,11 +63,19 @@
     "electron": "45.2.3",
     "electron-builder": "26.18.0",
     "electron-vite": "5.0.0",
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "husky": "9.1.7",
+    "lint-staged": "16.4.0",
     "playwright-core": "1.65.0",
+    "prettier": "3.9.10",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
     "unified": "11.0.5",
     "vite": "7.2.2",
     "vitest": "3.2.4"

@@ -5,11 +5,29 @@ import { cn } from '../../lib/utils';
 export const Dialog = DialogPrimitive.Root;
 export const DialogTitle = DialogPrimitive.Title;
 export const DialogDescription = DialogPrimitive.Description;
-export function DialogContent({ className, children, ...props }: ComponentProps<typeof DialogPrimitive.Content>) {
-  return <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm" />
-    <DialogPrimitive.Content className={cn('fixed left-1/2 top-1/2 z-50 max-h-[90vh] overflow-y-auto w-[min(560px,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-7 shadow-2xl outline-none', className)} {...props}>
-      {children}<DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-accent" aria-label="关闭设置"><X size={18} /></DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPrimitive.Portal>;
+export function DialogContent({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm" />
+      <DialogPrimitive.Content
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 max-h-[90vh] overflow-y-auto w-[min(560px,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-7 shadow-2xl outline-none',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close
+          className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-accent"
+          aria-label="关闭设置"
+        >
+          <X size={18} />
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
 }
