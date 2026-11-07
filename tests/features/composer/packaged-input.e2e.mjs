@@ -120,6 +120,10 @@ export const cases = {
       fixture.set({ text: 'Compatibility shortcut delivered.' });
       const restoredInput = page.getByRole('textbox', { name: '分析需求' });
       await restoredInput.fill('兼容原有快捷键');
+      await until(
+        () => page.getByRole('button', { name: '发送分析需求', exact: true }).isEnabled(),
+        'restored session and model configuration ready',
+      );
       await restoredInput.press('Meta+Enter');
       const second = await until(async () => {
         const v = await rpc(page, { type: 'runtime.snapshot', sessionId: id });

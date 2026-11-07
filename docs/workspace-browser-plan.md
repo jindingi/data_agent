@@ -1,6 +1,6 @@
 # 右侧工作区文件浏览器改造方案
 
-状态：实施中。2026-11-07，A/B/C 已完成，D 最终回归进行中。当前实现与阶段证据见 [实施进度](implementation-status.md)。 本文负责目录/预览交互，迁移与提交以 [存储简化方案](storage-simplification-plan.md) 为准。
+状态：已完成。2026-11-07，A–D 已实施并通过验收。当前实现与阶段证据见 [实施进度](implementation-status.md)。 本文负责目录/预览交互，迁移与提交以 [存储简化方案](storage-simplification-plan.md) 为准。
 
 ## 1. 目标与交互
 
