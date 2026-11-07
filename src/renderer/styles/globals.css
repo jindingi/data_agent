@@ -5,6 +5,8 @@
   --color-card: var(--card);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-secondary: var(--surface-hover);
   --color-secondary-foreground: var(--foreground);
   --color-muted-foreground: var(--text-muted);
@@ -19,6 +21,8 @@
   --card: #202326;
   --primary: #a2d0bb;
   --primary-foreground: #12231d;
+  --destructive: #b83228;
+  --destructive-foreground: #ffffff;
   --accent-text: #a2d0bb;
   --text-secondary: #bdc8c2;
   --text-muted: #909c98;
@@ -46,6 +50,7 @@
   --card: #ffffff;
   --primary: #286747;
   --primary-foreground: #ffffff;
+  --destructive: #b42318;
   --accent-text: #286747;
   --text-secondary: #40534a;
   --text-muted: #5d6d64;
