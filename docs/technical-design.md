@@ -2,6 +2,8 @@
 
 更新日期：2026-11-07。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
 
+每会话单个追加式事件文件的后续设计见 [Session 追加日志设计](session-logging-plan.md)，目前待实施；本文其他章节仍描述已实现行为。
+
 后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX1–UX4 与 R1–R5 已实施，完整回归证据见实施进度；下文描述实际结构与契约。
 
 ## 1. 技术栈与运行边界
@@ -378,7 +380,5 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 - API 依据：[DeepSeek List Models](https://api-docs.deepseek.com/api/list-models)、[OpenRouter Models](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)、[Electron net](https://www.electronjs.org/docs/latest/api/net)。DeepSeek 的实际 `/models` 响应与 OpenRouter 文档/实测共同验证接口；这些协议资料不代表逐模型产品验收。
 
 ## 完整工具日志
-
-以下描述已实现布局。后续改为每会话单个追加式事件文件的设计见 [Session 追加日志设计](session-logging-plan.md)，目前待实施；其格式、写入/恢复和读取规则不代表当前产品行为。
 
 日志直接保存在 logs/{sessionId}/{sha256(toolCallId)}/{executionId}.log，不建立 SQLite 索引或 sidecar。查看前用活动工具或原生历史确认归属，再有界列举该工具目录（每页 100 条），正文分页 32 KiB；每次执行仍合计最多保存 10 MiB。Main 返回短期日志 ID，读取再次验证归属、根、普通文件和无重定向。没有新布局日志明确提示“未保存可读取的完整日志”；旧布局文件原样保留，不自动迁移或清理。资源峰值仍由执行监督使用，不为 UI 另存日志元数据。
