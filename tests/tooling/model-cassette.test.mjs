@@ -135,3 +135,51 @@ test('paths split across SSE tool/content deltas are portable without removing e
     '{"path":"/tmp/new/fixture.txt","again":"/tmp/new/x"}',
   );
 });
+
+test('recording decodes UTF-8 once when a request splits inside a Chinese character', async () => {
+  const { request } = await import('node:http');
+  const root = mkdtempSync(join(tmpdir(), 'cassette-utf8-')),
+    file = join(root, 'candidate.json');
+  const oldMode = process.env.DATA_AGENT_TEST_MODEL_MODE;
+  process.env.DATA_AGENT_TEST_MODEL_MODE = 'live';
+  const payload = {
+    model: 'deepseek-flash',
+    messages: [{ role: 'user', content: '读取中文文件' }],
+  };
+  let transport;
+  try {
+    transport = await modelCassette({
+      mode: 'record',
+      file,
+      key: 'synthetic-utf8-key',
+      provenance: 'synthetic-unit',
+      fetchImpl: async (_url, options) => {
+        assert.deepEqual(JSON.parse(options.body), payload);
+        return new Response('data: [DONE]\n\n', {
+          headers: { 'Content-Type': 'text/event-stream' },
+        });
+      },
+    });
+    const body = Buffer.from(JSON.stringify(payload)),
+      split = body.indexOf(Buffer.from('读')) + 1;
+    await new Promise((resolve, reject) => {
+      const req = request(transport.baseUrl + '/chat/completions', { method: 'POST' }, (res) => {
+        res.resume();
+        res.on('end', () =>
+          res.statusCode === 200 ? resolve() : reject(new Error('Recording failed')),
+        );
+      });
+      req.on('error', reject);
+      req.write(body.subarray(0, split));
+      setTimeout(() => req.end(body.subarray(split)), 15);
+    });
+    transport.assertComplete();
+    transport.save();
+    assert.deepEqual(JSON.parse(readFileSync(file)).exchanges[0].request, payload);
+  } finally {
+    await transport?.close();
+    if (oldMode === undefined) delete process.env.DATA_AGENT_TEST_MODEL_MODE;
+    else process.env.DATA_AGENT_TEST_MODEL_MODE = oldMode;
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -74,11 +74,14 @@ export async function modelCassette({
     try {
       assert.equal(request.method, 'POST');
       assert.equal(request.url, '/v1/chat/completions');
-      let body = '';
+      const bodyChunks = [];
+      let bodyBytes = 0;
       for await (const chunk of request) {
-        body += chunk;
-        if (body.length > 2_000_000) throw new Error('Request too large');
+        bodyBytes += chunk.length;
+        if (bodyBytes > 2_000_000) throw new Error('Request too large');
+        bodyChunks.push(chunk);
       }
+      const body = Buffer.concat(bodyChunks).toString('utf8');
       const payload = JSON.parse(body),
         normalized = transform.encode(payload),
         index = cursor++;
