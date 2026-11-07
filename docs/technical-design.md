@@ -4,6 +4,8 @@
 
 每会话单个追加式事件文件的后续设计见 [Session 追加日志设计](session-logging-plan.md)，目前待实施；本文其他章节仍描述已实现行为。
 
+HTML 交互报告的后续工作见 [实现计划](interactive-report-plan.md)，目前待实施：新增独立 skill、内置 ECharts、自由 HTML/CSS/JS 生成及隔离预览，不固定报告布局，不定义报告 DSL 或组件生成器。现有 Markdown/PNG 与源码预览行为尚未改变。
+
 后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX 修复与 R1–R6 重构已完成；历史验收见 Git 与本地 test-results，当前回归入口见 [测试指南](testing-guide.md)；下文描述实际结构与契约。
 
 ## 1. 技术栈与运行边界
