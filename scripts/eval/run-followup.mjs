@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { runScenario, waitReviewedRun } from './run-scenario.mjs';
 import { startApp, until } from '../test/harness.mjs';
 import { liveKey } from '../test/live-key.mjs';
-import { rpc } from '../../tests/e2e/p3.mjs';
+import { rpc } from '../../tests/support/desktop.mjs';
 
 export async function runFollowup(root, { packaged = false } = {}) {
   root = resolve(root);

@@ -12,7 +12,7 @@
     "dev:cdp": "node scripts/test/dev-cdp.mjs",
     "start": "electron-vite preview",
     "build": "electron-vite build",
-    "package:dir": "pnpm runtime:verify && pnpm build && electron-builder --mac dir --arm64",
+    "package:dir": "node scripts/build/package.mjs",
     "native:rebuild": "electron-rebuild -f -w better-sqlite3",
     "check": "tsc --noEmit && node scripts/test/check.mjs",
     "test:unit": "vitest run tests/unit",

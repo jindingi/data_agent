@@ -1,3 +1,4 @@
+import { testBundle } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -5,57 +6,19 @@ import { randomUUID } from 'node:crypto';
 import { startApp, until } from '../../scripts/test/harness.mjs';
 import { verifyRuntime } from '../../scripts/build/verify-runtime.mjs';
 import { liveKey } from '../../scripts/test/live-key.mjs';
+import { rpc, configure, submit, settled, snapshot } from '../support/desktop.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
 
-export async function rpc(page, command) {
-  const result = await page.evaluate((command) => window.dataAgent.request(command), command);
-  assert.equal(result.ok, true, JSON.stringify(result));
-  return result.value;
-}
-async function snapshot(page, sessionId) {
-  return rpc(page, { type: 'runtime.snapshot', sessionId });
-}
-export async function configure(page, key = 'synthetic-p3-fixture-key') {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page
-    .getByLabel('选择模型')
-    .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
-  await page.getByRole('textbox', { name: 'API key' }).fill(key);
-  await page.getByRole('button', { name: '保存凭证', exact: true }).click();
-  await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
-  await page.getByRole('button', { name: '关闭设置' }).click();
-}
-export async function submit(page, text = 'Execute the requested fixture action.') {
-  const known = new Set((await rpc(page, { type: 'sessions.list' })).map((session) => session.id));
-  await page.getByRole('button', { name: '新会话', exact: true }).click();
-  const sessionId = await until(async () => {
-    const id = await page.getByTestId('session-title').getAttribute('data-session-id');
-    return id && !known.has(id) ? id : null;
-  }, 'new session selected');
-  await page.getByRole('textbox', { name: '分析需求' }).fill(text);
-  await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
-  return sessionId;
-}
 async function interaction(page, sessionId, kind = 'approval') {
   await page
     .getByRole('region', { name: kind === 'approval' ? '安全审批' : '澄清问题', exact: true })
     .waitFor({ timeout: 30_000 });
   return until(
     async () =>
-      (await snapshot(page, sessionId))?.interactions?.find((value) => value.kind === kind),
+      (await rpc(page, { type: 'runtime.snapshot', sessionId }))?.interactions?.find(
+        (value) => value.kind === kind,
+      ),
     'interaction in authoritative snapshot',
-  );
-}
-export async function settled(page, sessionId) {
-  return until(
-    async () => {
-      const value = await snapshot(page, sessionId);
-      return value && ['completed', 'failed', 'cancelled', 'interrupted'].includes(value.state)
-        ? value
-        : null;
-    },
-    'run settled',
-    60_000,
   );
 }
 async function late(page, value, changes = {}) {
@@ -154,7 +117,7 @@ export const cases = {
     for (const packaged of [false, true]) {
       const root = resolve(dir, packaged ? 'p3-runtime-app' : 'p3-runtime-dev');
       const runtimeRoot = packaged
-        ? resolve('release/mac-arm64/Data Agent.app/Contents/Resources/runtime')
+        ? join(testBundle(), 'Contents/Resources/runtime')
         : resolve('runtime/darwin-arm64');
       const inventory = verifyRuntime(runtimeRoot),
         fixture = await modelFixture();

@@ -1,3 +1,5 @@
+import { nativeIds, mergeCases, requirementsFor } from './case-registry.mjs';
+import { createRunContext, setRunContext, preparePackageDependencies } from './run-context.mjs';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -21,6 +23,10 @@ const selected = caseIndex >= 0 ? args[caseIndex + 1] : undefined;
 const stamp = new Date().toISOString().replaceAll(':', '-');
 const dir = resolve('test-results', stamp);
 mkdirSync(dir, { recursive: true });
+const contextIndex = args.indexOf('--run-root');
+if (contextIndex >= 0 && !args[contextIndex + 1]) throw new Error('--run-root requires a path');
+const context = createRunContext(contextIndex >= 0 ? args[contextIndex + 1] : dir);
+setRunContext(context);
 const summary = {
   phase: phase ?? 'targeted',
   started: new Date().toISOString(),
@@ -39,31 +45,6 @@ const command = (id, cmd) => {
   writeFileSync(join(dir, `${id}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
   if (result.status !== 0) throw new Error(`${id} failed (${result.status}): see ${id}.log`);
 };
-const nativeIds = [
-  'P6-OUTPUT-LIMIT',
-  'P6-LOG-LIMIT',
-  'P6-DELETE-STORAGE',
-  'P6-LOG-STORAGE',
-  'P6-READ-ENCODING',
-  'P4-ARTIFACT',
-  'P4-VERSIONS',
-  'P3-TOOLS',
-  'P3-POLICY',
-  'P3-READ-POLICY',
-  'P3-NETWORK',
-  'P3-CANCEL',
-  'P1-SCHEMA',
-  'P1-TREE',
-  'P1-RECOVERY',
-  'P1-COORDINATION',
-  'P2-STREAM',
-  'P2-SNAPSHOT',
-  'P2-IDENTITY',
-  'P2-CREDENTIAL',
-  'P2-READ-BOUNDS',
-  'P2-PREFLIGHT',
-  'P2-REQUEST-LIMIT',
-];
 function nativeCase(id) {
   const jsonFile = join(dir, `${id}.vitest.json`);
   const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
@@ -92,22 +73,24 @@ function nativeCase(id) {
     throw new Error('Native case missing, skipped or failed');
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
-const cases = {
-  ...p0,
-  ...p1,
-  ...p2,
-  ...p3,
-  ...p4,
-  ...p5,
-  ...p6,
-  ...p7,
-  ...Object.fromEntries(nativeIds.map((id) => [id, async () => nativeCase(id)])),
-  'P0-CHECK': async () => {
-    command('typecheck', ['check']);
-    command('unit', ['test:unit']);
-    return { commands: ['pnpm check', 'pnpm test:unit'] };
+const cases = mergeCases(
+  p0,
+  p1,
+  p2,
+  p3,
+  p4,
+  p5,
+  p6,
+  p7,
+  Object.fromEntries(nativeIds.map((id) => [id, async () => nativeCase(id)])),
+  {
+    'P0-CHECK': async () => {
+      command('typecheck', ['check']);
+      command('unit', ['test:unit']);
+      return { commands: ['pnpm check', 'pnpm test:unit'] };
+    },
   },
-};
+);
 cases['P7-ALL'] = async () => {
   if (phase !== 'P7' || !manifest) throw new Error('P7-ALL requires the complete P7 gate');
   const expected = manifest.required.filter((id) => id !== 'P7-ALL');
@@ -172,6 +155,7 @@ try {
     if (existsSync(file))
       sourceHash.update(file).update('\0').update(readFileSync(file)).update('\0');
   summary.sourceTreeHash = sourceHash.digest('hex');
+  summary.context = context;
   summary.sourceFiles = sources.length;
   summary.macOS = execFileSync('/usr/bin/sw_vers', ['-productVersion'], {
     encoding: 'utf8',
@@ -206,21 +190,34 @@ try {
             : [...Object.keys(p0).filter((id) => id !== 'P0-PACKAGE'), ...Object.keys(p1)]);
   if (!ids.length || ids.some((id) => !cases[id]))
     throw new Error('Missing or unknown required test');
-  if (!args.includes('--no-build')) command('build', ['build']);
+  const requirements = requirementsFor(ids);
+  const buildStamp = join(context.appDir, 'build-source.sha256');
+  if (
+    requirements.build &&
+    args.includes('--no-build') &&
+    (!existsSync(buildStamp) || readFileSync(buildStamp, 'utf8') !== summary.sourceTreeHash)
+  )
+    throw new Error('Missing or stale isolated build; rebuild without --no-build');
+  if (requirements.build && !args.includes('--no-build')) {
+    command('build', ['exec', 'electron-vite', 'build', '--outDir', context.buildDir]);
+    writeFileSync(buildStamp, summary.sourceTreeHash);
+  }
   if (args.includes('--no-package')) {
     if (!selected) throw new Error('--no-package is only for targeted checks');
     verifyRelease();
   }
-  if (
-    !args.includes('--no-package') &&
-    ids.some(
-      (id) =>
-        ['P0-PACKAGE', 'P3-RUNTIME'].includes(id) ||
-        (id.startsWith('P7-') && id !== 'P7-USABILITY'),
-    )
-  ) {
+  if (!args.includes('--no-package') && requirements.packaged) {
     command('runtime', ['runtime:verify']);
-    command('package', ['exec', 'electron-builder', '--mac', 'dir', '--arm64']);
+    preparePackageDependencies(context, command);
+    command('package', [
+      'exec',
+      'electron-builder',
+      '--mac',
+      'dir',
+      '--arm64',
+      `--config.directories.app=${context.appDir}`,
+      `--config.directories.output=${context.releaseDir}`,
+    ]);
   }
   for (const id of ids) {
     const started = Date.now();

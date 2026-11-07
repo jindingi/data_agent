@@ -17,7 +17,10 @@ function files(root) {
     return lstatSync(p).isDirectory() ? files(p) : [p];
   });
 }
-export function verifyRelease(bundle = resolve('release/mac-arm64/Data Agent.app')) {
+export function verifyRelease(
+  bundle = resolve(process.env.DATA_AGENT_TEST_BUNDLE ?? 'release/mac-arm64/Data Agent.app'),
+  buildDir = resolve(process.env.DATA_AGENT_TEST_BUILD_DIR ?? 'out'),
+) {
   const resources = join(bundle, 'Contents/Resources'),
     archive = join(resources, 'app.asar');
   assert(existsSync(archive), 'Build the actual .app first');
@@ -28,8 +31,8 @@ export function verifyRelease(bundle = resolve('release/mac-arm64/Data Agent.app
     'Development state bundled',
   );
   const checked = [];
-  for (const file of files('out')) {
-    const path = relative('.', file),
+  for (const file of files(buildDir)) {
+    const path = join('out', relative(buildDir, file)),
       bytes = asar.extractFile(archive, path);
     assert.equal(hash(bytes), hash(readFileSync(file)), `Stale packaged application code: ${path}`);
     assert(

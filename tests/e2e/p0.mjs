@@ -1,3 +1,4 @@
+import { testBuildDir } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -164,8 +165,8 @@ export const cases = {
     }
   },
   async 'P0-PACKAGE'({ dir }) {
-    assert.ok(existsSync('out/main/index.js'));
-    assert.ok(existsSync('out/main/agent.js'));
+    assert.ok(existsSync(join(testBuildDir(), 'main/index.js')));
+    assert.ok(existsSync(join(testBuildDir(), 'main/agent.js')));
     const app = await startApp(join(dir, 'packaged'), { packaged: true });
     try {
       await app.page.getByRole('button', { name: '设置', exact: true }).click();

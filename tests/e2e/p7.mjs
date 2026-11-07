@@ -1,3 +1,4 @@
+import { testBundle } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -5,7 +6,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { startApp, until, freePort } from '../../scripts/test/harness.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
-import { configure, rpc, settled, submit } from './p3.mjs';
+import { configure, rpc, settled, submit } from '../support/desktop.mjs';
 import { runFollowup } from '../../scripts/eval/run-followup.mjs';
 import { verifyRelease } from '../../scripts/build/verify-release.mjs';
 
@@ -379,7 +380,7 @@ export const cases = {
     const inventory = verifyRelease();
     const relocated = join(resolve(dir), 'relocated', 'Data Agent.app');
     mkdirSync(join(resolve(dir), 'relocated'), { recursive: true });
-    execFileSync('/usr/bin/ditto', [resolve('release/mac-arm64/Data Agent.app'), relocated]);
+    execFileSync('/usr/bin/ditto', [testBundle(), relocated]);
     const fixture = await modelFixture(),
       app = await startApp(join(dir, 'p7-relocated'), {
         packaged: true,
@@ -448,19 +449,15 @@ export const cases = {
         { encoding: 'utf8' },
       );
       assert.deepEqual(JSON.parse(sqlite), []);
-      const second = spawn(
-        resolve('release/mac-arm64/Data Agent.app/Contents/MacOS/Data Agent'),
-        [],
-        {
-          env: {
-            HOME: process.env.HOME,
-            PATH: '/usr/bin:/bin',
-            DATA_AGENT_HOME: join(root, 'data'),
-            DATA_AGENT_USER_DATA: join(root, 'userData'),
-          },
-          stdio: ['ignore', 'pipe', 'pipe'],
+      const second = spawn(join(testBundle(), 'Contents/MacOS/Data Agent'), [], {
+        env: {
+          HOME: process.env.HOME,
+          PATH: '/usr/bin:/bin',
+          DATA_AGENT_HOME: join(root, 'data'),
+          DATA_AGENT_USER_DATA: join(root, 'userData'),
         },
-      );
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       let output = '';
       second.stdout.on('data', (b) => {
         output += b;

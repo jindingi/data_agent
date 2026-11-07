@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { startApp, until } from '../../scripts/test/harness.mjs';
 import { runFollowup } from '../../scripts/eval/run-followup.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
-import { rpc, configure, submit, settled } from './p3.mjs';
+import { rpc, configure, submit, settled } from '../support/desktop.mjs';
 
 async function send(page, text, kind) {
   if (kind) await page.getByLabel('运行中输入方式').selectOption(kind);

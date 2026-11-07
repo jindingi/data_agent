@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, statSync, unlinkSyn
 import { resolve, join } from 'node:path';
 import { startApp, until } from '../../scripts/test/harness.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
-import { rpc, configure, submit, settled } from './p3.mjs';
+import { rpc, configure, submit, settled } from '../support/desktop.mjs';
 import { runFollowup } from '../../scripts/eval/run-followup.mjs';
 import { benchmark } from './p6-benchmark.mjs';
 import { cases as p4 } from './p4.mjs';

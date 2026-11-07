@@ -52,3 +52,5 @@ AI 和日常开发禁止使用 `--no-verify`、`HUSKY=0` 或改 hooksPath 绕过
 ## 门禁本身的验收
 
 `tests/tooling/pre-commit.test.mjs` 在独立目录安装真实 hooks 并尝试 git commit，验证：未格式化的合法源码自动变为标准格式；TS/JS 未使用变量、源码语法错误、非法 Hook 调用和 JSON 格式解析错误阻止提交；失败不推进 HEAD；部分暂存时未暂存修改仍保留。夹具中的 check 仅检查配置语法，正式项目的类型/架构检查由真实 `pnpm quality` 另行运行，不能互相冒充。
+
+运行时 `resources/runtime-lock.json` 的原始字节参与产物清单哈希，排除自动格式化，修改后必须重新准备运行时；不能只因为 JSON 等价而跳过哈希校验。

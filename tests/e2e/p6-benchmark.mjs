@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { startApp, until } from '../../scripts/test/harness.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
-import { rpc, configure } from './p3.mjs';
+import { rpc, configure } from '../support/desktop.mjs';
 
 function generate(path, size, shift) {
   const header = 'date,region,amount,order_id,padding\n',

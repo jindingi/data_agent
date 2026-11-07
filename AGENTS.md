@@ -8,7 +8,7 @@
 2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。
 3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX0–UX5 尚未实施。不要将计划写成现状。
 4. 验收与交付见 [开发计划](docs/development-plan.md)、[实施进度](docs/implementation-status.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
-5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R6 尚未实施，不用格式化替代职责重构。
+5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1 隔离验证基础已完成，R2–R6 尚未实施，不用格式化替代职责重构。
 
 ## 产品边界
 
@@ -69,7 +69,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 | `pnpm verify:phase -- Pn`                   | 对应阶段完整门禁；部分阶段会调用真实模型，P7 会打包                                  |
 | `pnpm verify:release`                       | 包资源/完整性校验，不能替代实际 .app UI 验收                                         |
 
-- **不要覆写用户正在使用的应用包或构建目录。** `pnpm build`、`package:dir` 和某些测试会写 out/release。先检查在用实例与输出路径，使用独立输出及匹配验证路径，或已停止的目标；不能自行杀掉用户任务来方便测试。测试数据隔离不等于构建输出隔离。
+- **不要覆写用户正在使用的应用包或构建目录。** `pnpm build`、`package:dir` 和某些测试会写 out/release。先检查在用实例与输出路径，使用独立输出及匹配验证路径，或已停止的目标；不能自行杀掉用户任务来方便测试。正式 runner 已将 build/package 放入独立测试上下文；不要绕过它使用共享目录。
 - `--no-build`/`--no-package` 只用于匹配当前代码的已验证产物；不以旧包结果验证新代码。优先采用已有隔离 harness，不伪称未实现的参数可用。
 - 正式测试使用合成 fixture、独立 userData/业务目录，通过真实 CDP 点击、键盘、滚动及状态/存储断言；mock 模型可用于确定性分支，不能替代规定的 live 用例。
 - UI 修复要看实际截图和阅读尾部、焦点、滚动行为；按钮存在或截图成功生成不等于体验通过。仅文档改动运行静态/链接检查，不启动无关 live/打包测试。

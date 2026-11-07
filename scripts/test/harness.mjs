@@ -5,6 +5,7 @@ import { mkdirSync, openSync, closeSync, readFileSync, existsSync, writeFileSync
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
+import { testAppDir, testBundle } from './run-context.mjs';
 const require = createRequire(import.meta.url);
 export async function until(fn, label, timeout = 15_000) {
   const deadline = Date.now() + timeout;
@@ -41,11 +42,11 @@ export async function startApp(
   mkdirSync(root, { recursive: true });
   const port = selectedPort ?? (await freePort());
   const executable = packaged
-    ? join(resolve(packagedPath ?? 'release/mac-arm64/Data Agent.app'), 'Contents/MacOS/Data Agent')
+    ? join(resolve(packagedPath ?? testBundle()), 'Contents/MacOS/Data Agent')
     : require('electron');
   if (!existsSync(executable)) throw new Error(`Missing executable: ${executable}`);
   const args = [
-    ...(packaged ? [] : [resolve('.')]),
+    ...(packaged ? [] : [testAppDir()]),
     ...(automation ? ['--data-agent-automation'] : []),
     ...(offline ? ['--no-sandbox'] : []),
     `--remote-debugging-port=${port}`,

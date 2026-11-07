@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { startApp, until } from '../test/harness.mjs';
 import { liveKey } from '../test/live-key.mjs';
-import { configure, rpc } from '../../tests/e2e/p3.mjs';
+import { configure, rpc } from '../../tests/support/desktop.mjs';
 import { scenarios } from '../../evaluations/fixtures/scenarios.mjs';
 
 /** Prepare evidence only. The independent Judge must read it; no quality score is invented. */

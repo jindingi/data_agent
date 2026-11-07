@@ -14,7 +14,8 @@ import { join, resolve } from 'node:path';
 import { runScenario } from '../../scripts/eval/run-scenario.mjs';
 import { startApp, until } from '../../scripts/test/harness.mjs';
 import { modelFixture } from '../../scripts/test/model-fixture.mjs';
-import { configure, rpc, settled, submit, cases as p3 } from './p3.mjs';
+import { cases as p3 } from './p3.mjs';
+import { configure, rpc, settled, submit } from '../support/desktop.mjs';
 
 const importScenarios = new Map();
 async function importScenario(dir) {
