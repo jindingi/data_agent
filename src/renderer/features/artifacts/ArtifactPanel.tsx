@@ -43,7 +43,7 @@ function ArtifactImage({ file, alt }: { file: ArtifactRecord; alt?: string }) {
     let mounted = true;
     setPreview(undefined);
     setError('');
-    void request<ArtifactPreview>({
+    void request({
       type: 'artifacts.preview',
       sessionId: file.sessionId,
       artifactId: file.id,
@@ -151,7 +151,7 @@ export function ArtifactPanel({
     const current = generation.current;
     if (!sessionId) return;
     try {
-      const next = await request<ArtifactListing>({ type: 'artifacts.list', sessionId });
+      const next = await request({ type: 'artifacts.list', sessionId });
       if (current !== generation.current) return;
       setListing(next);
       if (latest.current !== next.versions[0]?.id) {
@@ -196,7 +196,7 @@ export function ArtifactPanel({
     setPreviewError('');
     setCopied(false);
     if (sessionId && chosenId)
-      void request<ArtifactPreview>({ type: 'artifacts.preview', sessionId, artifactId: chosenId })
+      void request({ type: 'artifacts.preview', sessionId, artifactId: chosenId })
         .then((value) => {
           if (mounted) setPreview(value);
         })
@@ -211,7 +211,7 @@ export function ArtifactPanel({
     if (!sessionId || !versionId) return;
     setExporting(true);
     try {
-      const value = await request<string | null>({
+      const value = await request({
         type: 'artifacts.export',
         sessionId,
         versionId,

@@ -164,24 +164,24 @@ if (primaryInstance)
           db!.prepare('SELECT sqlite_version() AS version').get() as { version: string }
         ).version,
       });
-      registerHandlers(
-        (event) =>
+      registerHandlers({
+        trusted: (event) =>
           Boolean(
             window &&
             event.sender === window.webContents &&
             event.senderFrame === window.webContents.mainFrame &&
             event.senderFrame.url === rendererURL,
           ),
-        info,
-        host,
-        sessions,
-        new FilePicker(() => window, automation),
-        changed,
-        credentials,
-        runtime,
-        catalogReady,
-        interactions,
-        automation
+        info: info,
+        host: host,
+        sessions: sessions,
+        picker: new FilePicker(() => window, automation),
+        changed: changed,
+        credentials: credentials,
+        runtime: runtime,
+        catalogReady: catalogReady,
+        interactions: interactions,
+        automationControl: automation
           ? (action, sessionId) => {
               if (action === 'host_pid') return sessionId ? runtime!.hostPid(sessionId) : null;
               if (action === 'quit') setTimeout(() => app.quit(), 100);
@@ -195,10 +195,10 @@ if (primaryInstance)
               return null;
             }
           : undefined,
-        artifacts,
-        logs,
-        deletion,
-      );
+        artifacts: artifacts,
+        logs: logs,
+        deletion: deletion,
+      });
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
           {

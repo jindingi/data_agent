@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DeletionPreview, DeletionResult } from '../../../shared/maintenance';
+import type { DeletionPreview } from '../../../shared/maintenance';
 import { request } from '../../lib/desktop';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
@@ -19,7 +19,7 @@ export function DeleteSessionDialog({
   const [error, setError] = useState('');
   useEffect(() => {
     let mounted = true;
-    void request<DeletionPreview>({ type: 'sessions.deletePreview', sessionId })
+    void request({ type: 'sessions.deletePreview', sessionId })
       .then((value) => {
         if (mounted) {
           setPreview(value);
@@ -37,7 +37,7 @@ export function DeleteSessionDialog({
     setBusy(true);
     setError('');
     try {
-      const result = await request<DeletionResult>({
+      const result = await request({
         type: 'sessions.delete',
         sessionId,
         deleteArtifacts: outputs,
@@ -46,7 +46,7 @@ export function DeleteSessionDialog({
         deleted();
         return;
       }
-      const value = await request<DeletionPreview>({ type: 'sessions.deletePreview', sessionId });
+      const value = await request({ type: 'sessions.deletePreview', sessionId });
       setPreview({ ...value, remaining: result.remaining });
       setOutputs(value.deleteArtifacts);
       setError('部分文件尚未清理。处理下方问题后可继续，已完成的清理不会重复。');

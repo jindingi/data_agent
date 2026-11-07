@@ -18,7 +18,7 @@ export function ToolLogViewer({
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   async function load(logId: string, offset: number) {
-    const value = await request<LogPage>({ type: 'logs.page', sessionId, logId, offset });
+    const value = await request({ type: 'logs.page', sessionId, logId, offset });
     setPage(value);
     setSelected(logId);
   }
@@ -35,7 +35,7 @@ export function ToolLogViewer({
   }
   async function open() {
     setOpened(true);
-    const value = await request<ToolLog[]>({ type: 'logs.list', sessionId, toolCallId });
+    const value = await request({ type: 'logs.list', sessionId, toolCallId });
     setLogs(value);
     if (value[0]) {
       setOffsets([]);

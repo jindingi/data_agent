@@ -6,6 +6,10 @@ import {
   type RuntimeSnapshot,
 } from '../runtime';
 import { interactionAnswerSchema } from '../tools';
+import type { SessionRecord, SessionDetail, FileReference } from '../models';
+import type { ModelSettings } from '../runtime';
+import type { ArtifactListing, ArtifactPreview } from '../artifacts';
+import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
@@ -199,8 +203,42 @@ export type AppEvent =
   | { type: 'host.status'; status: HostStatus }
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
+export interface CommandResponses {
+  'automation.control': number | null;
+  'system.info': SystemInfo;
+  'system.ping': { type: 'pong'; id: string; text: string; pid: number };
+  'models.settings': ModelSettings;
+  'models.select': ModelSettings;
+  'models.thinking': ModelSettings;
+  'models.key': ModelSettings;
+  'runtime.submit': RuntimeSnapshot;
+  'runtime.activeStates': Record<string, RuntimeSnapshot['state']>;
+  'runtime.snapshot': RuntimeSnapshot | null;
+  'runtime.discardDraft': null;
+  'runtime.cancel': null;
+  'interaction.answer': null;
+  'sessions.list': SessionRecord[];
+  'sessions.create': SessionRecord | null;
+  'sessions.open': SessionDetail;
+  'sessions.rename': SessionRecord;
+  'sessions.archive': SessionRecord;
+  'sessions.deletePreview': DeletionPreview;
+  'sessions.delete': DeletionResult;
+  'files.pick': FileReference[];
+  'files.add': FileReference[];
+  'files.remove': FileReference[];
+  'artifacts.list': ArtifactListing;
+  'artifacts.preview': ArtifactPreview;
+  'artifacts.copy': null;
+  'artifacts.export': string | null;
+  'workspace.open': null;
+  'link.open': null;
+  'logs.list': ToolLog[];
+  'logs.page': LogPage;
+}
+export type CommandResponse<C extends CommandInput> = CommandResponses[C['type']];
 export interface DesktopAPI {
-  addFiles: (sessionId: string, files: File[]) => Promise<Result>;
-  request: (command: CommandInput) => Promise<Result>;
+  addFiles: (sessionId: string, files: File[]) => Promise<Result<FileReference[]>>;
+  request: <C extends CommandInput>(command: C) => Promise<Result<CommandResponse<C>>>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;
 }

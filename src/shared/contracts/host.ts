@@ -116,3 +116,23 @@ export type HostInput = HostRequest extends infer T
     ? Omit<T, 'id'>
     : never
   : never;
+type HostResponse = z.infer<typeof hostResponseSchema>;
+export interface HostResponses {
+  ping: Extract<HostResponse, { type: 'pong' }>;
+  'history.read': Extract<HostResponse, { type: 'history' }>;
+  'models.list': Extract<HostResponse, { type: 'models' }>;
+  'runtime.start': Extract<HostResponse, { type: 'accepted' }>;
+  'runtime.input': Extract<HostResponse, { type: 'accepted' }>;
+  'runtime.cancel': Extract<HostResponse, { type: 'accepted' }>;
+  'runtime.snapshot': Extract<HostResponse, { type: 'snapshot' }>;
+}
+export type HostCommand = Extract<HostInput, { type: keyof HostResponses }>;
+export const hostReplyTypes = {
+  ping: 'pong',
+  'history.read': 'history',
+  'models.list': 'models',
+  'runtime.start': 'accepted',
+  'runtime.input': 'accepted',
+  'runtime.cancel': 'accepted',
+  'runtime.snapshot': 'snapshot',
+} as const satisfies { [K in keyof HostResponses]: HostResponses[K]['type'] };

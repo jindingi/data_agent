@@ -32,7 +32,7 @@ export function ModelSettings({
     setBusy(true);
     setSaved('');
     try {
-      const result = await request<Settings>({
+      const result = await request({
         type: 'models.key',
         provider: value.selected.provider,
         key: remove ? '' : key,
@@ -61,7 +61,7 @@ export function ModelSettings({
             setBusy(true);
             try {
               onChange(
-                await request<Settings>({
+                await request({
                   type: 'models.select',
                   model: JSON.parse(event.target.value),
                 }),
@@ -104,7 +104,7 @@ export function ModelSettings({
               setBusy(true);
               try {
                 onChange(
-                  await request<Settings>({
+                  await request({
                     type: 'models.thinking',
                     level: event.target.value as ThinkingLevel,
                   }),

@@ -153,7 +153,7 @@ export function App() {
           if (mounted) setError('无法连接桌面服务，请重新打开应用。');
         });
     void refresh();
-    void request<ModelConfiguration>({ type: 'models.settings' })
+    void request({ type: 'models.settings' })
       .then((value) => {
         if (mounted) setModels(value);
       })
@@ -171,7 +171,7 @@ export function App() {
         );
       }
     });
-    void request<Record<string, RuntimeSnapshot['state']>>({ type: 'runtime.activeStates' })
+    void request({ type: 'runtime.activeStates' })
       .then((value) => {
         if (mounted) setActivity({ ...value, ...recentActivity });
       })
@@ -639,7 +639,7 @@ export function App() {
                         const level = event.target.value as ThinkingLevel;
                         setModelBusy(true);
                         act(
-                          request<ModelConfiguration>({ type: 'models.thinking', level })
+                          request({ type: 'models.thinking', level })
                             .then(setModels)
                             .finally(() => setModelBusy(false)),
                         );

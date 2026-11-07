@@ -5,7 +5,12 @@ import {
   type MessagePortMain,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { hostResponseSchema, type HostInput } from '../../shared/contracts/host';
+import {
+  hostResponseSchema,
+  hostReplyTypes,
+  type HostCommand,
+  type HostResponses,
+} from '../../shared/contracts/host';
 import { AppError } from '../../shared/errors';
 import type { HostStatus } from '../../shared/contracts/ipc';
 import type { RuntimeSnapshot } from '../../shared/runtime';
@@ -24,7 +29,12 @@ export class AgentProcess {
   private port: MessagePortMain | undefined;
   private pending = new Map<
     string,
-    { resolve: (data: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
+    {
+      resolve: (data: unknown) => void;
+      reject: (error: Error) => void;
+      timer: NodeJS.Timeout;
+      responseType: string;
+    }
   >();
   private ready: Promise<void>;
   private exited: Promise<void>;
@@ -121,6 +131,8 @@ export class AgentProcess {
               this.pending.delete(parsed.data.id);
               if (parsed.data.type === 'error')
                 request.reject(new AppError(parsed.data.code, parsed.data.message));
+              else if (parsed.data.type !== request.responseType)
+                request.reject(new AppError('HOST_PROTOCOL_ERROR', 'Agent 响应类型不匹配'));
               else request.resolve(parsed.data);
             }
           }
@@ -153,11 +165,11 @@ export class AgentProcess {
   readHistory(file: string, workspace: string, piSessionId: string) {
     return this.request({ type: 'history.read', file, workspace, piSessionId });
   }
-  async request(input: HostInput) {
+  async request<C extends HostCommand>(input: C): Promise<HostResponses[C['type']]> {
     await this.ready;
     if (this.status !== 'ready') throw new AppError('HOST_EXITED', 'Agent 进程已退出');
     const id = randomUUID();
-    return new Promise((resolve, reject) => {
+    return new Promise<HostResponses[C['type']]>((resolve, reject) => {
       const timer = setTimeout(
         () => {
           this.pending.delete(id);
@@ -165,7 +177,12 @@ export class AgentProcess {
         },
         input.type === 'runtime.start' ? 30_000 : 5_000,
       );
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, {
+        resolve: (value) => resolve(value as HostResponses[C['type']]),
+        reject,
+        timer,
+        responseType: hostReplyTypes[input.type],
+      });
       this.port!.postMessage({ ...input, id });
     });
   }

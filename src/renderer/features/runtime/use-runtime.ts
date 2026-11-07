@@ -11,7 +11,7 @@ export function useRuntime(sessionId: string | null, onError: (message: string) 
   const refresh = useCallback(async () => {
     if (!sessionId) return;
     const ticket = ++epoch.current;
-    const value = await request<RuntimeSnapshot | null>({ type: 'runtime.snapshot', sessionId });
+    const value = await request({ type: 'runtime.snapshot', sessionId });
     if (ticket !== epoch.current || selected.current !== sessionId) return;
     const next = value ? acceptSnapshot(watermark.current, value, sessionId, true) : null;
     watermark.current = next;

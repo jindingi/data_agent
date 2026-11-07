@@ -14,7 +14,7 @@ export function useSessions(search: string, archived: boolean, onError: (message
   const refresh = useCallback(async () => {
     const epoch = ++listEpoch.current;
     try {
-      const value = await request<SessionRecord[]>({ type: 'sessions.list', search, archived });
+      const value = await request({ type: 'sessions.list', search, archived });
       if (epoch === listEpoch.current) setList(value);
     } catch (error) {
       onError(String(error instanceof Error ? error.message : error));
@@ -28,7 +28,7 @@ export function useSessions(search: string, archived: boolean, onError: (message
         return;
       }
       try {
-        const value = await request<SessionDetail>({ type: 'sessions.open', sessionId: id });
+        const value = await request({ type: 'sessions.open', sessionId: id });
         if (epoch === detailEpoch.current && selectedRef.current === id) setDetail(value);
       } catch (error) {
         if (epoch === detailEpoch.current)
@@ -67,7 +67,7 @@ export function useSessions(search: string, archived: boolean, onError: (message
     void load();
   }, [load]);
   async function create(chooseWorkspace = false) {
-    const value = await request<SessionRecord | null>({ type: 'sessions.create', chooseWorkspace });
+    const value = await request({ type: 'sessions.create', chooseWorkspace });
     if (value) {
       select(value.id);
       await refresh();
