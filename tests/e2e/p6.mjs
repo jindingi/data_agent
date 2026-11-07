@@ -1,3 +1,4 @@
+import { openExecutionProcesses } from '../support/desktop.mjs';
 import { createStoredSession } from '../support/desktop.mjs';
 import { openPreview } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
@@ -253,6 +254,7 @@ export const cases = {
       assert(failed.some((t) => /ENOENT|不存在|无法访问/.test(t.output)));
       for (const tool of failed) {
         const card = page.locator(`[data-tool-id="${tool.id}"]`);
+        await openExecutionProcesses(page);
         await card.locator('summary').click();
         await card.getByText('执行失败', { exact: true }).waitFor();
         assert((await card.innerText()).includes(tool.output.slice(0, 35)));
@@ -608,6 +610,7 @@ export const cases = {
       assert(tool);
       assert(tool.output.includes('截断'));
       const card = page.locator(`[data-tool-id="${tool.id}"]`);
+      await openExecutionProcesses(page);
       await card.locator('summary').click();
       await card.getByRole('button', { name: '查看完整日志', exact: true }).click();
       const content = page.getByTestId('full-tool-log');

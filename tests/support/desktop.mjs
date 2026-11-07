@@ -62,3 +62,7 @@ export async function openPreview(page, tab = '预览') {
     await page.getByRole('button', { name: '切换结果面板' }).click();
   await page.getByRole('tab', { name: tab, exact: true }).click();
 }
+export async function openExecutionProcesses(page) {
+  for (const toggle of await page.locator('.process-toggle[aria-expanded="false"]').all())
+    await toggle.click();
+}

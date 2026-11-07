@@ -1,5 +1,6 @@
 import { cases as ux } from '../../tests/e2e/ux.mjs';
 import { cases as filePreview } from '../../tests/e2e/file-preview.mjs';
+import { cases as executionProcess } from '../../tests/e2e/execution-process.mjs';
 import { nativeIds, mergeCases, requirementsFor } from './case-registry.mjs';
 import { createRunContext, setRunContext, preparePackageDependencies } from './run-context.mjs';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -76,6 +77,7 @@ function nativeCase(id) {
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
 const cases = mergeCases(
+  executionProcess,
   filePreview,
   ux,
   p0,

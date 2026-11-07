@@ -1,3 +1,4 @@
+import { openExecutionProcesses } from '../support/desktop.mjs';
 import { openPreview } from '../support/desktop.mjs';
 import { testBundle } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
@@ -332,6 +333,7 @@ export const cases = {
       await listing(page, id);
       await openPreview(page, '预览');
       await page.locator('.artifact-markdown').getByRole('heading', { name: '主题预览' }).waitFor();
+      await openExecutionProcesses(page);
       await page.locator('.tool-card summary').first().click();
       await page.screenshot({ path: join(root, 'light-report.png') });
       await page.getByRole('button', { name: '切换到深色模式', exact: true }).click();

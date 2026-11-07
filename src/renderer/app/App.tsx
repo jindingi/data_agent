@@ -186,6 +186,11 @@ export function App() {
                 sessionId={sessions.selected!}
                 messages={history}
                 tools={runtime.snapshot?.tools ?? []}
+                active={
+                  !!runtime.snapshot &&
+                  !runtime.snapshot.queuedInputs?.some((input) => input.kind === 'prompt') &&
+                  ['running', 'waiting_approval', 'waiting_input'].includes(runtime.snapshot.state)
+                }
               />
             ) : (
               <>

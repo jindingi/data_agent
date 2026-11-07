@@ -1,3 +1,4 @@
+import { openExecutionProcesses } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -135,6 +136,7 @@ async function liveScenario(dir) {
           (request) => request.thinkingEnabled && request.reasoningEffort === 'high',
         ),
       );
+      await openExecutionProcesses(page);
       await page.locator('.tool-card').first().locator('summary').click();
       assert((await page.locator('.tool-card').first().innerText()).includes('参数'));
       const assistantTexts = first.messages

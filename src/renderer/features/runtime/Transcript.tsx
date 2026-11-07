@@ -3,8 +3,8 @@ import { request } from '../../lib/desktop';
 import { useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '../../components/ui/button';
-import { PagedText } from './PagedText';
-import { ToolLogViewer } from './ToolLogViewer';
+import { ExecutionProcess } from './ExecutionProcess';
+import { transcriptTurns } from './transcript-turns';
 import type { MessageView, ToolView } from '../../../shared/runtime';
 
 const components = {
@@ -53,28 +53,23 @@ export function Transcript({
   sessionId,
   messages,
   tools,
+  active = false,
 }: {
   sessionId: string;
   messages: MessageView[];
   tools: ToolView[];
+  active?: boolean;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const [first, setFirst] = useState<number | null>(null);
   const [away, setAway] = useState(false);
   const anchor = useRef<{ height: number; top: number } | null>(null);
-  const visible = useMemo(
-    () =>
-      messages.filter(
-        (message) =>
-          message.role !== 'toolResult' && message.blocks.length > 0 && message.role !== 'system',
-      ),
-    [messages],
-  );
-  const start = first ?? Math.max(0, visible.length - 20);
+  const turns = useMemo(() => transcriptTurns(messages), [messages]);
+  const start = first ?? Math.max(0, turns.length - 10);
   useLayoutEffect(() => {
-    if (first === null && visible.length) setFirst(Math.max(0, visible.length - 20));
-  }, [first, visible.length]);
+    if (first === null && turns.length) setFirst(Math.max(0, turns.length - 10));
+  }, [first, turns.length]);
   const toolMap = useMemo(() => new Map(tools.map((tool) => [tool.id, tool])), [tools]);
   const results = useMemo(
     () =>
@@ -108,7 +103,7 @@ export function Transcript({
     const node = list.current!;
     follow.current = false;
     anchor.current = { height: node.scrollHeight, top: node.scrollTop };
-    setFirst(Math.max(0, start - 20));
+    setFirst(Math.max(0, start - 10));
   }
   return (
     <div className="transcript-frame">
@@ -131,87 +126,27 @@ export function Transcript({
               </Button>
             </div>
           )}
-          {visible.slice(start).map((message) => (
-            <article
-              key={message.id}
-              className={`history-message ${message.role}`}
-              data-message-id={message.id}
-            >
-              <div className="message-author">
-                {message.role === 'user'
-                  ? '你'
-                  : message.role === 'assistant'
-                    ? 'Data Agent'
-                    : '运行记录'}
-              </div>
-              {message.paths?.length ? (
-                <div className="message-attachments" aria-label="本次附件">
-                  {message.paths.map((path) => (
-                    <span key={path} title={path}>
-                      {path.split('/').pop()}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              {message.blocks.map((block, index) => {
-                if (block.type === 'text')
-                  return (
-                    <div className="markdown-body" key={index}>
-                      {message.role === 'user' ? (
-                        <p>{block.text}</p>
-                      ) : (
-                        <Markdown text={block.text} pending={message.pending} />
-                      )}
-                    </div>
-                  );
-                if (block.type === 'thinking')
-                  return block.text ? (
-                    <details className="thinking-card" key={index}>
-                      <summary>思考过程</summary>
-                      <div>
-                        <PagedText text={block.text}>{(part) => <pre>{part}</pre>}</PagedText>
-                      </div>
-                    </details>
-                  ) : null;
-                const live = toolMap.get(block.id);
-                const result = results.get(block.id);
-                const status =
-                  live?.status ?? (result ? (result.isError ? 'failed' : 'completed') : 'running');
-                const output =
-                  live?.output ??
-                  result?.blocks
-                    .filter((b) => b.type === 'text')
-                    .map((b) => b.text)
-                    .join('\n');
-                return (
-                  <details className="tool-card" data-tool-id={block.id} key={index}>
-                    <summary>
-                      <span>{block.name}</span>
-                      <small>
-                        {status === 'running'
-                          ? '执行中'
-                          : status === 'failed'
-                            ? '执行失败'
-                            : '已结束'}
-                      </small>
-                    </summary>
-                    <div>
-                      <h4>参数</h4>
-                      <PagedText text={live?.arguments ?? block.arguments}>
-                        {(part) => <pre>{part}</pre>}
-                      </PagedText>
-                      <h4>结果</h4>
-                      <PagedText text={output || '等待工具结果…'}>
-                        {(part) => <pre>{part}</pre>}
-                      </PagedText>
-                      {['bash', 'grep', 'find'].includes(block.name) && (
-                        <ToolLogViewer sessionId={sessionId} toolCallId={block.id} />
-                      )}
-                    </div>
-                  </details>
-                );
-              })}
-            </article>
+          {turns.slice(start).map((turn, index) => (
+            <div className="transcript-turn" key={turn.id} data-turn-id={turn.id}>
+              {turn.user && <MessageContent message={turn.user} />}
+              <ExecutionProcess
+                sessionId={sessionId}
+                messages={turn.replies}
+                tools={toolMap}
+                results={results}
+                active={active && start + index === turns.length - 1}
+                onInspect={() => {
+                  follow.current = false;
+                }}
+              />
+              {turn.replies
+                .filter((message) =>
+                  message.blocks.some((block) => block.type === 'text' && block.text),
+                )
+                .map((message) => (
+                  <MessageContent key={message.id} message={message} />
+                ))}
+            </div>
           ))}
         </div>
       </div>
@@ -232,5 +167,35 @@ export function Transcript({
         </div>
       )}
     </div>
+  );
+}
+
+function MessageContent({ message }: { message: MessageView }) {
+  return (
+    <article className={`history-message ${message.role}`} data-message-id={message.id}>
+      <div className="message-author">
+        {message.role === 'user' ? '你' : message.role === 'assistant' ? 'Data Agent' : '运行记录'}
+      </div>
+      {message.paths?.length ? (
+        <div className="message-attachments" aria-label="本次附件">
+          {message.paths.map((path) => (
+            <span key={path} title={path}>
+              {path.split('/').pop()}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {message.blocks.map((block, index) =>
+        block.type === 'text' ? (
+          <div className="markdown-body" key={index}>
+            {message.role === 'user' ? (
+              <p>{block.text}</p>
+            ) : (
+              <Markdown text={block.text} pending={message.pending} />
+            )}
+          </div>
+        ) : null,
+      )}
+    </article>
   );
 }

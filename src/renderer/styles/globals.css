@@ -631,20 +631,71 @@ summary:focus-visible {
 }
 .thinking-card,
 .tool-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin: 12px 0;
+  margin: 4px 0;
   text-align: left;
+}
+.execution-process {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+.process-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 4px 0;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.process-toggle > svg {
+  transform: rotate(-90deg);
+}
+.process-toggle > svg.expanded {
+  transform: rotate(0deg);
+}
+.process-count {
+  color: var(--text-muted);
+}
+.process-failures,
+.tool-card [data-status='failed'] {
+  color: var(--danger-text);
+}
+.process-entries {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
 }
 .thinking-card summary,
 .tool-card summary {
-  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 4px;
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 12px;
+  list-style: none;
+}
+.thinking-card summary::-webkit-details-marker,
+.tool-card summary::-webkit-details-marker {
+  display: none;
+}
+.thinking-card summary > svg,
+.tool-card summary > svg {
+  flex-shrink: 0;
+}
+.process-excerpt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
 }
 .tool-card summary small {
-  float: right;
+  flex-shrink: 0;
   color: var(--text-muted);
 }
 .thinking-card > div,
