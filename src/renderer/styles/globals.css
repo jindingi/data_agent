@@ -405,24 +405,31 @@ summary:focus-visible {
   overflow-wrap: anywhere;
 }
 .saved-credential-controls,
-.thinking-setting {
+.thinking-setting-controls {
   display: flex;
   gap: 12px;
   align-items: center;
 }
 .saved-credential-controls input,
-.thinking-setting label {
+.thinking-setting-controls select {
   flex: 1;
   min-width: 0;
 }
 .saved-credential-controls {
   margin-bottom: 14px;
 }
-.saved-credential-controls button {
+.saved-credential-controls button,
+.thinking-setting-controls button {
   flex-shrink: 0;
 }
 .model-settings .saved-credential label {
   margin-bottom: 8px;
+}
+.thinking-setting {
+  margin: 14px 0;
+}
+.model-settings .thinking-setting label {
+  margin: 0 0 8px;
 }
 .credential-removal {
   margin: 12px 0;

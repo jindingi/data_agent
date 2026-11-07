@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ThinkingLevel } from '../../../shared/runtime';
 import { recommendedThinking, thinkingDescription } from '../../../shared/model-configuration';
 import type { ModelController } from './use-model-settings';
@@ -23,6 +23,7 @@ export function ModelSettings({
   disabled: boolean;
 }) {
   const { value, busy, change } = controller;
+  const thinkingId = useId();
   const [search, setSearch] = useState('');
   const matches =
     value?.models.filter(
@@ -103,9 +104,10 @@ export function ModelSettings({
           </p>
           {model.reasoning && model.thinkingLevels.length > 1 && (
             <div className="thinking-setting">
-              <label>
-                思考级别
+              <label htmlFor={thinkingId}>思考级别</label>
+              <div className="thinking-setting-controls">
                 <select
+                  id={thinkingId}
                   aria-label="思考级别"
                   value={value?.thinkingLevel}
                   disabled={busy || disabled}
@@ -120,17 +122,17 @@ export function ModelSettings({
                     </option>
                   ))}
                 </select>
-              </label>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy || disabled || value?.thinkingLevel === recommendedThinking(model)}
-                onClick={() =>
-                  void change({ type: 'models.thinking', level: recommendedThinking(model) })
-                }
-              >
-                恢复推荐级别
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy || disabled || value?.thinkingLevel === recommendedThinking(model)}
+                  onClick={() =>
+                    void change({ type: 'models.thinking', level: recommendedThinking(model) })
+                  }
+                >
+                  恢复推荐级别
+                </Button>
+              </div>
             </div>
           )}
           <p>{thinkingDescription(model)}</p>

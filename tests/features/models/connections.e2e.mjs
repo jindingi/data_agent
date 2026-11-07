@@ -13,6 +13,15 @@ async function assertKeyAlignment(page) {
   assert(alignment <= 1, `Key button center differs by ${alignment}px`);
 }
 
+async function assertThinkingAlignment(page) {
+  const alignment = await page.locator('.thinking-setting').evaluate((row) => {
+    const select = row.querySelector('select').getBoundingClientRect();
+    const button = row.querySelector('button').getBoundingClientRect();
+    return Math.abs((select.top + select.bottom) / 2 - (button.top + button.bottom) / 2);
+  });
+  assert(alignment <= 1, `Thinking reset button center differs by ${alignment}px`);
+}
+
 export const cases = {
   async 'models.connections-ui'({ dir }) {
     const fixture = await modelFixture();
@@ -32,6 +41,7 @@ export const cases = {
         'password',
       );
       await assertKeyAlignment(page);
+      await assertThinkingAlignment(page);
       const initial = await rpc(page, { type: 'models.settings' });
       assert.deepEqual(
         await page
@@ -123,6 +133,22 @@ export const cases = {
           await page.getByLabel('已保存 API key', { exact: true }).scrollIntoViewIfNeeded();
           await assertKeyAlignment(page);
           await page.screenshot({ path: join(root, `settings-${width}-${theme}-credential.png`) });
+          await page.getByLabel('思考级别', { exact: true }).scrollIntoViewIfNeeded();
+          await assertThinkingAlignment(page);
+          const reset = page.getByRole('button', { name: '恢复推荐级别', exact: true });
+          assert(await reset.isDisabled());
+          await page.getByLabel('思考级别', { exact: true }).selectOption('off');
+          await until(() => reset.isEnabled(), 'reset enabled');
+          await assertThinkingAlignment(page);
+          await reset.click();
+          await until(
+            async () => (await rpc(page, { type: 'models.settings' })).thinkingLevel === 'high',
+            'recommended thinking restored',
+          );
+          await page.screenshot({
+            path: join(root, `settings-${width}-${theme}-thinking.png`),
+            animations: 'disabled',
+          });
           await page.getByText('应用诊断', { exact: true }).click();
           await page.getByRole('button', { name: '检查本地引擎', exact: true }).click();
           await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();

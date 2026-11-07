@@ -241,3 +241,7 @@ Main 列表发现、Host 连接探测与会话请求接入 Electron 网络栈以
 - 收敛单元测试中的非推理模型样本后，`models.configuration` 补跑通过：`test-results/2026-11-07T08-10-28.655Z/summary.json`。
 - 真实 DeepSeek：`test-results/2026-11-07T08-01-36.149Z/summary.json` 中 `models.live-connection` 通过，同报告保留 OpenRouter GPT 地区失败；OpenRouter 新指定的 DeepSeek 模型：`test-results/2026-11-07T08-04-22.530Z/summary.json` 中 `models.live-openrouter` 通过。每次模型测试只发一个有界短请求，目录 GET 不计作生成调用。
 - `pnpm quality` 与测试选择器检查通过；3 种窗口尺寸 × 深浅主题的滚动、Key 对齐、焦点检查通过，并复核设置顶部、凭证区和底部截图。未覆盖正在使用的构建/应用目录，测试窗口保持后台隐藏。
+
+## 2026-11-07：推荐思考级别按钮对齐
+
+“恢复推荐级别”原先与包含标签的整块 label 居中，实际比 select 中心高 13 CSS px。将标签独立并用 htmlFor/id 保留关联，选择框与按钮放进同一居中 controls 行，不使用偏移量补偿。`models.connections-ui` 先以中心线差不超过 1px 的断言复现失败（`test-results/2026-11-07T08-34-18.276Z/summary.json`），修复后与 `models.settings` 两项通过（`test-results/2026-11-07T08-34-52.623Z/summary.json`）。覆盖三种尺寸、深浅主题、按钮启用/禁用及恢复推荐值，已复核实际截图；`pnpm quality` 通过。测试使用隔离后台窗口，无真实模型请求。
