@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelSettings } from '../../../shared/runtime';
 import type { CommandInput } from '../../../shared/contracts/ipc';
 import { request } from '../../lib/desktop';
-type Change = Extract<CommandInput, { type: 'models.select' | 'models.thinking' | 'models.key' }>;
+type Change = Extract<
+  CommandInput,
+  { type: 'models.select' | 'models.thinking' | 'models.key' | 'models.connection' }
+>;
 /** One owner for both the composer and settings dialog; changes are serialized. */
 export function useModelSettings() {
   const [value, setValue] = useState<ModelSettings>();
@@ -10,20 +13,28 @@ export function useModelSettings() {
   const [error, setError] = useState('');
   const locked = useRef(false),
     ticket = useRef(0);
-  useEffect(() => {
+  const reload = useCallback(async () => {
+    if (locked.current) return;
     const current = ++ticket.current;
-    void request({ type: 'models.settings' })
-      .then((result) => {
-        if (ticket.current === current) setValue(result);
-      })
-      .catch((error) => {
-        if (ticket.current === current) setError(error.message);
-      });
+    setError('');
+    setBusy(true);
+    try {
+      const result = await request({ type: 'models.settings' });
+      if (ticket.current === current) setValue(result);
+    } catch (error) {
+      if (ticket.current === current)
+        setError(error instanceof Error ? error.message : '读取模型设置失败');
+    } finally {
+      if (ticket.current === current) setBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    void reload();
     return () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps -- Invalidate async request tickets, not a DOM ref.
       ++ticket.current;
     };
-  }, []);
+  }, [reload]);
   const change = useCallback(async (command: Change) => {
     if (locked.current) return;
     locked.current = true;
@@ -42,6 +53,6 @@ export function useModelSettings() {
       if (current === ticket.current) setBusy(false);
     }
   }, []);
-  return { value, busy, error, change };
+  return { value, busy, error, change, reload };
 }
 export type ModelController = ReturnType<typeof useModelSettings>;

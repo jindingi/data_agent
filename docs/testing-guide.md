@@ -122,3 +122,11 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 - 提交前仍须相关功能验收和 `pnpm quality`，Husky 自动检查不能绕过。每个完成阶段创建 commit，不自动 push。
 - 当前 CI 的 Linux job 运行静态、unit 和 tooling；macOS 的原生/CDP/packaging 仍按本机命令验收，不能声称远端已跑过 Electron。
 - 程序回归判断工作台流程、状态与约定交付物，不判断分析结论准确性。真实模型效果用 [evaluations](../evaluations/README.md) 与独立 Judge；重放不替代质量评测。
+
+## 模型设置回归
+
+`pnpm test -- --feature models` 默认不读取真实 Key、不调用线上模型。新增的 `models.configuration` 经真实 pi SDK 验证覆盖地址、短请求预算、401/403/404/429/500 与网络错误分类，以及按模型能力选择推荐级别；`models.preflight` 还验证地址/凭证事务回滚与排队任务配置快照。`conversation.cache-prefix-unit` 使用生产 Base URL 覆盖路径验证最终 HTTP URL 和上下文前缀。
+
+`models.connections-ui` 使用后台 Electron/CDP 与合成 HTTP 服务，覆盖固定凭证遮罩、独立提供方管理、跨模型/提供方/弹窗的内存草稿、保存失败保留输入、地址持久化、真实 SDK 连接测试、鉴权错误脱敏、凭证移除确认、搜索无结果、焦点恢复、三种尺寸和深浅主题。`models.settings` 保持原有 Key 轮换/移除/重启及思考参数验收；`models.recorded-conversation` 严格匹配既有录制，不因 UI 修改放宽匹配。
+
+应用诊断测试使用“检查本地引擎”；这不会消耗模型请求，也不能替代“测试模型连接”。普通测试中的连接测试只访问本机合成 HTTP 服务，不能据此声称已经在线验证所有模型/代理服务。

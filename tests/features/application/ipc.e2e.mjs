@@ -14,8 +14,8 @@ export const cases = {
       const { page } = app;
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByText('应用诊断', { exact: true }).click();
-      await page.getByRole('button', { name: '检查连接' }).click();
-      await page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
+      await page.getByRole('button', { name: '检查本地引擎' }).click();
+      await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
       for (const command of [
         { type: 'unknown' },
         { type: 'system.ping', text: 1 },
@@ -33,7 +33,7 @@ export const cases = {
       assert.equal(system.hostStatus, 'ready');
       process.kill(system.hostPid, 'SIGKILL');
       await until(async () => (await info(page)).hostStatus === 'exited', 'Host crash detected');
-      await page.getByRole('button', { name: '检查连接' }).click();
+      await page.getByRole('button', { name: '检查本地引擎' }).click();
       await page.getByRole('status').filter({ hasText: 'Agent 进程已退出' }).waitFor();
       assert.deepEqual(app.errors, []);
       return { schemaRejections: 3, nativeSQLite: system.sqliteVersion, hostCrashDetected: true };

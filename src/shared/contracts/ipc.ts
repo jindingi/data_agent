@@ -95,6 +95,16 @@ export const commandSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('link.open'), url: z.string().url().max(4096) }).strict(),
   z.object({ ...base, type: z.literal('system.info') }).strict(),
   z.object({ ...base, type: z.literal('models.settings') }).strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('models.connection'),
+      provider: z.string().min(1).max(100),
+      baseUrl: z.string().max(2048),
+      key: z.string().trim().min(1).max(4096).optional(),
+    })
+    .strict(),
+  z.object({ ...base, type: z.literal('models.test'), model: modelChoiceSchema }).strict(),
   z.object({ ...base, type: z.literal('models.select'), model: modelChoiceSchema }).strict(),
   z.object({ ...base, type: z.literal('models.thinking'), level: thinkingLevelSchema }).strict(),
   z
@@ -257,6 +267,8 @@ export interface CommandResponses {
   'system.info': SystemInfo;
   'system.ping': { type: 'pong'; id: string; text: string; pid: number };
   'models.settings': ModelSettings;
+  'models.connection': ModelSettings;
+  'models.test': { elapsedMs: number };
   'models.select': ModelSettings;
   'models.thinking': ModelSettings;
   'models.key': ModelSettings;

@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { normalizeEndpoint, recommendedThinking } from '../../shared/model-configuration';
 import { AppError } from '../../shared/errors';
 import {
   DEFAULT_MODEL,
@@ -47,6 +48,12 @@ export class CredentialService {
   settings(): ModelSettings {
     return {
       thinkingLevel: this.thinking(),
+      endpoints: Object.fromEntries(
+        [...new Set(this.models.map((model) => model.provider))].map((provider) => [
+          provider,
+          this.endpoint(provider) ?? '',
+        ]),
+      ),
       selected: this.selected(),
       models: this.models,
       configuredProviders: this.db
@@ -68,9 +75,11 @@ export class CredentialService {
       ThinkingLevel | undefined;
     return saved && levels.includes(saved)
       ? saved
-      : levels.includes('high')
-        ? 'high'
-        : (levels[0] ?? 'off');
+      : recommendedThinking(
+          this.models.find(
+            (item) => item.provider === model.provider && item.model === model.model,
+          ),
+        );
   }
   setThinking(level: ThinkingLevel) {
     const model = this.selected();
@@ -102,6 +111,21 @@ export class CredentialService {
       `credential.${provider}`,
       this.encryption.encryptString(key.trim()).toString('base64'),
     );
+    return this.settings();
+  }
+  endpoint(provider: string): string | undefined {
+    return this.get(`endpoint.${provider}`) || undefined;
+  }
+  saveConnection(provider: string, baseUrl: string, key?: string) {
+    if (!this.models.some((model) => model.provider === provider))
+      throw new AppError('UNKNOWN_PROVIDER', '不支持此模型提供方');
+    const endpoint = baseUrl.trim() ? normalizeEndpoint(baseUrl) : '';
+    if (endpoint !== (this.endpoint(provider) ?? '') && !key?.trim())
+      throw new AppError('ENDPOINT_KEY_REQUIRED', '修改地址时请重新输入此地址使用的 API key');
+    this.db.transaction(() => {
+      if (key !== undefined) this.save(provider, key);
+      this.set(`endpoint.${provider}`, endpoint);
+    })();
     return this.settings();
   }
   key(provider: string): string {

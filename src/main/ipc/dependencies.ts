@@ -19,6 +19,7 @@ export interface HandlerDependencies {
   credentials: CredentialService;
   runtime: RuntimeService;
   catalogReady: Promise<void>;
+  testBaseUrl?: string | undefined;
   interactions: InteractionBroker;
   automationControl?: (
     action: 'close_reopen' | 'quit' | 'host_pid',

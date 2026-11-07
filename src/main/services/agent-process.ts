@@ -158,7 +158,7 @@ export class AgentProcess {
           this.pending.delete(id);
           reject(new AppError('HOST_TIMEOUT', 'Agent 未响应'));
         },
-        input.type === 'runtime.start' ? 30_000 : 5_000,
+        input.type === 'runtime.start' || input.type === 'models.test' ? 30_000 : 5_000,
       );
       this.pending.set(id, {
         resolve: (value) => resolve(value as HostResponses[C['type']]),

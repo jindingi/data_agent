@@ -40,6 +40,7 @@ export interface RuntimeConfig {
   thinkingLevel?: ThinkingLevel;
   apiKey: string;
   testBaseUrl?: string;
+  baseUrl?: string;
   skillsDirectory?: string;
   protectedRoots: string[];
 }
@@ -74,6 +75,8 @@ export class SessionRuntime {
   ) {
     if (!config.apiKey.trim()) throw new AppError('MISSING_KEY', '请先配置所选提供方的 API key');
     const runtime = dependencies?.runtime ?? (await createModelRuntime());
+    if (config.baseUrl)
+      runtime.registerProvider(config.model.provider, { baseUrl: config.baseUrl });
     if (config.testBaseUrl) {
       const url = new URL(config.testBaseUrl);
       if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password)

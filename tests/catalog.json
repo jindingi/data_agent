@@ -898,5 +898,25 @@
     "environment": "node",
     "tags": [],
     "related": []
+  },
+  {
+    "id": "models.configuration",
+    "feature": "models",
+    "level": "unit",
+    "file": "tests/features/models/configuration.unit.test.ts",
+    "model": "scripted",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.connections-ui",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/connections.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
   }
 ]

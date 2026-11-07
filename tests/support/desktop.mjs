@@ -14,7 +14,10 @@ export async function configure(page, key = 'synthetic-p3-fixture-key') {
   await page
     .getByLabel('选择模型')
     .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
-  await page.getByRole('textbox', { name: 'API key' }).fill(key);
+  await page.getByLabel('连接提供方', { exact: true }).selectOption('deepseek');
+  const edit = page.getByRole('button', { name: '更换 Key', exact: true });
+  if (await edit.count()) await edit.click();
+  await page.getByRole('textbox', { name: 'API key', exact: true }).fill(key);
   await page.getByRole('button', { name: '保存凭证', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
   await page.getByRole('button', { name: '关闭对话框' }).click();

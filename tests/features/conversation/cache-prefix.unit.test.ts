@@ -19,7 +19,8 @@ it.each([false, true])(
     mkdirSync(firstWorkspace, { recursive: true });
     const payloads: { messages: { role: string; content: unknown }[]; tools?: unknown }[] = [];
     let calls = 0;
-    vi.stubGlobal('fetch', async () => {
+    vi.stubGlobal('fetch', async (url: string) => {
+      expect(String(url)).toBe('https://configured.example/v1/chat/completions');
       const tool = calls++ === 0;
       const delta = tool
         ? {
@@ -52,6 +53,7 @@ it.each([false, true])(
           piSessionId: null,
           model: { provider: 'deepseek', model: 'deepseek-flash' },
           apiKey: 'synthetic',
+          baseUrl: 'https://configured.example/v1',
           protectedRoots: [],
         },
         (value) => {
@@ -105,6 +107,7 @@ it.each([false, true])(
           piSessionId,
           model: { provider: 'deepseek', model: 'deepseek-flash' },
           apiKey: 'synthetic',
+          baseUrl: 'https://configured.example/v1',
           protectedRoots: [],
         },
         (value) => {
@@ -149,6 +152,7 @@ it.each([false, true])(
           piSessionId,
           model: { provider: 'deepseek', model: 'deepseek-flash' },
           apiKey: 'synthetic',
+          baseUrl: 'https://configured.example/v1',
           protectedRoots: [],
         },
         (value) => {

@@ -22,12 +22,15 @@ export interface ModelOption extends ModelChoice {
   vision: boolean;
   verified: boolean;
   thinkingLevels: ThinkingLevel[];
+  baseUrl?: string;
+  api?: string;
 }
 export interface ModelSettings {
   thinkingLevel: ThinkingLevel;
   selected: ModelChoice;
   models: ModelOption[];
   configuredProviders: string[];
+  endpoints: Record<string, string>;
   encryptionAvailable: boolean;
 }
 export const DEFAULT_MODEL: ModelChoice = { provider: 'deepseek', model: 'deepseek-flash' };

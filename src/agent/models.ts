@@ -26,6 +26,8 @@ export function modelCatalog(runtime: ModelRuntime): ModelOption[] {
       reasoning: model.reasoning,
       vision: model.input.includes('image'),
       thinkingLevels: getSupportedThinkingLevels(model),
+      baseUrl: model.baseUrl,
+      api: model.api,
       verified: model.provider === 'deepseek' && model.id === 'deepseek-flash',
     }))
     .sort(

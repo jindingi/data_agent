@@ -59,6 +59,7 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   ]);
   const events: RuntimeSnapshot[] = [];
   const usedKeys: string[] = [];
+  const usedEndpoints: (string | undefined)[] = [];
   let starts = 0,
     stops = 0;
   const service = new RuntimeService({
@@ -76,6 +77,7 @@ it('models.preflight credentials and model errors leave no run or permit; later 
           if (input.type === 'runtime.start') {
             starts++;
             usedKeys.push(input.config.apiKey);
+            usedEndpoints.push(input.config.baseUrl);
             const { sessionId, runId, hostEpoch } = input.config;
             current = {
               schemaVersion: 1,
@@ -130,7 +132,27 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   expect(() => credentials.select({ provider: 'deepseek', model: 'wrong-name' })).toThrow('模型');
   expect(db.prepare('SELECT count(*) n FROM runs').get()).toEqual({ n: 0 });
   const sentinel = 'sk-synthetic-credential-do-not-persist';
-  credentials.save('deepseek', sentinel);
+  credentials.saveConnection('deepseek', 'https://first.example/v1/', sentinel);
+  expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');
+  expect(() => credentials.saveConnection('deepseek', 'https://second.example/v1')).toThrow(
+    '重新输入',
+  );
+  expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');
+  expect(() => credentials.saveConnection('deepseek', 'http://unsafe.example', 'new')).toThrow(
+    'HTTPS',
+  );
+  const failedStore = new CredentialService(db, {
+    isEncryptionAvailable: () => true,
+    encryptString: () => {
+      throw new Error('synthetic keychain failure');
+    },
+    decryptString: () => '',
+  });
+  failedStore.setCatalog(credentials.settings().models);
+  expect(() =>
+    failedStore.saveConnection('deepseek', 'https://failed.example/v1', 'replacement'),
+  ).toThrow('keychain');
+  expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');
   expect(credentials.key('deepseek')).toBe(sentinel);
   expect(JSON.stringify(credentials.settings())).not.toContain(sentinel);
   expect(JSON.stringify(db.prepare('SELECT * FROM app_metadata').all())).not.toContain(sentinel);
@@ -142,12 +164,13 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   await service.submit(c.id, makeInput());
   await vi.waitFor(() => expect(starts).toBe(2));
   expect(service.snapshot(c.id)?.state).toBe('queued');
-  credentials.save('deepseek', 'sk-rotated-after-queue');
+  credentials.saveConnection('deepseek', 'https://second.example/v1', 'sk-rotated-after-queue');
   await service.cancel(session.id);
   expect(service.snapshot(session.id)?.state).toBe('cancelled');
   await vi.waitFor(() => expect(starts).toBe(3));
   expect(service.snapshot(c.id)?.state).toBe('running');
   expect(usedKeys).toEqual([sentinel, sentinel, sentinel]);
+  expect(usedEndpoints).toEqual(Array(3).fill('https://first.example/v1'));
   await service.cancel(b.id);
   await service.cancel(c.id);
   expect(stops).toBe(3);

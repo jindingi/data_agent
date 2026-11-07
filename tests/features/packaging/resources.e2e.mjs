@@ -17,8 +17,8 @@ export const cases = {
     try {
       await app.page.getByRole('button', { name: '设置', exact: true }).click();
       await app.page.getByText('应用诊断', { exact: true }).click();
-      await app.page.getByRole('button', { name: '检查连接' }).click();
-      await app.page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
+      await app.page.getByRole('button', { name: '检查本地引擎' }).click();
+      await app.page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
       const system = await info(app.page);
       assert.equal(system.packaged, true);
       assert.equal(system.architecture, 'arm64');

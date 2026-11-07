@@ -179,6 +179,7 @@ if (primaryInstance)
         credentials: credentials,
         runtime: runtime,
         catalogReady: catalogReady,
+        testBaseUrl: automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
         interactions: interactions,
         automationControl: automation
           ? (action, sessionId) => {

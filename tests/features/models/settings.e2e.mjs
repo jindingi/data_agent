@@ -60,6 +60,7 @@ export const cases = {
           (await rpc(page, { type: 'models.settings' })).selected.model === alternate.model,
         'model changed',
       );
+      await page.getByRole('button', { name: '更换 Key', exact: true }).click();
       await page.getByRole('textbox', { name: 'API key', exact: true }).fill(secondKey);
       await page.getByRole('button', { name: '保存凭证', exact: true }).click();
       await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
@@ -85,6 +86,7 @@ export const cases = {
       assert.equal(fixture.authorizations.at(-1), `Bearer ${secondKey}`);
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByRole('button', { name: '移除凭证', exact: true }).click();
+      await page.getByRole('button', { name: '确认移除凭证', exact: true }).click();
       await page.getByRole('status').filter({ hasText: '已移除凭证' }).waitFor();
       const basic = restored.models.find((m) => !m.reasoning);
       assert(basic);

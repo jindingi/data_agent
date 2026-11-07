@@ -73,7 +73,7 @@ async function liveScenario(dir) {
           .filter({ hasText: 'API key 已保存' })
           .waitFor({ timeout: 20_000 });
       } finally {
-        await keyField.fill('').catch(() => {});
+        if (await keyField.isEditable().catch(() => false)) await keyField.fill('').catch(() => {});
       }
       await page.getByRole('button', { name: '关闭对话框' }).click();
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();

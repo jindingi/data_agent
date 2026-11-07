@@ -22,6 +22,7 @@ export async function dispatchCommand(
     credentials,
     runtime,
     catalogReady,
+    testBaseUrl,
     interactions,
     automationControl,
     artifacts,
@@ -100,6 +101,24 @@ export async function dispatchCommand(
     case 'models.settings':
       await catalogReady;
       return success(command.type, credentials.settings());
+    case 'models.connection':
+      await catalogReady;
+      return success(
+        command.type,
+        credentials.saveConnection(command.provider, command.baseUrl, command.key),
+      );
+    case 'models.test': {
+      await catalogReady;
+      credentials.validate(command.model);
+      const baseUrl = testBaseUrl ?? credentials.endpoint(command.model.provider);
+      const result = await host.request({
+        type: 'models.test',
+        model: command.model,
+        apiKey: credentials.key(command.model.provider),
+        ...(baseUrl ? { baseUrl } : {}),
+      });
+      return success(command.type, { elapsedMs: result.elapsedMs });
+    }
     case 'models.select':
       await catalogReady;
       return success(command.type, credentials.select(command.model));

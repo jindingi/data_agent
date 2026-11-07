@@ -1,0 +1,153 @@
+import assert from 'node:assert/strict';
+import { join } from 'node:path';
+import { startApp, until } from '../../../scripts/test/harness.mjs';
+import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
+import { configure, rpc } from '../../support/desktop.mjs';
+
+export const cases = {
+  async 'models.connections-ui'({ dir }) {
+    const fixture = await modelFixture();
+    const root = join(dir, 'connections');
+    let app;
+    try {
+      app = await startApp(root, { testModelBaseUrl: fixture.baseUrl });
+      const { page } = app;
+      await configure(page, 'synthetic-original');
+      await page.getByRole('button', { name: '设置', exact: true }).click();
+      assert.equal(
+        await page.getByLabel('已保存 API key', { exact: true }).inputValue(),
+        '********',
+      );
+      assert.equal(
+        await page.getByLabel('已保存 API key', { exact: true }).getAttribute('type'),
+        'password',
+      );
+      const initial = await rpc(page, { type: 'models.settings' });
+      await page.getByLabel('搜索模型', { exact: true }).fill('no-such-model-xyz');
+      await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor();
+      assert.equal(await page.getByLabel('选择模型', { exact: true }).count(), 0);
+      await page.getByLabel('搜索模型', { exact: true }).fill('');
+      await page.getByRole('button', { name: '更换 Key', exact: true }).click();
+      await page.getByLabel('API key', { exact: true }).fill('synthetic-unsaved');
+      await page.getByLabel('连接提供方', { exact: true }).selectOption('openai');
+      assert.deepEqual((await rpc(page, { type: 'models.settings' })).selected, initial.selected);
+      await page.getByLabel('API key', { exact: true }).fill('synthetic-other-provider');
+      await page.getByLabel('连接提供方', { exact: true }).selectOption('deepseek');
+      assert.equal(
+        await page.getByLabel('API key', { exact: true }).inputValue(),
+        'synthetic-unsaved',
+      );
+      const alternate = initial.models.find(
+        (m) => m.provider === 'deepseek' && m.model !== initial.selected.model,
+      );
+      await page
+        .getByLabel('选择模型', { exact: true })
+        .selectOption(JSON.stringify({ provider: alternate.provider, model: alternate.model }));
+      assert.equal(
+        await page.getByLabel('API key', { exact: true }).inputValue(),
+        'synthetic-unsaved',
+      );
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
+      await page.getByRole('button', { name: '设置', exact: true }).click();
+      assert.equal(
+        await page.getByLabel('API key', { exact: true }).inputValue(),
+        'synthetic-unsaved',
+      );
+      await page.getByLabel('API Base URL', { exact: true }).fill('http://unsafe.example');
+      await page.getByRole('button', { name: '保存凭证', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'HTTPS' }).waitFor();
+      assert.equal(
+        await page.getByLabel('API key', { exact: true }).inputValue(),
+        'synthetic-unsaved',
+      );
+      assert.equal((await rpc(page, { type: 'models.settings' })).endpoints.deepseek, '');
+      await page.getByLabel('API Base URL', { exact: true }).fill(fixture.baseUrl);
+      await page.getByRole('button', { name: '保存凭证', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
+      assert.equal(
+        (await rpc(page, { type: 'models.settings' })).endpoints.deepseek,
+        fixture.baseUrl,
+      );
+      await page.getByLabel('测试模型', { exact: true }).selectOption('deepseek-flash');
+      fixture.set({ status: 401, error: 'synthetic-unsaved' });
+      await page.getByRole('button', { name: '测试模型连接', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: '鉴权失败' }).waitFor();
+      assert(!(await page.locator('.settings-body').innerText()).includes('synthetic-unsaved'));
+      fixture.set({ text: 'OK', delay: 250 });
+      await page.getByRole('button', { name: '测试模型连接', exact: true }).click();
+      await page.getByRole('button', { name: '正在测试模型…', exact: true }).waitFor();
+      await page.getByRole('status').filter({ hasText: '连接测试通过' }).waitFor();
+      assert.equal(fixture.requests.length, 2);
+      assert.equal(fixture.authorizations.at(-1), 'Bearer synthetic-unsaved');
+      assert.equal((await rpc(page, { type: 'sessions.list' })).length, 0);
+      await page.getByRole('button', { name: '移除凭证', exact: true }).click();
+      assert(
+        (await rpc(page, { type: 'models.settings' })).configuredProviders.includes('deepseek'),
+      );
+      await page.getByRole('button', { name: '取消移除', exact: true }).click();
+      // Header/close stay visible while every section can be reached at each supported size/theme.
+      for (const [width, height] of [
+        [1440, 900],
+        [1180, 760],
+        [900, 650],
+      ]) {
+        await page.setViewportSize({ width, height });
+        const body = page.locator('.settings-body');
+        for (const theme of ['light', 'dark']) {
+          await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+          await body.evaluate((el) => {
+            el.scrollTop = 0;
+          });
+          await page.screenshot({ path: join(root, `settings-${width}-${theme}-top.png`) });
+          await page.getByText('应用诊断', { exact: true }).click();
+          await page.getByRole('button', { name: '检查本地引擎', exact: true }).click();
+          await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
+          const geometry = await page.locator('.settings-dialog').evaluate((dialog) => {
+            const body = dialog.querySelector('.settings-body'),
+              header = dialog.querySelector('.settings-header');
+            return {
+              overflow: dialog.scrollWidth > dialog.clientWidth,
+              scrolled: body.scrollTop > 0,
+              headerTop: header.getBoundingClientRect().top,
+              dialogTop: dialog.getBoundingClientRect().top,
+            };
+          });
+          assert.equal(geometry.overflow, false);
+          assert.equal(geometry.scrolled, true);
+          assert(Math.abs(geometry.headerTop - geometry.dialogTop) < 2);
+          await page.screenshot({ path: join(root, `settings-${width}-${theme}-bottom.png`) });
+          await page.getByText('应用诊断', { exact: true }).click();
+        }
+      }
+      assert.equal(fixture.requests.length, 2, 'Local health check must not call the model');
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
+      await until(
+        () =>
+          page
+            .getByRole('button', { name: '设置', exact: true })
+            .evaluate((el) => el === document.activeElement),
+        'settings focus restored',
+      );
+      await app.stop();
+      app = await startApp(root, { testModelBaseUrl: fixture.baseUrl });
+      const restored = await rpc(app.page, { type: 'models.settings' });
+      assert.equal(restored.endpoints.deepseek, fixture.baseUrl);
+      assert(!JSON.stringify(restored).includes('synthetic-unsaved'));
+      assert(!restored.configuredProviders.includes('openai'));
+      assert.deepEqual(app.errors, []);
+      return {
+        maskedKey: true,
+        providerDrafts: true,
+        independentModelChoice: true,
+        endpointPersisted: true,
+        realSdkProbe: true,
+        authFailure: true,
+        localDiagnosticSeparate: true,
+        layouts: 6,
+      };
+    } finally {
+      await app?.stop();
+      await fixture.close();
+    }
+  },
+};

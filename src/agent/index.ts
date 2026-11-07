@@ -3,6 +3,7 @@ import { readHistory } from './history';
 import { AppError } from '../shared/errors';
 import { SessionRuntime } from './session-runtime';
 import { createModelRuntime, modelCatalog } from './models';
+import { testModelConnection } from './model-connection';
 import { ToolClient } from './tool-client';
 
 // This entry is deliberately independent from Main and Renderer implementations.
@@ -23,6 +24,7 @@ parent.on('message', ({ ports }) => {
   let runtime: SessionRuntime | undefined;
   const tools = new ToolClient((message) => port.postMessage(message));
   let initializing = false;
+  let testing = false;
   port.on('message', async ({ data }) => {
     const parsed = hostRequestSchema.safeParse(data);
     if (!parsed.success) return;
@@ -47,6 +49,17 @@ parent.on('message', ({ ports }) => {
             models: modelCatalog(await createModelRuntime()),
           });
           break;
+        case 'models.test': {
+          if (testing) throw new AppError('TEST_BUSY', '连接测试正在进行');
+          testing = true;
+          try {
+            const elapsedMs = await testModelConnection(request);
+            port.postMessage({ type: 'model.tested', id: request.id, elapsedMs });
+          } finally {
+            testing = false;
+          }
+          break;
+        }
         case 'runtime.start': {
           if (runtime || initializing) throw new AppError('HOST_BUSY', '该 Agent 进程已有任务');
           initializing = true;

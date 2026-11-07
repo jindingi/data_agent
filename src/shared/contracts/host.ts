@@ -22,6 +22,7 @@ const runtimeConfigSchema = z
     apiKey: z.string().min(1).max(4096),
     protectedRoots: z.array(z.string()),
     testBaseUrl: z.string().url().optional(),
+    baseUrl: z.string().url().optional(),
     skillsDirectory: z.string().optional(),
   })
   .strict();
@@ -42,6 +43,15 @@ export const hostRequestSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ id, type: z.literal('models.list') }).strict(),
+  z
+    .object({
+      id,
+      type: z.literal('models.test'),
+      model: modelChoiceSchema,
+      apiKey: z.string().min(1).max(4096),
+      baseUrl: z.string().url().optional(),
+    })
+    .strict(),
   z
     .object({
       id,
@@ -92,10 +102,13 @@ export const hostResponseSchema = z.discriminatedUnion('type', [
           vision: z.boolean(),
           verified: z.boolean(),
           thinkingLevels: z.array(thinkingLevelSchema),
+          baseUrl: z.string().optional(),
+          api: z.string().optional(),
         }),
       ),
     })
     .strict(),
+  z.object({ type: z.literal('model.tested'), id, elapsedMs: z.number() }).strict(),
   z.object({ type: z.literal('accepted'), id }).strict(),
   z.object({ type: z.literal('snapshot'), id, snapshot: snapshotSchema }).strict(),
   z.object({ type: z.literal('runtime.event'), snapshot: snapshotSchema }).strict(),
@@ -112,6 +125,7 @@ export interface HostResponses {
   ping: Extract<HostResponse, { type: 'pong' }>;
   'history.read': Extract<HostResponse, { type: 'history' }>;
   'models.list': Extract<HostResponse, { type: 'models' }>;
+  'models.test': Extract<HostResponse, { type: 'model.tested' }>;
   'runtime.start': Extract<HostResponse, { type: 'accepted' }>;
   'runtime.input': Extract<HostResponse, { type: 'accepted' }>;
   'runtime.cancel': Extract<HostResponse, { type: 'accepted' }>;
@@ -122,6 +136,7 @@ export const hostReplyTypes = {
   ping: 'pong',
   'history.read': 'history',
   'models.list': 'models',
+  'models.test': 'model.tested',
   'runtime.start': 'accepted',
   'runtime.input': 'accepted',
   'runtime.cancel': 'accepted',

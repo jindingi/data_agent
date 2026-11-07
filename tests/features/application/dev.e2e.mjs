@@ -14,8 +14,8 @@ export const cases = {
       assert.match(page.url(), /^http:\/\/localhost:\d+\/$/);
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByText('应用诊断', { exact: true }).click();
-      await page.getByRole('button', { name: '检查连接' }).click();
-      await page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
+      await page.getByRole('button', { name: '检查本地引擎' }).click();
+      await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
       await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       await page.getByRole('button', { name: '新会话', exact: true }).click();
       assert.equal(await page.getByTestId('session-title').getAttribute('data-session-id'), null);

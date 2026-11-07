@@ -47,6 +47,7 @@ interface Task {
   input: RunInput;
   model: ModelChoice;
   apiKey?: string;
+  baseUrl?: string;
   host?: RuntimeHost;
   starting: boolean;
   outputDirectory?: string;
@@ -285,6 +286,7 @@ export class RuntimeService {
     this.credentials.validate(model);
     const apiKey = this.credentials.key(model.provider);
     const thinkingLevel = this.credentials.thinking(model);
+    const baseUrl = this.credentials.endpoint(model.provider);
     this.sessions.reconcile(sessionId);
     const session = this.sessions.get(sessionId);
     if (session.archived || !['draft', 'persisted'].includes(session.state))
@@ -317,6 +319,7 @@ export class RuntimeService {
       input,
       model,
       apiKey,
+      baseUrl,
       starting: false,
       snapshot: {
         schemaVersion: 1,
@@ -531,6 +534,7 @@ export class RuntimeService {
           thinkingLevel: task.thinkingLevel,
           apiKey,
           skillsDirectory: this.skillsDirectory,
+          ...(task.baseUrl ? { baseUrl: task.baseUrl } : {}),
           ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
           protectedRoots: [
             this.paths.sessions,
