@@ -57,12 +57,12 @@ it('P2-PREFLIGHT credentials and model errors leave no run or permit; later inpu
   const usedKeys: string[] = [];
   let starts = 0,
     stops = 0;
-  const service = new RuntimeService(
-    db,
-    sessions,
-    credentials,
-    paths,
-    (_status, emit) => {
+  const service = new RuntimeService({
+    db: db,
+    sessions: sessions,
+    credentials: credentials,
+    paths: paths,
+    createHost: (_status, emit) => {
       let current: RuntimeSnapshot;
       return {
         stop: () => {
@@ -98,10 +98,10 @@ it('P2-PREFLIGHT credentials and model errors leave no run or permit; later inpu
         },
       };
     },
-    { readHistory: async () => ({ messages: [] }) },
-    (event) => events.push(event),
-    () => {},
-  );
+    reader: { readHistory: async () => ({ messages: [] }) },
+    publish: (event) => events.push(event),
+    changed: () => {},
+  });
   cleanups.push(() => service.stop());
   const session = sessions.create();
   const makeInput = () => ({

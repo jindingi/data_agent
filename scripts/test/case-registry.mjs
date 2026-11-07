@@ -1,4 +1,5 @@
 export const nativeIds = [
+  'R-WRITES',
   'P6-OUTPUT-LIMIT',
   'P6-LOG-LIMIT',
   'P6-DELETE-STORAGE',

@@ -334,6 +334,21 @@ export class ToolService {
   async settled(runId?: string) {
     await Promise.allSettled(runId ? [this.tails.get(runId)] : [...this.tails.values()]);
   }
+  releaseRun(runId: string) {
+    if ([...this.active].some((item) => item.runId === runId))
+      throw new Error('Cannot release active tools');
+    this.closed.delete(runId);
+    this.tails.delete(runId);
+    this.processes.releaseRun(runId);
+  }
+  resourceCounts() {
+    return {
+      active: this.active.size,
+      tails: this.tails.size,
+      closed: this.closed.size,
+      processBudgets: this.processes.runCount,
+    };
+  }
   stop() {
     for (const item of this.active) item.abort.abort();
     this.broker.stop();

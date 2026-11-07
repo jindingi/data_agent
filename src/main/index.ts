@@ -121,12 +121,12 @@ if (primaryInstance)
         if (window && !window.isDestroyed())
           window.webContents.send(IPC_EVENT, { type: 'sessions.changed' });
       };
-      runtime = new RuntimeService(
-        db,
-        sessions,
-        credentials,
-        paths,
-        (status, snapshot, tool, cancelTool, advanceOutput) =>
+      runtime = new RuntimeService({
+        db: db,
+        sessions: sessions,
+        credentials: credentials,
+        paths: paths,
+        createHost: (status, snapshot, tool, cancelTool, advanceOutput) =>
           new AgentProcess(
             join(here, 'agent.js'),
             status,
@@ -135,19 +135,19 @@ if (primaryInstance)
             cancelTool,
             advanceOutput,
           ),
-        host,
-        (snapshot) => {
+        reader: host,
+        publish: (snapshot) => {
           if (window && !window.isDestroyed())
             window.webContents.send(IPC_EVENT, { type: 'runtime.event', snapshot });
         },
-        changed,
-        tools,
-        automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
-        artifacts,
-        app.isPackaged
+        changed: changed,
+        tools: tools,
+        testBaseUrl: automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
+        artifacts: artifacts,
+        skillsDirectory: app.isPackaged
           ? join(process.resourcesPath, 'skills')
           : join(app.getAppPath(), 'resources/skills'),
-      );
+      });
       deletion = new DeletionService(db, sessions, runtime, artifacts, paths, changed);
       const info = (): SystemInfo => ({
         version: app.getVersion(),

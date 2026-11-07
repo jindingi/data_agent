@@ -175,3 +175,7 @@ R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接
 ### R3 实施进展（2026-11-07）
 
 App 已拆出 SessionSidebar、SessionHeader、Composer/useComposer、RunControls/useActivity、SettingsDialog/useModelSettings、Report/ZoomImage/usePanelSize。草稿、模型写入与预览请求各自有状态所有者；布局组合留在 App，不迁移为全能 controller。草稿 revision/token 单元正反例及 UX-DRAFTS、UX-READING、P6-DRAFTS、P6-SETTINGS 通过。新增模型搜索/提供方分组、弹窗错误、焦点返回、图片放大与输入框自增高。旧测试已迁移调用方式，完整旧门禁仍待运行，R3 最终验收与 R6 一并收束。
+
+### R4 实施记录（2026-11-07）
+
+运行账本 RunLedger、FIFO/许可 RunAdmission、终态写者收束 RunLifecycle 已提取，RuntimeService 改用命名依赖。元数据仅在运行状态/输入 ACK 变化时写入，JSONL 继续由 pi 写；R-WRITES 证明连续文本 snapshot 不增加 SQL 写入，ACK/终态仍耐久。停止等待 Host、工具及版本发布后释放许可；终态缓存最多保留 8 个 task 和 8 个恢复 snapshot，历史仍可按需从 JSONL 读取。工具计数在写者结束后显式释放（与 R5 共用）。R-WRITES、P2-PREFLIGHT、P5-SWITCH、unit 和 quality 通过，完整 P5/删除/崩溃门禁留待最终汇总。

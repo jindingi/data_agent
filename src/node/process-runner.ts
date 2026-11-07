@@ -37,6 +37,12 @@ export class ProcessRunner {
     private logs: string,
     private logObserver?: LogObserver,
   ) {}
+  releaseRun(runId: string) {
+    this.logBytes.delete(runId);
+  }
+  get runCount() {
+    return this.logBytes.size;
+  }
   environment(workspace: string) {
     const cache = join(workspace, '.cache');
     const home = join(workspace, '.home');
