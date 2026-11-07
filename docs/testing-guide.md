@@ -125,8 +125,12 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 ## 模型设置回归
 
-`pnpm test -- --feature models` 默认不读取真实 Key、不调用线上模型。新增的 `models.configuration` 经真实 pi SDK 验证覆盖地址、短请求预算、401/403/404/429/500 与网络错误分类，以及按模型能力选择推荐级别；`models.preflight` 还验证地址/凭证事务回滚与排队任务配置快照。`conversation.cache-prefix-unit` 使用生产 Base URL 覆盖路径验证最终 HTTP URL 和上下文前缀。
+`pnpm test -- --feature models` 默认不读取真实 Key、不调用线上模型。新增的 `models.configuration` 经真实 pi SDK 验证覆盖地址、短请求预算、401/403/404/429/500/503 与网络错误分类，以及按模型能力选择推荐级别；`models.preflight` 还验证地址/凭证事务回滚与排队任务配置快照。`conversation.cache-prefix-unit` 使用生产 Base URL 覆盖路径验证最终 HTTP URL 和上下文前缀。
 
 `models.connections-ui` 使用后台 Electron/CDP 与合成 HTTP 服务，覆盖固定凭证遮罩、独立提供方管理、跨模型/提供方/弹窗的内存草稿、保存失败保留输入、地址持久化、真实 SDK 连接测试、鉴权错误脱敏、凭证移除确认、搜索无结果、焦点恢复、三种尺寸和深浅主题。`models.settings` 保持原有 Key 轮换/移除/重启及思考参数验收；`models.recorded-conversation` 严格匹配既有录制，不因 UI 修改放宽匹配。
 
 应用诊断测试使用“检查本地引擎”；这不会消耗模型请求，也不能替代“测试模型连接”。普通测试中的连接测试只访问本机合成 HTTP 服务，不能据此声称已经在线验证所有模型/代理服务。
+
+连接探测还覆盖“首段内容已到达，但服务端始终不发结束事件”的流：收到非空内容即通过并 abort，避免把等不到 DONE 误报为连接失败；只收到空帧不能通过。虚拟时钟验证无响应/首内容等待的 20 秒超时分类与计时器清理。CDP 对三种尺寸和深浅主题断言“更换 Key”与输入框中心差不超过 1 px，并保存凭证区域截图。
+
+`pnpm test -- --case models.live-connection --live` 仅运行一次真实 DeepSeek 设置页探测，使用 `live-key.mjs` 读取测试 Key，不创建会话、不发文件、不自动重试、不保留原始响应。它独立于录制重放与普通回归；服务端不可用时如实失败，不改为 skip 或反复重试取绿。

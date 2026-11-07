@@ -10,7 +10,9 @@ export async function testModelConnection(config: {
   baseUrl?: string;
 }): Promise<number> {
   const started = Date.now();
-  const signal = AbortSignal.timeout(20_000);
+  const controller = new AbortController();
+  const { signal } = controller;
+  const deadline = setTimeout(() => controller.abort(), 20_000);
   let status: number | undefined;
   try {
     const runtime = await createModelRuntime();
@@ -21,7 +23,7 @@ export async function testModelConnection(config: {
     const model = runtime.getModel(config.model.provider, config.model.model);
     if (!model) throw new AppError('UNKNOWN_MODEL', '所选模型不在内置模型列表中');
     await runtime.setRuntimeApiKey(model.provider, config.apiKey);
-    const result = await runtime.completeSimple(
+    const stream = runtime.streamSimple(
       model,
       {
         messages: [{ role: 'user', content: 'Reply with OK.', timestamp: Date.now() }],
@@ -41,22 +43,39 @@ export async function testModelConnection(config: {
         },
       },
     );
-    if (result.stopReason === 'error' || result.stopReason === 'aborted' || !result.content.length)
-      throw new Error('Incomplete model response');
-    return Date.now() - started;
+    for await (const event of stream) {
+      // Connectivity is established by parsed model content, not by an HTTP 200 or a role-only frame.
+      // Some providers keep streaming after content; do not wait for their final usage/DONE frame.
+      if ((event.type === 'text_delta' || event.type === 'thinking_delta') && event.delta.trim())
+        return Date.now() - started;
+      if (event.type === 'error') throw new Error('Model stream failed');
+    }
+    throw new Error('Model returned no content');
   } catch {
     // Never forward provider error bodies: they may echo credentials or request headers.
-    if (signal.aborted) throw new AppError('MODEL_TIMEOUT', '模型请求超时，请检查地址或稍后重试');
+    if (signal.aborted) {
+      if (status && status >= 200 && status < 300)
+        throw new AppError(
+          'MODEL_FIRST_CONTENT_TIMEOUT',
+          '已连接到服务，但 20 秒内未收到有效模型内容；服务可能繁忙，请稍后重试',
+        );
+      throw new AppError('MODEL_TIMEOUT', '20 秒内未收到服务响应，请检查网络或 Base URL');
+    }
     if (status === 401 || status === 403)
       throw new AppError('MODEL_AUTH', '鉴权失败，请检查 API key 及模型访问权限');
     if (status === 404)
       throw new AppError('MODEL_NOT_FOUND', '地址或模型不存在，请检查 Base URL 和模型名称');
     if (status === 429) throw new AppError('MODEL_RATE_LIMIT', '提供方限流或额度不足，请稍后重试');
+    if (status === 503)
+      throw new AppError('MODEL_UNAVAILABLE', '模型服务暂时不可用或繁忙（HTTP 503），请稍后重试');
     if (status && status >= 400)
       throw new AppError(
         'MODEL_RESPONSE',
         `提供方返回 HTTP ${status}，请检查模型协议、参数或服务状态`,
       );
     throw new AppError('MODEL_CONNECTION', '未取得有效模型响应，请检查网络、Base URL 和 API 协议');
+  } finally {
+    clearTimeout(deadline);
+    controller.abort(); // Stop the probe, including any provider stream still open after first content.
   }
 }

@@ -328,7 +328,7 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 - 连接保存是显式操作。`models.connection` 通过 Main 校验 Base URL；只允许 HTTPS 或本机 HTTP，禁止地址内凭证、query 和 fragment。空字符串表示 SDK 内置地址。所有内置模型保留原来的 API 协议，不将 Anthropic/Google 强制转成 OpenAI 格式。
 - `app_metadata` 的 `endpoint.{provider}` 保存可选覆盖地址，`credential.{provider}` 仍存 safeStorage 密文。两者在 SQLite 单事务内保存；地址变更（包括恢复默认）要求重新输入 Key，失败全部回滚。旧数据库无 endpoint 键时自然使用内置地址，无需表结构迁移；移除凭证保留地址，重启不会恢复未保存的草稿。
 - Renderer 根据配置存在性显示固定八位遮罩，不请求已保存密钥。更换/显示/隐藏仅作用于新输入；提供方草稿存在 SettingsDialog 内存中，切换模型、提供方或关闭弹窗不丢失，退出应用后清除。移除凭证需明确确认其提供方级别影响。
-- `models.test` 使用已保存的 Key/地址及指定的内置模型，在诊断 Host 中创建独立临时 ModelRuntime，经实际 SDK 发一条 `Reply with OK.` 请求，无会话、工具、文件或持久化结果；输出上限 32，超时 20 秒、禁用重试，Host 同时只接受一次测试。错误分类为鉴权、地址/模型不存在、限流/额度、HTTP 响应、网络/协议及超时；不向 Renderer 转发原始服务端错误正文。成功只代表这一次短请求，不等于完整工具/思考兼容性验收，测试用量不计入任何会话轮次。
+- `models.test` 使用已保存的 Key/地址及指定的内置模型，在诊断 Host 中创建独立临时 ModelRuntime，经实际 SDK 发一条 `Reply with OK.` 请求，无会话、工具、文件或持久化结果；输出上限 32，超时 20 秒、禁用重试，Host 同时只接受一次测试。错误分类为鉴权、地址/模型不存在、限流/额度、HTTP 响应、网络/协议及超时；不向 Renderer 转发原始服务端错误正文。连接成功以 pi SDK 首个非空 text/thinking delta 为准，立即 abort 并清理计时器，不等待完整生成或最终 usage/DONE；HTTP 200、role-only 帧不算成功。20 秒内无响应与已连接但无有效内容分别提示，503 明确提示服务繁忙。成功只代表收到有效模型内容，不等于完整生成或工具/思考兼容性验收，测试用量不计入任何会话轮次。
 - `system.ping` 明确标为“检查本地引擎”，与模型连接测试分开。普通自动化仍强制使用隔离 loopback 模型地址，不能因连接测试访问线上提供方。
 - 推荐思考级别为产品默认值，并非 SDK/模型提供方保证：DeepSeek 优先 high；其他模型若支持 medium 则用 medium，否则使用支持的最低非 off 级别或 off。已有按 provider/model 保存的显式选择优先；可恢复推荐值。可用级别仍唯一来自锁定 SDK 的 `getSupportedThinkingLevels`，不同模型同名级别不代表相同预算。
 - Base URL 与 Key/模型/级别一起在提交预检时快照，排队后修改设置不改变原任务。后续新任务才应用新设置；不改写会话上下文、工具或历史消息。连接测试自身不参加会话队列。

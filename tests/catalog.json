@@ -918,5 +918,15 @@
     "environment": "built",
     "tags": [],
     "related": []
+  },
+  {
+    "id": "models.live-connection",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/live-connection.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
   }
 ]

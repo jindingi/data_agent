@@ -3,7 +3,10 @@ import { normalizeEndpoint, recommendedThinking } from '../../../src/shared/mode
 import { testModelConnection } from '../../../src/agent/model-connection';
 import { createModelRuntime, modelCatalog } from '../../../src/agent/models';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 it('validates endpoint destinations and recommends only model-supported thinking levels', async () => {
   expect(normalizeEndpoint(' https://example.com/v1/ ')).toBe('https://example.com/v1');
   expect(normalizeEndpoint('http://127.0.0.1:1234/v1')).toBe('http://127.0.0.1:1234/v1');
@@ -60,13 +63,14 @@ it('tests the saved endpoint through the real SDK with a bounded prompt and sani
     [404, 'MODEL_NOT_FOUND'],
     [429, 'MODEL_RATE_LIMIT'],
     [500, 'MODEL_RESPONSE'],
+    [503, 'MODEL_UNAVAILABLE'],
   ] as const) {
     status = code;
     await expect(testModelConnection(config)).rejects.toMatchObject({ code: expected });
   }
   status = 200;
   expect(await testModelConnection(config)).toBeGreaterThanOrEqual(0);
-  expect(calls).toHaveLength(6); // No automatic retries or sessions.
+  expect(calls).toHaveLength(7); // No automatic retries or sessions.
   expect(calls.every((c) => c.url === 'https://probe.example/v1/chat/completions')).toBe(true);
   expect(calls.at(-1)?.body.messages).toEqual([{ role: 'user', content: 'Reply with OK.' }]);
   expect(calls.at(-1)?.body.max_tokens).toBe(32);
@@ -76,3 +80,101 @@ it('tests the saved endpoint through the real SDK with a bounded prompt and sani
   });
   await expect(testModelConnection(config)).rejects.toMatchObject({ code: 'MODEL_CONNECTION' });
 });
+
+it('finishes a connection probe after valid content even when the provider leaves the stream open', async () => {
+  let streamController: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let aborted = false;
+  vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+        const event = {
+          id: 'held-open',
+          object: 'chat.completion.chunk',
+          model: 'deepseek-flash',
+          choices: [{ index: 0, delta: { role: 'assistant', content: 'OK' }, finish_reason: null }],
+        };
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
+        init.signal?.addEventListener(
+          'abort',
+          () => {
+            aborted = true;
+            controller.error(new DOMException('Aborted', 'AbortError'));
+          },
+          { once: true },
+        );
+      },
+    });
+    return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+  });
+  const pending = testModelConnection({
+    model: { provider: 'deepseek', model: 'deepseek-flash' },
+    apiKey: 'synthetic',
+    baseUrl: 'https://probe.example/v1',
+  });
+  const verdict = await Promise.race([
+    pending.then(
+      () => 'responded',
+      () => 'failed',
+    ),
+    new Promise<string>((resolve) => setTimeout(() => resolve('still-waiting-for-end'), 750)),
+  ]);
+  streamController?.error(new Error('fixture cleanup'));
+  await pending.catch(() => {});
+  expect(verdict).toBe('responded');
+  expect(aborted).toBe(true);
+});
+
+it.each([false, true])(
+  'distinguishes no response from an empty connected stream (connected=%s)',
+  async (connected) => {
+    vi.useFakeTimers();
+    let entered!: () => void;
+    const fetched = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      entered();
+      if (!connected)
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true },
+          );
+        });
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            // A role-only SSE frame proves transport, not a working model response.
+            controller.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({ id: 'empty', object: 'chat.completion.chunk', model: 'deepseek-flash', choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] })}\n\n`,
+              ),
+            );
+            init.signal?.addEventListener(
+              'abort',
+              () => controller.error(new DOMException('Aborted', 'AbortError')),
+              { once: true },
+            );
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      );
+    });
+    const outcome = testModelConnection({
+      model: { provider: 'deepseek', model: 'deepseek-flash' },
+      apiKey: 'synthetic',
+      baseUrl: 'https://probe.example/v1',
+    }).then(
+      () => null,
+      (error) => error,
+    );
+    await fetched;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await outcome).toMatchObject({
+      code: connected ? 'MODEL_FIRST_CONTENT_TIMEOUT' : 'MODEL_TIMEOUT',
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);

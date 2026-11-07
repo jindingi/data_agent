@@ -4,6 +4,15 @@ import { startApp, until } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
 import { configure, rpc } from '../../support/desktop.mjs';
 
+async function assertKeyAlignment(page) {
+  const alignment = await page.locator('.saved-credential').evaluate((row) => {
+    const input = row.querySelector('input').getBoundingClientRect();
+    const button = row.querySelector('button').getBoundingClientRect();
+    return Math.abs((input.top + input.bottom) / 2 - (button.top + button.bottom) / 2);
+  });
+  assert(alignment <= 1, `Key button center differs by ${alignment}px`);
+}
+
 export const cases = {
   async 'models.connections-ui'({ dir }) {
     const fixture = await modelFixture();
@@ -22,6 +31,7 @@ export const cases = {
         await page.getByLabel('已保存 API key', { exact: true }).getAttribute('type'),
         'password',
       );
+      await assertKeyAlignment(page);
       const initial = await rpc(page, { type: 'models.settings' });
       await page.getByLabel('搜索模型', { exact: true }).fill('no-such-model-xyz');
       await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor();
@@ -99,6 +109,9 @@ export const cases = {
             el.scrollTop = 0;
           });
           await page.screenshot({ path: join(root, `settings-${width}-${theme}-top.png`) });
+          await page.getByLabel('已保存 API key', { exact: true }).scrollIntoViewIfNeeded();
+          await assertKeyAlignment(page);
+          await page.screenshot({ path: join(root, `settings-${width}-${theme}-credential.png`) });
           await page.getByText('应用诊断', { exact: true }).click();
           await page.getByRole('button', { name: '检查本地引擎', exact: true }).click();
           await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();

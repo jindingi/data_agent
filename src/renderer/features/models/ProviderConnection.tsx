@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useId, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ModelController } from './use-model-settings';
 import { normalizeEndpoint } from '../../../shared/model-configuration';
 import { Button } from '../../components/ui/button';
@@ -20,6 +20,7 @@ export function ProviderConnection({
   setDrafts: Dispatch<SetStateAction<ConnectionDrafts>>;
 }) {
   const { value, busy, change } = controller;
+  const savedKeyId = useId();
   const [provider, setProvider] = useState(value?.selected.provider ?? 'deepseek');
   const [testModel, setTestModel] = useState('');
   const [visible, setVisible] = useState(false);
@@ -87,7 +88,7 @@ export function ProviderConnection({
         model: { provider, model: model.model },
       });
       setNotice(
-        `${model.name} 连接测试通过（${(result.elapsedMs / 1000).toFixed(1)} 秒）。仅验证本次请求，不代表完整兼容性。`,
+        `${model.name} 连接测试通过（${(result.elapsedMs / 1000).toFixed(1)} 秒）。已收到模型内容并结束探测，不代表完整兼容性。`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : '连接测试失败');
@@ -155,18 +156,24 @@ export function ProviderConnection({
       )}
       {configured && !draft.editing ? (
         <div className="saved-credential">
-          <label>
-            API key
-            <input aria-label="已保存 API key" type="password" value="********" readOnly />
-          </label>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={locked}
-            onClick={() => update({ editing: true })}
-          >
-            更换 Key
-          </Button>
+          <label htmlFor={savedKeyId}>API key</label>
+          <div className="saved-credential-controls">
+            <input
+              id={savedKeyId}
+              aria-label="已保存 API key"
+              type="password"
+              value="********"
+              readOnly
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={locked}
+              onClick={() => update({ editing: true })}
+            >
+              更换 Key
+            </Button>
+          </div>
         </div>
       ) : (
         <>
@@ -265,8 +272,8 @@ export function ProviderConnection({
         </select>
       </label>
       <p>
-        向已保存地址发送一条短请求（最多 32 个输出 token，20
-        秒超时），可能产生少量费用。不发送会话或文件。
+        收到有效模型内容即结束探测，最多等待 20 秒，输出上限 32 token。
+        可能产生少量费用，不发送会话或文件。
       </p>
       <Button
         size="sm"

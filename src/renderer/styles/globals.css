@@ -404,16 +404,25 @@ summary:focus-visible {
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
 }
-.saved-credential,
+.saved-credential-controls,
 .thinking-setting {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-.saved-credential label,
+.saved-credential-controls input,
 .thinking-setting label {
   flex: 1;
   min-width: 0;
+}
+.saved-credential-controls {
+  margin-bottom: 14px;
+}
+.saved-credential-controls button {
+  flex-shrink: 0;
+}
+.model-settings .saved-credential label {
+  margin-bottom: 8px;
 }
 .credential-removal {
   margin: 12px 0;
