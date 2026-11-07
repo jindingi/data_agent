@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { Activity, Trash2, Archive, ArchiveRestore, Pencil, ArrowUp, ChartNoAxesCombined, ChevronDown, FileChartColumn, FolderOpen, Layers3, PanelLeftClose, PanelLeftOpen, PanelRight, Plus, Search, Settings2, ShieldCheck, Sparkles, Table2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog';
@@ -12,6 +13,7 @@ import { ModelSettings } from '../features/runtime/ModelSettings';
 import { ArtifactPanel } from '../features/artifacts/ArtifactPanel';
 import { InteractionCard } from '../features/runtime/InteractionCard';
 import { request } from '../lib/desktop';
+import { readTheme, saveTheme } from '../lib/theme';
 
 const ideas = [
   { icon: ChartNoAxesCombined, title: '看清变化', prompt: '分析最近 3 个月各地区的销售变化，找出下降最明显的地区。' },
@@ -19,6 +21,9 @@ const ideas = [
   { icon: FileChartColumn, title: '整理成报告', prompt: '分析这份数据的主要特征，生成图表和一份 Markdown 报告。' },
 ];
 export function App() {
+  const [theme, setTheme] = useState(readTheme);
+  const sendPending = useRef(false);
+  const composing = useRef(false);
   const [info, setInfo] = useState<SystemInfo>();
   const [error, setError] = useState('');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -46,6 +51,8 @@ export function App() {
   const runtime = useRuntime(sessions.selected, setError);
   const active = runtime.snapshot ? isActive(runtime.snapshot.state) : false;
   const current = sessions.detail?.session;
+  const canSend = Boolean(draft.trim()) && !sending && !modelBusy && !current?.error
+    && (!active || ['running', 'waiting_approval', 'waiting_input'].includes(runtime.snapshot?.state ?? ''));
   const files = sessions.detail?.files ?? [];
   const history = runtime.snapshot?.messages ?? sessions.detail?.messages ?? [];
   const act = (task: Promise<unknown>) => { void task.catch(error => setError(error instanceof Error ? error.message : '操作失败')); };
@@ -54,7 +61,8 @@ export function App() {
     if (value) { setArchived(false); setSearch(''); }
   }
   async function send() {
-    if (!draft.trim() || sending) return;
+    if (!canSend || sendPending.current) return;
+    sendPending.current = true;
     setSending(true); setError('');
     try {
       const id = sessions.selected ?? (await sessions.create())?.id;
@@ -62,7 +70,7 @@ export function App() {
       const input: RunInput = { inputId: crypto.randomUUID(), kind: active ? inputKind : 'prompt', text: draft };
       await request({ type: 'runtime.submit', sessionId: id, input });
       setDraft(''); await runtime.refresh();
-    } catch (error) { setError(error instanceof Error ? error.message : '无法发送'); } finally { setSending(false); }
+    } catch (error) { setError(error instanceof Error ? error.message : '无法发送'); } finally { sendPending.current = false; setSending(false); }
   }
   useEffect(() => {
     let mounted = true;
@@ -112,7 +120,7 @@ export function App() {
       </aside>}
       <main className={`main-area${dragging ? ' drag-over' : ''}`} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDragging(true); } }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDrop={event => { event.preventDefault(); setDragging(false); const incoming = Array.from(event.dataTransfer.files); if (incoming.length) act(sessions.addFiles(incoming)); }}>
         {dragging && <div className="drop-hint">松开以添加 CSV 原文件路径</div>}
-        <header className="workspace-header"><Button size="icon" variant="ghost" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}>{sidebar ? <PanelLeftClose /> : <PanelLeftOpen />}</Button><span className="breadcrumb" data-testid="session-title" data-session-id={current?.id}>工作台<span>/</span><strong>{current?.title ?? '新会话'}</strong></span><div className="header-actions">{current && <><Button size="icon" variant="ghost" aria-label="重命名会话" onClick={() => { setTitle(current.title); setRenaming(true); }}><Pencil /></Button><Button size="icon" variant="ghost" aria-label={current.archived ? '恢复会话' : '归档会话'} onClick={() => act(sessions.archiveCurrent())}>{current.archived ? <ArchiveRestore /> : <Archive />}</Button><Button size="icon" variant="ghost" aria-label="删除会话" onClick={() => setDeleting(current.id)}><Trash2 /></Button></>}<span className="privacy-label"><ShieldCheck size={14} />文件保留在本地</span><Button size="icon" variant="ghost" aria-label="切换结果面板" aria-pressed={panel} onClick={() => setPanel(!panel)}><PanelRight /></Button></div></header>
+        <header className="workspace-header"><Button size="icon" variant="ghost" aria-label={sidebar ? '收起侧栏' : '展开侧栏'} onClick={() => setSidebar(!sidebar)}>{sidebar ? <PanelLeftClose /> : <PanelLeftOpen />}</Button><span className="breadcrumb" data-testid="session-title" data-session-id={current?.id}>工作台<span>/</span><strong>{current?.title ?? '新会话'}</strong></span><div className="header-actions"><Button size="icon" variant="ghost" aria-label={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'} title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'} onClick={() => { const next = theme === 'dark' ? 'light' : 'dark'; saveTheme(next); setTheme(next); }}>{theme === 'dark' ? <Sun /> : <Moon />}</Button>{current && <><Button size="icon" variant="ghost" aria-label="重命名会话" onClick={() => { setTitle(current.title); setRenaming(true); }}><Pencil /></Button><Button size="icon" variant="ghost" aria-label={current.archived ? '恢复会话' : '归档会话'} onClick={() => act(sessions.archiveCurrent())}>{current.archived ? <ArchiveRestore /> : <Archive />}</Button><Button size="icon" variant="ghost" aria-label="删除会话" onClick={() => setDeleting(current.id)}><Trash2 /></Button></>}<span className="privacy-label"><ShieldCheck size={14} />文件保留在本地</span><Button size="icon" variant="ghost" aria-label="切换结果面板" aria-pressed={panel} onClick={() => setPanel(!panel)}><PanelRight /></Button></div></header>
         {error && <div role="alert" className="error-banner">{error}<button aria-label="关闭错误" onClick={() => setError('')}><X size={16} /></button></div>}
         {current?.error && <div role="alert" className="error-banner">{current.error}</div>}
         <section className={`welcome ${history.length ? 'has-history' : ''}`}>
@@ -128,10 +136,14 @@ export function App() {
             <div className="workspace-hint"><FolderOpen size={15} /><span title={current?.workspace ?? info?.workspaceRoot}>{current ? current.workspace.split('/').slice(-2).join('/') : '会话独立工作区'}</span><button aria-label="选择新会话工作区" title="在指定位置新建会话" onClick={() => act(newSession(true))}><ChevronDown size={12} /></button><span className="hint-separator" /><ShieldCheck size={13} /><span>外部写入需审批</span></div>
             <div className="composer">
               {files.length > 0 && <div className="attachment-list">{files.map(file => <span key={file.id} title={file.path}><Table2 size={13} /><span>{file.name}{file.missing ? ' · 文件缺失' : ''}</span><button aria-label={`移除文件 ${file.name}`} onClick={() => act(sessions.removeFile(file.id))}><X size={12} /></button></span>)}</div>}
-              <textarea aria-label="分析需求" placeholder="描述你的分析需求，或先添加 CSV 文件…" value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={event => { if (event.key === 'Enter' && event.metaKey) { event.preventDefault(); void send(); } }} rows={4} />
-              <div className="composer-bottom"><Button size="icon" variant="ghost" aria-label="添加 CSV 文件" onClick={() => act(sessions.pickFiles())}><Plus /></Button><span className="attachment-hint">CSV · 多文件</span><div className="composer-spacer" />{active && <select className="input-kind" aria-label="运行中输入方式" value={inputKind} onChange={event => setInputKind(event.target.value as 'steer' | 'followUp')}><option value="steer">插话</option><option value="followUp">后续提问</option></select>}{selectedModel?.reasoning && selectedModel.thinkingLevels.length > 1 && <select className="composer-thinking" aria-label="输入区思考级别" title="用于之后提交的任务" value={models?.thinkingLevel} disabled={modelBusy} onChange={event => { const level = event.target.value as ThinkingLevel; setModelBusy(true); act(request<ModelConfiguration>({ type: 'models.thinking', level }).then(setModels).finally(() => setModelBusy(false))); }}>{selectedModel.thinkingLevels.map(level => <option key={level} value={level}>{thinkingLabels[level]}</option>)}</select>}<button className="model-button" onClick={() => setSettings(true)}><Sparkles size={14} />{models?.configuredProviders.includes(models.selected.provider) ? models.models.find(model => model.provider === models.selected.provider && model.model === models.selected.model)?.name ?? models.selected.model : '配置模型'}<ChevronDown size={13} /></button><Button size="icon" aria-label="发送分析需求" disabled={!draft.trim() || sending || modelBusy || Boolean(current?.error) || Boolean(active && !['running', 'waiting_approval', 'waiting_input'].includes(runtime.snapshot?.state ?? ''))} onClick={() => void send()} title="发送 · ⌘ Enter"><ArrowUp /></Button></div>
+              <textarea aria-label="分析需求" placeholder="描述你的分析需求，或先添加 CSV 文件…" value={draft} onChange={(e) => setDraft(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
+                if (event.key !== 'Enter' || event.shiftKey || composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+                event.preventDefault();
+                if (!event.repeat) void send();
+              }} rows={4} />
+              <div className="composer-bottom"><Button size="icon" variant="ghost" aria-label="添加 CSV 文件" onClick={() => act(sessions.pickFiles())}><Plus /></Button><span className="attachment-hint">CSV · 多文件</span><div className="composer-spacer" />{active && <select className="input-kind" aria-label="运行中输入方式" value={inputKind} onChange={event => setInputKind(event.target.value as 'steer' | 'followUp')}><option value="steer">插话</option><option value="followUp">后续提问</option></select>}{selectedModel?.reasoning && selectedModel.thinkingLevels.length > 1 && <select className="composer-thinking" aria-label="输入区思考级别" title="用于之后提交的任务" value={models?.thinkingLevel} disabled={modelBusy} onChange={event => { const level = event.target.value as ThinkingLevel; setModelBusy(true); act(request<ModelConfiguration>({ type: 'models.thinking', level }).then(setModels).finally(() => setModelBusy(false))); }}>{selectedModel.thinkingLevels.map(level => <option key={level} value={level}>{thinkingLabels[level]}</option>)}</select>}<button className="model-button" onClick={() => setSettings(true)}><Sparkles size={14} />{models?.configuredProviders.includes(models.selected.provider) ? models.models.find(model => model.provider === models.selected.provider && model.model === models.selected.model)?.name ?? models.selected.model : '配置模型'}<ChevronDown size={13} /></button><Button size="icon" aria-label="发送分析需求" disabled={!canSend} onClick={() => void send()} title="Enter 发送 · Shift+Enter 换行"><ArrowUp /></Button></div>
             </div>
-            <div className="composer-caption">你的文件在本机处理，必要的内容会发送给所选模型。</div>
+            <div className="composer-caption">你的文件在本机处理，必要的内容会发送给所选模型。<span className="keyboard-hint">Enter 发送 · Shift+Enter 换行</span></div>
           </div>
           {history.length === 0 && <div className="idea-grid">{ideas.map(({ icon: Icon, title, prompt }) => <button className="idea-card" key={title} onClick={() => setDraft(prompt)}><div><Icon size={17} /><strong>{title}</strong></div><p>{prompt}</p></button>)}</div>}
         </section>

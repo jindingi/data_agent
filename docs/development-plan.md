@@ -266,6 +266,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 
 | Case ID | 自动成功标准 |
 | --- | --- |
+| P7-THEME-INPUT | 打包应用经 CDP 验证深浅切换、刷新和重启持久化；Enter 实际提交、Shift+Enter 换行、空格保留、空白/输入法/长按不误发，兼容 ⌘ Enter；保存主题与预览截图供人工复核 |
 | P7-USABILITY | 真实磁盘 File 经 CDP 拖拽进入 preload 并登记原路径；不解析 CSV；输入区思考设置持久化；复制 Markdown 与文件内容一致；窄窗口可展开阅读报告并返回输入 |
 | P7-PACKAGE | 全新临时用户数据目录、移除开发者工具 PATH 后启动 .app；无本地源码绝对路径，所有必需资源/库存在且 hash/架构匹配 |
 | P7-OFFLINE | 测试启动器阻断外网、仅保留 loopback，使用本地确定性响应源完成导入/分析/绘图/恢复；无 pip/npm/二进制自动下载；该用例与需要联网的 P7-LIVE 分开运行 |
