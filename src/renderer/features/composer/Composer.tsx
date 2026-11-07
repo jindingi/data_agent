@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useLayoutEffect } from 'react';
 import { FolderOpen, Table2, X, Plus, Sparkles, Settings2, ArrowUp } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import type { useComposer } from './use-composer';
@@ -33,6 +33,12 @@ export function Composer({
   onError: (message: string) => void;
 }) {
   const composing = useRef(false);
+  const input = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    if (!input.current) return;
+    input.current.style.height = 'auto';
+    input.current.style.height = `${Math.min(150, Math.max(64, input.current.scrollHeight))}px`;
+  }, [composer.draft.text]);
   const [inputKind, setInputKind] = useState<'steer' | 'followUp'>('steer');
   const models = modelSettings.value;
   const selectedModel = models?.models.find(
@@ -76,6 +82,7 @@ export function Composer({
           </div>
         )}
         <textarea
+          ref={input}
           aria-label="分析需求"
           placeholder="描述你的分析需求，或先添加 CSV 文件…"
           value={composer.draft.text}
@@ -98,7 +105,7 @@ export function Composer({
             event.preventDefault();
             if (!event.repeat) void onSend(active ? inputKind : 'prompt');
           }}
-          rows={4}
+          rows={2}
         />
         <div className="composer-bottom">
           <Button

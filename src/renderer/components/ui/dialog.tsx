@@ -1,7 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Button } from './button';
 import { X } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { useRef, type ComponentProps } from 'react';
 import { cn } from '../../lib/utils';
 export const Dialog = DialogPrimitive.Root;
 export const DialogTitle = DialogPrimitive.Title;
@@ -9,8 +9,11 @@ export const DialogDescription = DialogPrimitive.Description;
 export function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content>) {
+  const previous = useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm" />
@@ -20,6 +23,19 @@ export function DialogContent({
           className,
         )}
         {...props}
+        onOpenAutoFocus={(event) => {
+          previous.current = document.activeElement as HTMLElement | null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          const target = previous.current;
+          if (target?.isConnected) target.focus();
+          else
+            document.querySelector<HTMLTextAreaElement>('textarea[aria-label="分析需求"]')?.focus();
+        }}
       >
         {children}
         <DialogPrimitive.Close asChild>

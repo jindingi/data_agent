@@ -1,3 +1,5 @@
+import { selectSession } from '../../tests/support/desktop.mjs';
+import { openPreview } from '../../tests/support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -49,7 +51,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
       oldIds = before.map((row) => row.id);
     app = await startApp(join(root, 'initial/application'), { packaged });
     const page = app.page;
-    await page.getByRole('button', { name: '打开会话 新会话', exact: true }).click();
+    await selectSession(page, evidence.sessionId);
     const recovered = await rpc(page, { type: 'runtime.snapshot', sessionId: first.sessionId });
     assert.equal(recovered.state, 'completed');
     assert.equal(recovered.runId, first.final.runId);
@@ -86,7 +88,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
     assert(final.requests.length > 0 && final.requests.every((r) => r.model === 'deepseek-flash'));
     assert(final.requests[0].userMessages >= 2);
     assert(final.requests[0].toolResultHashes.length > 0);
-    await page.getByRole('tab', { name: '预览', exact: true }).click();
+    await openPreview(page, '预览');
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     await page.screenshot({ path: join(root, 'followup-report.png'), fullPage: true });

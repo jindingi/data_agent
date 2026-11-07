@@ -1252,3 +1252,25 @@ summary:focus-visible {
 .markdown-body td {
   min-width: 120px;
 }
+.run-controls {
+  max-height: 32vh;
+  overflow-y: auto;
+}
+.image-zoom {
+  display: block;
+  max-width: 100%;
+  cursor: zoom-in;
+}
+.image-dialog {
+  width: min(94vw, 1400px);
+  max-height: 94vh;
+}
+.image-original {
+  overflow: auto;
+  max-height: 72vh;
+  margin-top: 16px;
+}
+.image-original img {
+  max-width: none;
+  background: white;
+}

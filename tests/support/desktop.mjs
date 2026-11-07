@@ -42,3 +42,23 @@ export async function settled(page, sessionId) {
     60_000,
   );
 }
+
+/** Storage fixtures may create an empty legacy session; product UI creates only on accepted send. */
+export async function createStoredSession(page, chooseWorkspace = false) {
+  const session = await rpc(page, { type: 'sessions.create', chooseWorkspace });
+  assert(session);
+  await selectSession(page, session.id);
+  return session;
+}
+export async function selectSession(page, id) {
+  await page.locator(`.session-list button[data-session-id="${id}"]`).click();
+  await until(
+    async () => (await page.getByTestId('session-title').getAttribute('data-session-id')) === id,
+    'session selected',
+  );
+}
+export async function openPreview(page, tab = '预览') {
+  if (!(await page.getByRole('complementary', { name: '结果面板' }).isVisible()))
+    await page.getByRole('button', { name: '切换结果面板' }).click();
+  await page.getByRole('tab', { name: tab, exact: true }).click();
+}

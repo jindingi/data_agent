@@ -1,3 +1,5 @@
+import { createStoredSession } from '../support/desktop.mjs';
+import { openPreview } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -30,18 +32,10 @@ export const cases = {
     const app = await startApp(join(dir, 'p6-drafts'));
     try {
       const page = app.page;
-      await page.getByRole('button', { name: '新会话', exact: true }).click();
-      const a = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'A selected',
-      );
+      const { id: a } = await createStoredSession(page);
       await rpc(page, { type: 'sessions.rename', sessionId: a, title: 'Draft A' });
       await page.getByRole('textbox', { name: '分析需求' }).fill('Unsaved text in A');
-      await page.getByRole('button', { name: '新会话', exact: true }).click();
-      const b = await until(async () => {
-        const id = await page.getByTestId('session-title').getAttribute('data-session-id');
-        return id && id !== a ? id : null;
-      }, 'B selected');
+      const { id: b } = await createStoredSession(page);
       await rpc(page, { type: 'sessions.rename', sessionId: b, title: 'Draft B' });
       assert.equal(await page.getByRole('textbox', { name: '分析需求' }).inputValue(), '');
       await page.getByRole('textbox', { name: '分析需求' }).fill('Different text in B');
@@ -227,11 +221,8 @@ export const cases = {
       });
       const page = app.page;
       await configure(page);
-      await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
-      const sessionId = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'files session',
-      );
+      const { id: sessionId } = await createStoredSession(page);
+      await rpc(page, { type: 'files.pick', sessionId });
       const detail = await until(async () => {
         const d = await rpc(page, { type: 'sessions.open', sessionId });
         return d.files.length === paths.length ? d : null;
@@ -337,7 +328,7 @@ export const cases = {
       const first = await settled(page, sessionId);
       assert.equal(first.state, 'completed');
       await published(page, sessionId);
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page
         .locator('.artifact-markdown')
         .getByRole('heading', { name: 'Safe report heading' })
@@ -365,7 +356,7 @@ export const cases = {
       const message = page
         .locator('.history-message.assistant')
         .filter({ has: page.locator('.markdown-body', { hasText: 'LONG_MESSAGE_BEGIN' }) });
-      await message.getByRole('button', { name: '末段文字', exact: true }).click();
+      assert.equal(await message.locator('.markdown-body .paged-text').count(), 0);
       await page
         .locator('.history-message.assistant .markdown-body')
         .filter({ hasText: 'LONG_MESSAGE_END' })
@@ -382,11 +373,18 @@ export const cases = {
         const value = await rpc(page, { type: 'runtime.snapshot', sessionId });
         return value?.runId !== first.runId && value?.state === 'completed';
       }, 'second run ended');
-      await page.getByRole('navigation', { name: '会话分页', exact: true }).waitFor();
-      assert((await page.locator('.history-message').count()) <= 20);
-      await page.getByRole('button', { name: '更早消息', exact: true }).click();
+      assert.equal(await page.locator('.history-pagination').count(), 0);
+      const chat = page.locator('.history-list');
+      await chat.hover();
+      await page.mouse.wheel(0, -1000000);
+      const load = page.getByRole('button', { name: '加载更早消息', exact: true });
+      while (await load.isVisible()) {
+        await load.click();
+        await chat.hover();
+        await page.mouse.wheel(0, -1000000);
+      }
       await page.getByText('FIRST_USER_MESSAGE_PAGINATION', { exact: true }).waitFor();
-      await page.getByRole('button', { name: '回到最新', exact: true }).click();
+      await page.getByRole('button', { name: '回到最新消息', exact: true }).click();
       await page.getByText('SECOND_RUN_END', { exact: true }).waitFor();
       assert.equal(await page.evaluate(() => window.__p6Executed), false);
       assert.deepEqual(remoteRequests, []);
@@ -444,12 +442,8 @@ export const cases = {
         },
       };
       fixture.set(loop, loop);
-      await page.getByRole('button', { name: '选择新会话工作区', exact: true }).click();
-      const a = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'external session selected',
-      );
-      await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
+      const { id: a } = await createStoredSession(page, true);
+      await rpc(page, { type: 'files.pick', sessionId: a });
       await until(
         async () => (await rpc(page, { type: 'sessions.open', sessionId: a })).files.length === 1,
         'CSV registered',

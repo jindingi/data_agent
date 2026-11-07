@@ -1,3 +1,4 @@
+import { openPreview } from '../support/desktop.mjs';
 import { testBundle } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
@@ -32,7 +33,7 @@ async function deliver(page, sessionId, previousRunId) {
   const files = (await listing(page, sessionId)).files.filter((f) => f.runId === final.runId);
   assert(files.some((f) => f.relativePath === 'report.md' && f.state === 'ready' && f.size > 0));
   assert(files.some((f) => f.kind === 'png' && f.state === 'ready' && f.size > 0));
-  await page.getByRole('tab', { name: '预览', exact: true }).click();
+  await openPreview(page, '预览');
   await until(
     () =>
       page
@@ -91,10 +92,7 @@ async function story(dir, offline) {
     let page = app.page;
     await configure(page);
     await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
-    const id = await until(
-      () => page.getByTestId('session-title').getAttribute('data-session-id'),
-      'input session',
-    );
+
     await page.getByRole('button', { name: '移除文件 输入 数据.csv', exact: true }).waitFor();
     const script = `from pathlib import Path\nimport sys,json,pandas as pd,matplotlib.pyplot as plt\nd=pd.read_csv(${JSON.stringify(source)})\nplt.bar(d.region,d.sales);plt.title('地区销售');plt.savefig('chart.png');plt.close()\nPath('report.md').write_text('# Packaged delivery\\n\\n![地区销售](chart.png)\\n',encoding='utf-8')\nprint(json.dumps({'python':sys.executable}))\n`;
     fixture.set(
@@ -104,6 +102,10 @@ async function story(dir, offline) {
     );
     await page.getByRole('textbox', { name: '分析需求' }).fill('生成 report.md 与中文图表');
     await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+    const id = await until(
+      () => page.getByTestId('session-title').getAttribute('data-session-id'),
+      'input session',
+    );
     const first = await deliver(page, id);
     track();
     const old = readFileSync(join(first.outputDirectory, 'report.md'));
@@ -328,7 +330,7 @@ export const cases = {
         ),
       );
       await listing(page, id);
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page.locator('.artifact-markdown').getByRole('heading', { name: '主题预览' }).waitFor();
       await page.locator('.tool-card summary').first().click();
       await page.screenshot({ path: join(root, 'light-report.png') });
@@ -524,10 +526,10 @@ export const cases = {
         document.querySelector('#cdp-disk-file').remove();
       });
       await page.getByRole('button', { name: '移除文件 拖拽 数据.csv', exact: true }).waitFor();
-      const id = await page.getByTestId('session-title').getAttribute('data-session-id');
-      const detail = await rpc(page, { type: 'sessions.open', sessionId: id });
-      assert.equal(detail.files[0].path, source);
-      assert.equal(detail.files[0].size, bytes.length);
+      assert.equal(await page.getByTestId('session-title').getAttribute('data-session-id'), null);
+      const selected = await rpc(page, { type: 'files.inspect', paths: [source] });
+      assert.equal(selected[0].path, source);
+      assert.equal(selected[0].size, bytes.length);
       await page.getByLabel('输入区思考级别').selectOption('off');
       await until(
         async () => (await rpc(page, { type: 'models.settings' })).thinkingLevel === 'off',
@@ -539,9 +541,13 @@ export const cases = {
       });
       await page.getByRole('textbox', { name: '分析需求' }).fill('Generate report.md');
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+      const id = await until(
+        () => page.getByTestId('session-title').getAttribute('data-session-id'),
+        'drop submission accepted',
+      );
       await settled(page, id);
       await listing(page, id);
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'Copyable report' }).waitFor();
       oldClipboard = execFileSync('/usr/bin/pbpaste');
       await page.getByRole('button', { name: '复制 Markdown', exact: true }).click();

@@ -57,6 +57,7 @@ export function SessionSidebar({
           {sessions.list.map((session) => (
             <button
               key={session.id}
+              data-session-id={session.id}
               aria-label={`打开会话 ${session.title}`}
               aria-current={sessions.selected === session.id ? 'true' : undefined}
               onClick={() => sessions.select(session.id)}

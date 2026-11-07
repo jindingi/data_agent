@@ -1,3 +1,5 @@
+import { createStoredSession } from '../support/desktop.mjs';
+import { openPreview } from '../support/desktop.mjs';
 import { testBuildDir } from '../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -24,10 +26,8 @@ export const cases = {
       await page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
       await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       await page.getByRole('button', { name: '新会话', exact: true }).click();
-      const id = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'dev session created',
-      );
+      assert.equal(await page.getByTestId('session-title').getAttribute('data-session-id'), null);
+      const { id } = await createStoredSession(page);
       await page.reload();
       await until(
         async () =>
@@ -79,7 +79,7 @@ export const cases = {
         '分析地区销售变化',
       );
       await page.getByRole('button', { name: '切换结果面板' }).click();
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page.getByRole('heading', { name: '还没有预览' }).waitFor();
       await page.getByRole('button', { name: '关闭结果面板' }).click();
       await page.getByRole('button', { name: '收起侧栏' }).click();

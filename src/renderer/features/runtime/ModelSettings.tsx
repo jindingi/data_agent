@@ -7,6 +7,14 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
   const { value, busy, error, change } = controller;
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState('');
+  const [search, setSearch] = useState('');
+  const matches =
+    value?.models.filter(
+      (m) =>
+        `${m.provider} ${m.name} ${m.model}`.toLowerCase().includes(search.toLowerCase()) ||
+        (m.provider === value.selected.provider && m.model === value.selected.model),
+    ) ?? [];
+  const providers = [...new Set(matches.map((m) => m.provider))];
   const model = value?.models.find(
     (model) => model.provider === value.selected.provider && model.model === value.selected.model,
   );
@@ -43,6 +51,15 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
       )}
       <p>文件在本机处理，必要内容会发送给所选模型。工作区外写入与检测到的联网请求需要批准。</p>
       <label>
+        搜索模型
+        <input
+          aria-label="搜索模型"
+          placeholder="模型名称或提供方"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      <label>
         模型
         <select
           aria-label="选择模型"
@@ -57,14 +74,23 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
           <option value="" disabled>
             正在读取内置模型…
           </option>
-          {value?.models.map((model) => (
-            <option
-              key={`${model.provider}/${model.model}`}
-              value={JSON.stringify({ provider: model.provider, model: model.model })}
+          {providers.map((provider) => (
+            <optgroup
+              key={provider}
+              label={`${provider}${value?.configuredProviders.includes(provider) ? ' · 已配置' : ''}`}
             >
-              {model.provider} · {model.name}
-              {model.reasoning ? ' · 思考' : ''}
-            </option>
+              {matches
+                .filter((m) => m.provider === provider)
+                .map((model) => (
+                  <option
+                    key={`${model.provider}/${model.model}`}
+                    value={JSON.stringify({ provider: model.provider, model: model.model })}
+                  >
+                    {model.name}
+                    {model.reasoning ? ' · 思考' : ''}
+                  </option>
+                ))}
+            </optgroup>
           ))}
         </select>
       </label>

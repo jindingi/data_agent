@@ -1,3 +1,4 @@
+import { createStoredSession, selectSession, rpc, openPreview } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import {
   existsSync,
@@ -18,20 +19,7 @@ async function list(page, archived = false) {
   assert.equal(result.ok, true);
   return result.value;
 }
-async function newSession(page) {
-  const count = (await list(page)).length;
-  await page.getByRole('button', { name: '新会话', exact: true }).click();
-  const sessions = await until(async () => {
-    const value = await list(page);
-    return value.length === count + 1 ? value : null;
-  }, 'new session');
-  await until(
-    async () =>
-      (await page.getByTestId('session-title').getAttribute('data-session-id')) === sessions[0].id,
-    'selected new session',
-  );
-  return sessions[0];
-}
+const newSession = createStoredSession;
 async function rename(page, title) {
   await page.getByRole('button', { name: '会话操作', exact: true }).click();
   await page.getByRole('menuitem', { name: '重命名会话', exact: true }).click();
@@ -72,16 +60,7 @@ export const cases = {
     try {
       const a = await newSession(app.page);
       await rename(app.page, '销售趋势');
-      await app.page.getByRole('button', { name: '选择新会话工作区' }).click();
-      const b = await until(
-        async () => (await list(app.page)).find((s) => s.id !== a.id),
-        'custom workspace session',
-      );
-      await until(
-        async () =>
-          (await app.page.getByTestId('session-title').getAttribute('data-session-id')) === b.id,
-        'selected custom workspace session',
-      );
+      const b = await createStoredSession(app.page, true);
       assert.equal(b.workspace, join(custom, b.id));
       assert.notEqual(a.workspace, b.workspace);
       await rename(app.page, '客户分析');
@@ -95,7 +74,8 @@ export const cases = {
       await until(async () => (await list(app.page, true)).length === 1, 'archive persisted');
       await app.page.getByRole('button', { name: '查看归档会话' }).click();
       await app.page.getByRole('button', { name: '打开会话 销售趋势' }).click();
-      await app.page.getByRole('button', { name: '恢复会话', exact: true }).click();
+      await app.page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await app.page.getByRole('menuitem', { name: '恢复会话', exact: true }).click();
       await until(async () => (await list(app.page, true)).length === 0, 'unarchive persisted');
       assert.equal((await list(app.page)).length, 2);
       assert.deepEqual(app.errors, []);
@@ -113,17 +93,18 @@ export const cases = {
     const root = join(dir, 'file-ref');
     let app = await startApp(root, { pickFiles: [file] });
     try {
-      await app.page.getByRole('button', { name: '添加 CSV 文件' }).click();
-      await app.page.getByRole('button', { name: '移除文件 数据.csv' }).waitFor();
-      const created = (await list(app.page))[0];
+      const created = await createStoredSession(app.page);
+      await rpc(app.page, { type: 'files.pick', sessionId: created.id });
       assert.deepEqual(readFileSync(file), raw);
       assert.deepEqual(readdirSync(created.workspace), []);
-      await app.page.getByRole('button', { name: '切换结果面板' }).click();
+      await openPreview(app.page, '文件');
       await app.page.getByText(file, { exact: true }).waitFor();
       await app.stop();
       unlinkSync(file);
       app = await startApp(root);
-      await app.page.getByText('数据.csv · 文件缺失', { exact: true }).waitFor();
+      await selectSession(app.page, created.id);
+      await openPreview(app.page, '文件');
+      await app.page.getByText('原文件不可用', { exact: true }).waitFor();
       assert.equal(existsSync(file), false);
       assert.deepEqual(readdirSync(created.workspace), []);
       const detail = await app.page.evaluate(

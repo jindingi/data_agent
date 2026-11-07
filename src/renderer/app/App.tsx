@@ -1,29 +1,21 @@
+import { SettingsDialog } from '../features/models/SettingsDialog';
+import { RunControls } from '../features/runtime/RunControls';
+import { useActivity } from '../features/runtime/use-activity';
 import { Composer } from '../features/composer/Composer';
 import { useModelSettings } from '../features/models/use-model-settings';
 import { useComposer } from '../features/composer/use-composer';
 import { SessionSidebar } from '../features/sessions/SessionSidebar';
 import { SessionHeader } from '../features/sessions/SessionHeader';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Activity,
-  ChartNoAxesCombined,
-  FileChartColumn,
-  FolderOpen,
-  Table2,
-  X,
-} from 'lucide-react';
+import { ChartNoAxesCombined, FileChartColumn, Table2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog';
 import { DeleteSessionDialog } from '../features/sessions/DeleteSessionDialog';
 import { useSessions } from '../features/sessions/use-sessions';
-import type { SystemInfo } from '../../shared/contracts/ipc';
-import { isActive, type RuntimeSnapshot } from '../../shared/runtime';
+import { isActive } from '../../shared/runtime';
 import { useRuntime } from '../features/runtime/use-runtime';
 import { Transcript } from '../features/runtime/Transcript';
-import { ModelSettings } from '../features/runtime/ModelSettings';
 import { ArtifactPanel } from '../features/artifacts/ArtifactPanel';
-import { InteractionCard } from '../features/runtime/InteractionCard';
-import { request } from '../lib/desktop';
 import { readTheme, saveTheme } from '../lib/theme';
 
 const ideas = [
@@ -41,18 +33,16 @@ const ideas = [
 ];
 export function App() {
   const [theme, setTheme] = useState(readTheme);
-  const [info, setInfo] = useState<SystemInfo>();
   const [error, setError] = useState('');
   const [sidebar, setSidebar] = useState(true);
   const [panel, setPanel] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [ping, setPing] = useState('');
   const [search, setSearch] = useState('');
   const [archived, setArchived] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [activity, setActivity] = useState<Record<string, RuntimeSnapshot['state']>>({});
+  const activity = useActivity(setError);
   const modelSettings = useModelSettings();
   const [dragging, setDragging] = useState(false);
   const sessions = useSessions(search, archived, setError);
@@ -97,43 +87,6 @@ export function App() {
     await composer.send(kind);
   }
   useEffect(() => {
-    let mounted = true;
-    const refresh = () =>
-      window.dataAgent
-        .request({ type: 'system.info' })
-        .then((r) => {
-          if (!mounted) return;
-          if (r.ok) setInfo(r.value as SystemInfo);
-          else setError(r.error.message);
-        })
-        .catch(() => {
-          if (mounted) setError('无法连接桌面服务，请重新打开应用。');
-        });
-    void refresh();
-    const recentActivity: Record<string, RuntimeSnapshot['state']> = {};
-    const unsubscribe = window.dataAgent.subscribe((event) => {
-      if (event.type === 'host.status') void refresh();
-      if (event.type === 'runtime.event') {
-        const { sessionId, state } = event.snapshot;
-        recentActivity[sessionId] = state;
-        setActivity((previous) =>
-          previous[sessionId] === state ? previous : { ...previous, [sessionId]: state },
-        );
-      }
-    });
-    void request({ type: 'runtime.activeStates' })
-      .then((value) => {
-        if (mounted) setActivity({ ...value, ...recentActivity });
-      })
-      .catch((error) => {
-        if (mounted) setError(error.message);
-      });
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, []);
-  useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (!event.metaKey) return;
       if (event.key === ',') {
@@ -156,11 +109,6 @@ export function App() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   });
-  async function checkConnection() {
-    setPing('正在检查…');
-    const r = await window.dataAgent.request({ type: 'system.ping', text: 'desktop-health' });
-    setPing(r.ok ? '连接正常' : r.error.message);
-  }
   return (
     <div className="desktop-shell">
       <div className={`app-layout${sidebar ? '' : ' sidebar-hidden'}`}>
@@ -249,101 +197,12 @@ export function App() {
               </>
             )}
             <div className="composer-wrap">
-              {runtime.snapshot?.interactions?.map((interaction) => (
-                <InteractionCard key={interaction.id} value={interaction} onError={setError} />
-              ))}
-              {(runtime.snapshot?.queuedInputs ?? [])
-                .filter(
-                  (input) =>
-                    input.kind !== 'prompt' ||
-                    !active ||
-                    runtime.snapshot?.state === 'queued' ||
-                    runtime.snapshot?.state === 'starting',
-                )
-                .map((input) => (
-                  <div className="queued-input" key={input.inputId}>
-                    <span>
-                      {active ? '等待处理' : '未发送'} ·{' '}
-                      {input.kind === 'steer'
-                        ? '插话'
-                        : input.kind === 'followUp'
-                          ? '后续提问'
-                          : '提问'}
-                    </span>
-                    <p>{input.text}</p>
-                    {!active && (
-                      <button onClick={() => act(composer.restore(input))}>放回输入框</button>
-                    )}
-                  </div>
-                ))}
-              {(runtime.snapshot?.unsentInputs ?? []).map((input) => (
-                <div className="queued-input" data-unsent-input={input.inputId} key={input.inputId}>
-                  <span>
-                    未发送 ·{' '}
-                    {input.kind === 'steer'
-                      ? '插话'
-                      : input.kind === 'followUp'
-                        ? '后续提问'
-                        : '提问'}
-                  </span>
-                  <p>{input.text}</p>
-                  <button onClick={() => act(composer.restore(input))}>放回输入框</button>
-                  <button
-                    onClick={() =>
-                      act(
-                        request({
-                          type: 'runtime.discardDraft',
-                          sessionId: sessions.selected!,
-                          inputId: input.inputId,
-                        }).then(() => runtime.refresh()),
-                      )
-                    }
-                  >
-                    移除未发送输入
-                  </button>
-                </div>
-              ))}
-              {runtime.snapshot && (
-                <div className="run-status" role="status" data-run-state={runtime.snapshot.state}>
-                  <span>
-                    {
-                      {
-                        queued: '等待运行名额',
-                        starting: '正在连接模型',
-                        running: 'Agent 正在执行',
-                        waiting_approval: '等待你批准操作',
-                        waiting_input: '等待你补充信息',
-                        completed: '执行完成',
-                        cancelled: '已停止',
-                        failed: '本轮执行出错',
-                        interrupted: '上次执行已中断',
-                      }[runtime.snapshot.state]
-                    }
-                  </span>
-                  {runtime.snapshot.activity && (
-                    <small data-runtime-activity={runtime.snapshot.activity.kind}>
-                      {runtime.snapshot.activity.kind === 'retry'
-                        ? `模型请求重试中（${runtime.snapshot.activity.attempt}/${runtime.snapshot.activity.maxAttempts}）`
-                        : '正在压缩上下文，完整历史仍保留'}
-                    </small>
-                  )}
-                  {runtime.snapshot.inputs.filter(
-                    (input) => input.state === 'pending' && input.kind !== 'prompt',
-                  ).length > 0 && <small>有待处理输入</small>}
-                  {active && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        act(request({ type: 'runtime.cancel', sessionId: sessions.selected! }))
-                      }
-                    >
-                      停止
-                    </Button>
-                  )}
-                  {runtime.snapshot.error && <span role="alert">{runtime.snapshot.error}</span>}
-                </div>
-              )}
+              <RunControls
+                snapshot={runtime.snapshot}
+                restore={composer.restore}
+                refresh={runtime.refresh}
+                onError={setError}
+              />
               <Composer
                 composer={composer}
                 modelSettings={modelSettings}
@@ -424,45 +283,7 @@ export function App() {
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog open={settings} onOpenChange={setSettings}>
-        <DialogContent>
-          <DialogTitle className="text-xl font-semibold">设置</DialogTitle>
-          <DialogDescription className="mt-2 text-sm text-muted-foreground">
-            管理模型与本地工作环境
-          </DialogDescription>
-          <ModelSettings controller={modelSettings} />
-          <div className="settings-section">
-            <h3>
-              <FolderOpen size={15} />
-              本地工作区
-            </h3>
-            <p className="path-label">{info?.workspaceRoot ?? '正在加载…'}</p>
-            <p>每个会话使用独立目录，原始 CSV 不会被复制或移动。</p>
-          </div>
-          <details className="diagnostics">
-            <summary>
-              <Activity size={15} />
-              应用诊断
-            </summary>
-            <dl>
-              <dt>版本</dt>
-              <dd>{info?.version}</dd>
-              <dt>平台</dt>
-              <dd>
-                {info?.platform} / {info?.architecture}
-              </dd>
-              <dt>本地存储</dt>
-              <dd>{info?.sqliteVersion ? 'SQLite 已连接' : '连接中'}</dd>
-            </dl>
-            <Button size="sm" variant="outline" onClick={() => void checkConnection()}>
-              检查连接
-            </Button>
-            <span role="status" className="ping-result">
-              {ping}
-            </span>
-          </details>
-        </DialogContent>
-      </Dialog>
+      <SettingsDialog open={settings} onOpenChange={setSettings} modelSettings={modelSettings} />
     </div>
   );
 }

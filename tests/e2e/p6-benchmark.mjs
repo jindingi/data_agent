@@ -113,19 +113,23 @@ print('BENCHMARK_DELIVERED')
     async function start(label) {
       const known = new Set((await rpc(page, { type: 'sessions.list' })).map((s) => s.id));
       await page.getByRole('button', { name: '新会话', exact: true }).click();
-      const id = await until(async () => {
-        const id = await page.getByTestId('session-title').getAttribute('data-session-id');
-        return id && !known.has(id) ? id : null;
-      }, 'benchmark session selected');
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
       await until(
-        async () => (await rpc(page, { type: 'sessions.open', sessionId: id })).files.length === 2,
-        '100 MB references attached',
+        () =>
+          page
+            .locator('.attachment-list > span')
+            .count()
+            .then((n) => n === 2),
+        '100 MB pending paths',
       );
       await page.getByRole('textbox', { name: '分析需求' }).fill(label);
       const started = performance.now(),
         epoch = Date.now() / 1000;
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+      const id = await until(async () => {
+        const id = await page.getByTestId('session-title').getAttribute('data-session-id');
+        return id && !known.has(id) ? id : null;
+      }, 'benchmark session selected');
       return { id, started, epoch };
     }
     async function finish(run) {

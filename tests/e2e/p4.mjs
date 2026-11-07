@@ -1,3 +1,4 @@
+import { openPreview } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import {
   mkdirSync,
@@ -39,29 +40,20 @@ async function importScenario(dir) {
             .then((n) => n === 2),
         'two same-name attachments',
       );
-      const id = await page.getByTestId('session-title').getAttribute('data-session-id'),
-        detail = await rpc(page, { type: 'sessions.open', sessionId: id });
-      assert.deepEqual(new Set(detail.files.map((file) => file.path)), new Set(files));
+      assert.equal(await page.getByTestId('session-title').getAttribute('data-session-id'), null);
+      assert.equal((await rpc(page, { type: 'sessions.list' })).length, 0);
+      const selected = await rpc(page, { type: 'files.inspect', paths: files });
+      assert.deepEqual(new Set(selected.map((file) => file.path)), new Set(files));
       assert.deepEqual(
-        detail.files.map((file) => file.size).sort((a, b) => a - b),
+        selected.map((file) => file.size).sort((a, b) => a - b),
         [4, 17],
       );
-      assert.deepEqual(readdirSync(detail.session.workspace), []);
-      assert.equal(existsSync(detail.session.sessionFile), false);
-      await page.getByRole('button', { name: '切换结果面板', exact: true }).click();
-      for (const path of files) await page.getByText(path, { exact: true }).waitFor();
-      await page
-        .locator('.attachment-list > span')
-        .filter({ has: page.locator(`span[title="${files[0]}"]`) })
-        .count();
       await page
         .locator(`.attachment-list > span[title="${files[0]}"]`)
         .getByRole('button')
         .click();
-      await until(async () => {
-        const next = await rpc(page, { type: 'sessions.open', sessionId: id });
-        return next.files.length === 1 && next.files[0].path === files[1];
-      }, 'remove exact original path');
+      assert.equal(await page.locator('.attachment-list > span').count(), 1);
+      assert.equal(await page.locator('.attachment-list > span').getAttribute('title'), files[1]);
       assert.deepEqual(readFileSync(files[0]), Buffer.from([255, 0, 34, 10]));
       assert.equal(readFileSync(files[1], 'utf8'), 'not a valid table');
     } finally {
@@ -86,11 +78,8 @@ async function importScenario(dir) {
           .getByRole('alert')
           .filter({ hasText: mode === 'single' ? '单个 CSV' : 'CSV 总大小' })
           .waitFor();
-        const id = await instance.page.getByTestId('session-title').getAttribute('data-session-id');
-        assert.equal(
-          (await rpc(instance.page, { type: 'sessions.open', sessionId: id })).files.length,
-          0,
-        );
+        assert.equal((await rpc(instance.page, { type: 'sessions.list' })).length, 0);
+        assert.equal(await instance.page.locator('.attachment-list > span').count(), 0);
       } finally {
         await instance.stop();
       }
@@ -126,8 +115,8 @@ export const cases = {
       let id = await submit(page);
       assert.equal((await settled(page, id)).state, 'completed');
       await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
-      await page.getByRole('heading', { name: '还没有报告' }).waitFor();
+      await openPreview(page, '预览');
+      await page.getByRole('heading', { name: '还没有预览' }).waitFor();
       fixture.set(
         { tool: { name: 'write', args: { path: 'report.md', content: '' } } },
         { tool: { name: 'write', args: { path: 'chart.png', content: 'broken png' } } },
@@ -139,7 +128,7 @@ export const cases = {
         const value = await rpc(page, { type: 'artifacts.list', sessionId: id });
         return value.files.length === 2 ? value : null;
       }, 'empty and invalid artifacts');
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page
         .getByLabel('选择报告或图表')
         .selectOption(listing.files.find((file) => file.kind === 'markdown').id);
@@ -196,10 +185,7 @@ export const cases = {
       const page = app.page;
       await configure(page);
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
-      const sessionId = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'session created for imported paths',
-      );
+
       await page.getByRole('button', { name: '移除文件 regions.csv', exact: true }).waitFor();
       const script = String.raw`from pathlib import Path
 import pandas as pd
@@ -222,6 +208,10 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
         .getByRole('textbox', { name: '分析需求' })
         .fill('分析两份文件并生成 report.md 与图表。');
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+      const sessionId = await until(
+        () => page.getByTestId('session-title').getAttribute('data-session-id'),
+        'session created for imported paths',
+      );
       const final = await settled(page, sessionId);
       assert.equal(final.state, 'completed', final.error ?? '');
       const listing = await until(async () => {
@@ -244,7 +234,7 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
         !fixture.requests[0].messages.some((message) => String(message.content).includes('N,10')),
       );
       await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'Delivery report', exact: true }).waitFor();
       const image = page.getByRole('img', { name: '地区销售', exact: true });
       await until(

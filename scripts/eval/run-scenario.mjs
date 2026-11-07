@@ -1,3 +1,4 @@
+import { openPreview } from '../../tests/support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -60,12 +61,13 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     await page
       .getByRole('button', { name: `移除文件 ${Object.keys(scenario.files).at(-1)}`, exact: true })
       .waitFor();
+
+    await page.getByRole('textbox', { name: '分析需求' }).fill(scenario.task);
+    await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
     sessionId = await until(
       () => page.getByTestId('session-title').getAttribute('data-session-id'),
       'imported session',
     );
-    await page.getByRole('textbox', { name: '分析需求' }).fill(scenario.task);
-    await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
     const final = await waitReviewedRun(page, sessionId, root, evidence);
     evidence.final = final;
     evidence.sessionId = sessionId;
@@ -90,7 +92,7 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     assert(report, `nonempty ${reportName} required by fixture`);
     if (chartRequired) assert(chart, 'displayable PNG required by fixture');
     await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-    await page.getByRole('tab', { name: '预览', exact: true }).click();
+    await openPreview(page, '预览');
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     assert((await page.locator('.artifact-markdown').innerText()).length > 0);

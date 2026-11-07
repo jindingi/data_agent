@@ -72,16 +72,17 @@ async function liveScenario(dir) {
       }
       await page.getByRole('button', { name: '关闭对话框' }).click();
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
-      const sessionId = await until(
-        () => page.getByTestId('session-title').getAttribute('data-session-id'),
-        'session selected',
-      );
+
       await page
         .getByRole('textbox', { name: '分析需求' })
         .fill(
           `这是一个需要仔细推理的工具验证任务。请先用 read 读取 ${sourceA}，收到结果后再用 read 读取 ${sourceB}。比较各地区在退货调整前后可能的下降趋势，解释你采用的假设和资料限制，形成简短 Markdown 表格。nonce 行是测试标记，不参与业务比较。不需要生成文件。必须实际使用 read，不要猜测文件内容。本次仅验收只读对话链路，只使用 read 工具，不调用 bash、write 或其他工具；根据读取到的简短表格直接推理回答。`,
         );
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+      const sessionId = await until(
+        () => page.getByTestId('session-title').getAttribute('data-session-id'),
+        'session selected',
+      );
       await until(
         async () => {
           const value = await snapshot(page, sessionId);

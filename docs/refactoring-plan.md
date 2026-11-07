@@ -171,3 +171,7 @@ R0 为本轮工程门禁；R1 → R2 后，R3 和 R4 可在互不修改同一接
 ### R2 验证记录（2026-11-07）
 
 命令响应由 CommandResponses 推导，Main 的 success 构造检查响应类型，Renderer 保留 AppError.code；Host RPC 校验预期响应类别。IPC 安全入口、命令分派与命名依赖已分离。类型负例、相对/alias/动态导入/再导出边界测试、真实 P0-IPC 和 P1-METADATA 通过。
+
+### R3 实施进展（2026-11-07）
+
+App 已拆出 SessionSidebar、SessionHeader、Composer/useComposer、RunControls/useActivity、SettingsDialog/useModelSettings、Report/ZoomImage/usePanelSize。草稿、模型写入与预览请求各自有状态所有者；布局组合留在 App，不迁移为全能 controller。草稿 revision/token 单元正反例及 UX-DRAFTS、UX-READING、P6-DRAFTS、P6-SETTINGS 通过。新增模型搜索/提供方分组、弹窗错误、焦点返回、图片放大与输入框自增高。旧测试已迁移调用方式，完整旧门禁仍待运行，R3 最终验收与 R6 一并收束。

@@ -1,3 +1,4 @@
+import { selectSession } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -437,7 +438,7 @@ export const cases = {
         assert.equal(answer.ok, false);
         assert.equal(answer.error.code, 'INTERACTION_EXPIRED');
         assert.equal(fixture.requests.length, requestCount);
-        await app.page.getByRole('button', { name: '打开会话 新会话', exact: true }).click();
+        await selectSession(app.page, sessionId);
         await app.page.locator('[data-run-state="interrupted"]').waitFor();
         assert.equal(
           await app.page.locator('.tool-card small').filter({ hasText: '执行中' }).count(),
