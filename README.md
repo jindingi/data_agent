@@ -24,6 +24,7 @@ Agent 效果独立评测，结果不保证正确：首轮交付的 J1/J5 为 8/1
 - [设计原则与 AI 实施规范](docs/design-principles.md)
 - [UX 修复阶段与验收计划](docs/ux-remediation-plan.md)
 - [工作区文件浏览器改造方案（待实施）](docs/workspace-browser-plan.md)
+- [会话存储与工作区管理简化方案（待实施）](docs/storage-simplification-plan.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)
