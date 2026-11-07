@@ -282,3 +282,9 @@ Main 列表发现、Host 连接探测与会话请求接入 Electron 网络栈以
 - `workspace.access` 单元回归通过：实际目录、原文预览、截断、跨会话/路径/文件替换与另存。
 - `workspace.browser` 后台 CDP 通过：目录展开、源码预览、另存、长报告尾部滚动；三种尺寸与深浅主题截图已检查（证据：`test-results/2026-11-07T10-38-37.151Z`）。
 - 未调用真实模型，未修改用户业务目录或 release/out。
+
+## 存储简化：删除与日志（阶段 B）
+
+2026-11-07，删除会话不再清理工作区，确认弹窗取消产物开关、显示保留说明与 Finder 入口。删除仅按固定会话路径清理内部 JSONL 和新日志，失败保留 deleting 状态，重启可继续。日志改为会话/tool hash/执行 ID 的磁盘布局，不再注册或查询 tool_logs；旧表实体随阶段 C 迁移统一删除。
+
+`tools.log-storage`、`sessions.deletion-storage`、`sessions.deletion`、`sessions.delete-confirmation` 共 4 项通过，含真实双会话进程停止隔离、全部工作区文件保留、内部链接拒绝、清理中断恢复、日志 UTF-8 分页和确认按钮深浅主题检查。证据：`test-results/2026-11-07T10-44-01.422Z`；已检查实际删除弹窗截图。`pnpm quality` 通过。本轮未调用真实模型。

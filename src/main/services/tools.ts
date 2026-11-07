@@ -1,7 +1,7 @@
 import { ToolOperations } from './tool-operations';
 import { PolicyService, digest, type PolicyContext } from './policy';
 import { InteractionBroker } from './interactions';
-import { ProcessRunner, type LogObserver } from '../../node/process-runner';
+import { ProcessRunner } from '../../node/process-runner';
 import { requireRuntime, type RuntimePaths } from '../../node/runtime-paths';
 import type { ToolOperation, ToolResult, Interaction } from '../../shared/tools';
 
@@ -31,10 +31,9 @@ export class ToolService {
     private resources: RuntimePaths,
     logs: string,
     readonly broker: InteractionBroker,
-    logObserver?: LogObserver,
   ) {
     this.policy = new PolicyService(resources);
-    this.processes = new ProcessRunner(resources, logs, logObserver);
+    this.processes = new ProcessRunner(resources, logs);
     this.operations = new ToolOperations(resources, this.processes);
   }
   execute(

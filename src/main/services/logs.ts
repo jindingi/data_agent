@@ -1,53 +1,45 @@
-import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import { open, realpath } from 'node:fs/promises';
+import { open, realpath, opendir } from 'node:fs/promises';
 import { constants, realpathSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { LogObserver } from '../../node/process-runner';
-import { inside } from '../../node/path-policy';
+import { toolLogDirectory } from '../../node/tool-log-path';
 import { AppError } from '../../shared/errors';
 import type { ToolLog, LogPage } from '../../shared/maintenance';
-
 export class LogService {
   private canonicalRoot: string;
+  private entries = new Map<string, { path: string; sessionId: string; toolCallId: string }>();
   constructor(
-    private db: Database.Database,
     private root: string,
+    private authorized: (sessionId: string, toolCallId: string) => Promise<boolean>,
   ) {
     this.canonicalRoot = realpathSync(root);
   }
-  register: LogObserver = ({ runId, toolCallId, path, result }) => {
-    this.db
-      .prepare(
-        `INSERT INTO tool_logs(id,run_id,tool_call_id,path,peak_rss,reason,truncated) VALUES (?,?,?,?,?,?,?)
-      ON CONFLICT(run_id,tool_call_id) DO UPDATE SET peak_rss=excluded.peak_rss,reason=excluded.reason,truncated=excluded.truncated`,
-      )
-      .run(
-        randomUUID(),
-        runId,
-        toolCallId,
-        path,
-        result?.peakRss ?? 0,
-        result?.reason ?? null,
-        Number(result?.truncated ?? false),
-      );
-  };
-  list(sessionId: string, toolCallId: string): ToolLog[] {
-    const rows = this.db
-      .prepare(
-        `SELECT l.id,l.run_id AS runId,l.tool_call_id AS toolCallId,l.peak_rss AS peakRss,l.reason,l.truncated
-      FROM tool_logs l JOIN runs r ON r.id=l.run_id WHERE r.session_id=? AND l.tool_call_id=? ORDER BY r.created_at DESC`,
-      )
-      .all(sessionId, toolCallId) as (Omit<ToolLog, 'truncated'> & { truncated: number })[];
-    return rows.map((row) => ({ ...row, truncated: Boolean(row.truncated) }));
+  async list(sessionId: string, toolCallId: string): Promise<ToolLog[]> {
+    if (!(await this.authorized(sessionId, toolCallId)))
+      throw new AppError('LOG_NOT_FOUND', '工具不属于当前会话');
+    const directory = toolLogDirectory(this.root, sessionId, toolCallId);
+    try {
+      if ((await realpath(directory)) !== join(this.canonicalRoot, relative(this.root, directory)))
+        throw new Error('redirect');
+      const rows: ToolLog[] = [];
+      for await (const item of await opendir(directory)) {
+        if (rows.length >= 100) break;
+        if (!item.isFile() || !/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\.log$/i.test(item.name))
+          continue;
+        const id = randomUUID();
+        this.entries.set(id, { sessionId, toolCallId, path: join(directory, item.name) });
+        rows.push({ id, runId: item.name.slice(0, -4), toolCallId });
+      }
+      while (this.entries.size > 1000) this.entries.delete(this.entries.keys().next().value!);
+      return rows;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw new AppError('LOG_UNAVAILABLE', '日志目录已变更，无法读取');
+    }
   }
   async page(sessionId: string, id: string, offset: number): Promise<LogPage> {
-    const row = this.db
-      .prepare(
-        'SELECT l.path FROM tool_logs l JOIN runs r ON r.id=l.run_id WHERE l.id=? AND r.session_id=?',
-      )
-      .get(id, sessionId) as { path: string } | undefined;
-    if (!row || !inside(row.path, this.root))
+    const row = this.entries.get(id);
+    if (!row || row.sessionId !== sessionId || !(await this.authorized(sessionId, row.toolCallId)))
       throw new AppError('LOG_NOT_FOUND', '日志不存在或不属于当前会话');
     try {
       if ((await realpath(row.path)) !== join(this.canonicalRoot, relative(this.root, row.path)))
@@ -79,8 +71,6 @@ export class LogService {
         await handle.close();
       }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-        return { text: '', offset: 0, nextOffset: null, totalBytes: 0 };
       throw new AppError('LOG_UNAVAILABLE', '日志路径或内容已变更，无法读取');
     }
   }

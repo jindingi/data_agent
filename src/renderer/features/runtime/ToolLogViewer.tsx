@@ -80,7 +80,7 @@ export function ToolLogViewer({
         </select>
       )}
       {error && <p role="alert">{error}</p>}
-      {!busy && !logs.length && <p>此工具没有保存进程输出日志。</p>}
+      {!busy && !logs.length && <p>未保存可读取的完整日志。</p>}
       {page && (
         <>
           <pre data-testid="full-tool-log">{page.text || '尚无输出'}</pre>

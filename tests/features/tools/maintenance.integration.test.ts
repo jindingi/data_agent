@@ -8,6 +8,8 @@ import { openDatabase } from '../../../src/main/storage/database';
 import { SessionService } from '../../../src/main/services/sessions';
 import { ArtifactService } from '../../../src/main/services/artifacts';
 import { LogService } from '../../../src/main/services/logs';
+import { toolLogPath } from '../../../src/node/tool-log-path';
+import { dirname } from 'node:path';
 import { readText } from '../../../src/node/read-text';
 
 let root: string,
@@ -59,23 +61,14 @@ it('tools.log-storage paginates UTF-8 without loss, enforces session scope, and 
   const session = sessions.create(),
     other = sessions.create(),
     runId = run(session.id),
-    logs = new LogService(db, paths.logs);
-  const path = join(paths.logs, runId, 'tool.log');
-  await mkdir(join(paths.logs, runId));
+    logs = new LogService(paths.logs, async (id) => id === session.id);
+  const path = toolLogPath(paths.logs, session.id, runId, 'tool');
+  await mkdir(dirname(path), { recursive: true });
   const content = 'a'.repeat(32767) + '中文\n'.repeat(18000) + 'END_MARKER';
   await writeFile(path, content);
-  logs.register({ runId, toolCallId: 'tool', path });
-  logs.register({
-    runId,
-    toolCallId: 'tool',
-    path,
-    result: { output: '', reason: 'exit', peakRss: 123, exitCode: 0, truncated: true, pid: 1 },
-  });
-  const rows = logs.list(session.id, 'tool');
+  const rows = await logs.list(session.id, 'tool');
   expect(rows).toHaveLength(1);
-  expect(rows[0].peakRss).toBe(123);
-  expect(rows[0].truncated).toBe(true);
-  expect(logs.list(other.id, 'tool')).toEqual([]);
+  await expect(logs.list(other.id, 'tool')).rejects.toThrow();
   await expect(logs.page(other.id, rows[0].id, 0)).rejects.toThrow('不属于当前会话');
   let offset = 0,
     output = '',

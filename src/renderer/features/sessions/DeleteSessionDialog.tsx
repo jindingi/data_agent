@@ -14,7 +14,6 @@ export function DeleteSessionDialog({
   deleted: () => void;
 }) {
   const [preview, setPreview] = useState<DeletionPreview>();
-  const [outputs, setOutputs] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -23,7 +22,6 @@ export function DeleteSessionDialog({
       .then((value) => {
         if (mounted) {
           setPreview(value);
-          setOutputs(value.deleteArtifacts);
         }
       })
       .catch((error) => {
@@ -40,7 +38,6 @@ export function DeleteSessionDialog({
       const result = await request({
         type: 'sessions.delete',
         sessionId,
-        deleteArtifacts: outputs,
       });
       if (result.complete) {
         deleted();
@@ -48,7 +45,6 @@ export function DeleteSessionDialog({
       }
       const value = await request({ type: 'sessions.deletePreview', sessionId });
       setPreview({ ...value, remaining: result.remaining });
-      setOutputs(value.deleteArtifacts);
       setError('部分文件尚未清理。处理下方问题后可继续，已完成的清理不会重复。');
     } catch (error) {
       setError(error instanceof Error ? error.message : '删除失败');
@@ -66,23 +62,23 @@ export function DeleteSessionDialog({
       <DialogContent>
         <DialogTitle>删除会话</DialogTitle>
         <DialogDescription className="mt-2 text-sm text-muted-foreground">
-          先停止此会话的任务，再删除会话记录与工具日志。原始 CSV、外部父目录和未登记文件会保留。
+          先停止此会话的任务，再删除对话记录和内部工具日志。工作区及其中所有文件保留，由你自行管理。
         </DialogDescription>
         {preview && (
           <>
-            <label className="delete-choice">
-              <input
-                type="checkbox"
-                checked={outputs}
-                disabled={busy || preview.pending}
-                onChange={(event) => setOutputs(event.target.checked)}
-              />
-              同时清理已登记产物（当前 {preview.artifactCount} 个）
-            </label>
             <p className="maintenance-note">
-              正在生成的产物会在任务停止后登记。保留产物时，你仍可通过 Finder
-              访问工作区；会话记录删除后无法在工作台内恢复。
+              删除后侧栏不再保留工作区入口，对话记录无法在应用内恢复。
             </p>
+            <Button
+              variant="outline"
+              onClick={() =>
+                void request({ type: 'workspace.open', sessionId }).catch((error) =>
+                  setError(error.message),
+                )
+              }
+            >
+              在 Finder 中打开工作区
+            </Button>
             <p className="path-label">{preview.workspace}</p>
           </>
         )}

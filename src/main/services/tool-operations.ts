@@ -36,6 +36,7 @@ export class ToolOperations {
       const outputRoot = runOutputRoot(context);
       await checkOutputBudget(outputRoot);
       const result = await this.processes.run({
+        sessionId: context.sessionId,
         argv: ['/bin/bash', '--noprofile', '--norc', '-c', operation.command],
         outputRoot,
         cwd: context.workingDirectory ?? context.workspace,
@@ -112,6 +113,7 @@ export class ToolOperations {
     }
     if (operation.name === 'find') {
       const result = await this.processes.run({
+        sessionId: context.sessionId,
         argv: [
           join(this.resources.bin, 'fd'),
           '--max-results',
@@ -172,6 +174,7 @@ export class ToolOperations {
       ...files,
     ];
     const result = await this.processes.run({
+      sessionId: context.sessionId,
       argv,
       cwd: context.workingDirectory ?? context.workspace,
       runId: context.runId,

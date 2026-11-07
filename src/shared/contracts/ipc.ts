@@ -240,7 +240,6 @@ export const commandSchema = z.discriminatedUnion('type', [
       ...base,
       type: z.literal('sessions.delete'),
       sessionId: z.string().uuid(),
-      deleteArtifacts: z.boolean(),
     })
     .strict(),
   z

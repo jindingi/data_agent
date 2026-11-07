@@ -236,12 +236,9 @@ export async function dispatchCommand(
     case 'sessions.deletePreview':
       return success(command.type, deletion.preview(command.sessionId));
     case 'sessions.delete':
-      return success(
-        command.type,
-        await deletion.remove(command.sessionId, command.deleteArtifacts),
-      );
+      return success(command.type, await deletion.remove(command.sessionId));
     case 'logs.list':
-      return success(command.type, logs.list(command.sessionId, command.toolCallId));
+      return success(command.type, await logs.list(command.sessionId, command.toolCallId));
     case 'logs.page':
       return success(
         command.type,

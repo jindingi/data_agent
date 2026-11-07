@@ -2,9 +2,6 @@ export interface ToolLog {
   id: string;
   runId: string;
   toolCallId: string;
-  peakRss: number;
-  reason: string | null;
-  truncated: boolean;
 }
 export interface LogPage {
   text: string;
@@ -14,8 +11,6 @@ export interface LogPage {
 }
 export interface DeletionPreview {
   pending: boolean;
-  deleteArtifacts: boolean;
-  artifactCount: number;
   workspace: string;
   remaining: { path: string; error: string | null }[];
 }

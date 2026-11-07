@@ -6,15 +6,6 @@ import { startApp, until } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
 import { rpc, configure, submit, settled } from '../../support/desktop.mjs';
 
-async function published(page, sessionId) {
-  return until(async () => {
-    const value = await rpc(page, { type: 'artifacts.list', sessionId });
-    return value.versions.length && value.versions.every((v) => v.state === 'published')
-      ? value
-      : null;
-  }, 'outputs published');
-}
-
 async function deleted(page, id) {
   await until(
     async () =>
@@ -84,7 +75,7 @@ export const cases = {
         .fill('discard this unsent draft with session A');
       await page.getByRole('button', { name: '会话操作', exact: true }).click();
       await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
-      await page.getByRole('checkbox').check();
+      assert.equal(await page.getByRole('dialog').getByRole('checkbox').count(), 0);
       await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
       await deleted(page, a);
       await until(
@@ -103,7 +94,10 @@ export const cases = {
         undefined,
       );
       assert(!existsSync(aSession.sessionFile));
-      assert(!existsSync(join(aRun.outputDirectory, 'report.md')));
+      assert.equal(
+        readFileSync(join(aRun.outputDirectory, 'report.md'), 'utf8'),
+        '# running report\n',
+      );
       assert.equal(readFileSync(manual, 'utf8'), 'keep manual');
       assert.equal(readFileSync(original, 'utf8'), 'name,value\nA,1\n');
       assert(existsSync(outside));
@@ -122,70 +116,33 @@ export const cases = {
       );
       const c = await submit(page, 'Make a report to exercise cleanup retry.');
       await settled(page, c);
-      const listing = await published(page, c);
-      const report = listing.files.find((f) => f.relativePath === 'report.md');
-      assert(report);
-      const manualAfter = join(listing.versions[0].directory, 'manual-after.txt');
-      writeFileSync(manualAfter, 'never registered');
-      writeFileSync(report.path, '# manually modified');
+      const cSession = (await rpc(page, { type: 'sessions.open', sessionId: c })).session;
+      const report = join(cSession.workspace, 'report.md');
+      const manualAfter = join(cSession.workspace, 'manual-after.txt');
+      writeFileSync(manualAfter, 'manual');
+      writeFileSync(report, '# modified report');
       await page.getByRole('button', { name: '会话操作', exact: true }).click();
       await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
-      await page.getByRole('checkbox').check();
+      assert.equal(await page.getByRole('dialog').getByRole('checkbox').count(), 0);
+      await page
+        .getByRole('dialog')
+        .screenshot({ path: join(dir, 'delete-retains-workspace.png') });
       await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
-      await page.getByRole('button', { name: '继续清理', exact: true }).waitFor();
-      const pending = await rpc(page, { type: 'sessions.deletePreview', sessionId: c });
-      assert.equal(pending.remaining.length, 1);
-      assert.equal(pending.remaining[0].path, report.path);
+      await deleted(page, c);
+      assert.equal(readFileSync(report, 'utf8'), '# modified report');
+      assert.equal(readFileSync(manualAfter, 'utf8'), 'manual');
       await app.stop();
       app = await startApp(root, { testModelBaseUrl: fixture.baseUrl });
       page = app.page;
-      await until(
-        () =>
-          page
-            .getByTestId('session-title')
-            .getAttribute('data-session-id')
-            .then((id) => id === c),
-        'deleting session restored',
-      );
-      await page.getByRole('button', { name: '会话操作', exact: true }).click();
-      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
-      await page.getByRole('button', { name: '继续清理', exact: true }).waitFor();
-      assert.equal(await page.getByRole('checkbox').isChecked(), true);
-      assert.equal(await page.getByRole('checkbox').isDisabled(), true);
-      writeFileSync(report.path, '# original report');
-      await page.getByRole('button', { name: '继续清理', exact: true }).click();
-      await deleted(page, c);
-      assert.equal(readFileSync(manualAfter, 'utf8'), 'never registered');
-      assert(!existsSync(report.path));
-      fixture.set(
-        { tool: { name: 'write', args: { path: 'report.md', content: '# retained file' } } },
-        { text: 'File delivered.' },
-      );
-      const d = await submit(page, 'Keep the files when removing this conversation.');
-      await settled(page, d);
-      const keep = (await published(page, d)).files.find((f) => f.relativePath === 'report.md');
-      await page.getByRole('button', { name: '会话操作', exact: true }).click();
-      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
-      assert.equal(await page.getByRole('checkbox').isChecked(), false);
-      await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
-      await deleted(page, d);
-      assert.equal(readFileSync(keep.path, 'utf8'), '# retained file');
-      await until(
-        () =>
-          page
-            .getByRole('dialog')
-            .count()
-            .then((n) => n === 0),
-        'final deletion closed',
-      );
-      assert.equal(await page.getByRole('alert').count(), 0);
+      assert(!(await rpc(page, { type: 'sessions.list' })).some((s) => s.id === c || s.id === a));
+      assert.equal(readFileSync(report, 'utf8'), '# modified report');
       assert.deepEqual(app.errors, []);
       return {
         runningSessionStoppedBeforeCleanup: true,
         otherSessionContinues: true,
         parentOriginalAndManualFilesPreserved: true,
-        partialFailureRecoveredAfterRestart: true,
-        explicitKeepArtifactsHonored: true,
+        deletedSessionDoesNotReturn: true,
+        workspaceAlwaysRetained: true,
       };
     } finally {
       await app?.stop();

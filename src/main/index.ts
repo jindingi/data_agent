@@ -122,12 +122,20 @@ if (primaryInstance)
           for (const version of artifacts.list(session.id).versions)
             if (version.state === 'open') void artifacts.publish(version.id);
       const interactions = new InteractionBroker(db);
-      const logs = new LogService(db, paths.logs);
+      const logs = new LogService(paths.logs, async (sessionId, toolCallId) => {
+        sessions.get(sessionId);
+        const snapshot = await runtime?.restoreSnapshot(sessionId);
+        return Boolean(
+          snapshot?.tools.some((tool) => tool.id === toolCallId) ||
+          snapshot?.messages.some((message) =>
+            message.blocks.some((block) => block.type === 'toolCall' && block.id === toolCallId),
+          ),
+        );
+      });
       const tools = new ToolService(
         getRuntimePaths(resourceAppPath, process.resourcesPath, app.isPackaged),
         paths.logs,
         interactions,
-        logs.register,
       );
       const catalogReady = host.request({ type: 'models.list' }).then((value) => {
         credentials.setCatalog((value as { models: ModelOption[] }).models);
@@ -156,7 +164,8 @@ if (primaryInstance)
         skillsDirectory,
         agentConfigs,
       });
-      deletion = new DeletionService(db, sessions, runtime, artifacts, paths, changed);
+      deletion = new DeletionService(db, sessions, runtime, paths, changed);
+      deletion.recover();
       const info = (): SystemInfo => ({
         version: app.getVersion(),
         platform: process.platform,
