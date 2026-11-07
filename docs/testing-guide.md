@@ -15,6 +15,7 @@ tests/
     conversation/               # 多轮、steer/follow-up、重试/压缩、缓存前缀
     lifecycle/                  # 并发/FIFO、停止、窗口、崩溃
     models/                     # 设置/BYOK、模型前置检查、真实/重放协议链路
+    agent-config/               # 配置修订/迁移、会话绑定、工具禁用、上下文前缀与设置 UI
     tools/                      # 执行、取消、资源限制、完整日志
     approvals/                  # 路径策略、联网、审批、澄清
     artifacts/                  # 共享工作区、文件登记、交付与导出
@@ -141,3 +142,9 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 - `tests/support/model/listing.mjs` 是明确的合成目录响应，普通 scripted/replay/拒绝模型服务器仅对 `GET /v1/models` 返回此列表。重放的 POST 请求哈希/原始响应校验不变，目录设置不计入录制中的模型调用次数，不能把它说成线上目录录制或真实鉴权。普通 runner 同时移除 DeepSeek/OpenRouter 环境密钥。
 - `pnpm test -- --case models.live-connection,models.live-openrouter --live` 使用真实设置/IPC/SDK，各做一次短探测（另有目录 GET）。OpenRouter 测试密钥为 `OPENROUTER_API_KEY`，只从环境或 `.zshrc` 字面量读取；默认测试模型 `deepseek/deepseek-v4.1-flash`，不自动遍历模型直到通过。成功只证明此组合当前连通，失败不计为通过。
 - 所有 UI 测试使用隔离、后台隐藏窗口。模型网络栈变更需运行普通全量回归，以验证实际工具、前缀和重放链路未变。
+
+## Agent 配置回归
+
+`pnpm test -- --feature agent-config` 执行配置 schema 与真实 SDK 请求测试、SQLite 版本/历史恢复、并发排队绑定与 Main 工具检查、后台 CDP 设置交互。`agent-config.requests` 比较实际序列化请求，覆盖 skill 开关、全部工具关闭、工具循环、steer/follow-up、新附件和重启；普通全量中的 `conversation.retry-compaction` 继续覆盖明确的压缩边界。`agent-config.settings` 覆盖三尺寸/深浅主题、未保存关闭确认、保存冲突保留草稿、只读版本详情与新会话不提前创建。
+
+重放场景把 APP_ROOT 路径绑定到当前 skill 快照根，并在请求前核对快照正文与内置正文相同；只是可移植路径发生变化，完整请求匹配、原响应与 usage 样本保持不变。没有删除提示词或工具字段的匹配，也没有 live 回退。

@@ -1,3 +1,4 @@
+import { AgentConfigService } from './services/agent-config';
 import { app, BrowserWindow, Menu, safeStorage, nativeImage } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,6 +20,11 @@ import type { ModelOption } from '../shared/runtime';
 import { registerHandlers } from './ipc/handlers';
 import { IPC_EVENT } from '../shared/channels';
 import type { SystemInfo } from '../shared/contracts/ipc';
+
+declare const __DATA_AGENT_DEV_ROOT__: string;
+// Vite's --entry can make app.getAppPath() point at out/main. Resource roots are build-owned, never supplied by Renderer.
+const resourceAppPath =
+  !app.isPackaged && process.env.ELECTRON_RENDERER_URL ? __DATA_AGENT_DEV_ROOT__ : app.getAppPath();
 
 app.setName('Data Agent');
 const automation = process.argv.includes('--data-agent-automation');
@@ -89,7 +95,11 @@ if (primaryInstance)
     .whenReady()
     .then(() => {
       db = openDatabase(paths.database);
-      const sessions = new SessionService(db, paths);
+      const skillsDirectory = app.isPackaged
+        ? join(process.resourcesPath, 'skills')
+        : join(resourceAppPath, 'resources/skills');
+      const agentConfigs = new AgentConfigService(db, paths, skillsDirectory);
+      const sessions = new SessionService(db, paths, undefined, agentConfigs);
       sessions.recoverIntents();
       sessions.reconcile();
       host = new AgentProcess(join(here, 'agent.js'), (status) => {
@@ -113,7 +123,7 @@ if (primaryInstance)
       const interactions = new InteractionBroker(db);
       const logs = new LogService(db, paths.logs);
       const tools = new ToolService(
-        getRuntimePaths(app.getAppPath(), process.resourcesPath, app.isPackaged),
+        getRuntimePaths(resourceAppPath, process.resourcesPath, app.isPackaged),
         paths.logs,
         interactions,
         logs.register,
@@ -142,9 +152,8 @@ if (primaryInstance)
         tools: tools,
         testBaseUrl: automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
         artifacts: artifacts,
-        skillsDirectory: app.isPackaged
-          ? join(process.resourcesPath, 'skills')
-          : join(app.getAppPath(), 'resources/skills'),
+        skillsDirectory,
+        agentConfigs,
       });
       deletion = new DeletionService(db, sessions, runtime, artifacts, paths, changed);
       const info = (): SystemInfo => ({
@@ -178,6 +187,7 @@ if (primaryInstance)
         changed: changed,
         credentials: credentials,
         runtime: runtime,
+        agentConfigs,
         catalogReady: catalogReady,
         testBaseUrl: automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
         interactions: interactions,

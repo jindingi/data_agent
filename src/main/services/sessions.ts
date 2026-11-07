@@ -1,3 +1,4 @@
+import type { AgentConfigService } from './agent-config';
 import { inspectFiles } from './file-selection';
 import { inputTextPreview, checkedInputPath } from './text-preview';
 import type Database from 'better-sqlite3';
@@ -17,6 +18,7 @@ export class SessionService {
     private db: Database.Database,
     private paths: AppPaths,
     private faults?: { afterWorkspaceCreated?: () => void },
+    private agentConfigs?: AgentConfigService,
   ) {}
   list(search = '', archived = false): SessionRecord[] {
     const rows = this.db
@@ -50,6 +52,7 @@ export class SessionService {
           now,
           now,
         );
+      this.agentConfigs?.bindNew(id);
       if (intent) this.db.prepare('INSERT INTO conversation_intents VALUES (?)').run(id);
     })();
     try {

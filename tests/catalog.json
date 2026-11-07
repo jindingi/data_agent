@@ -948,5 +948,55 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["conversation"]
+  },
+  {
+    "id": "agent-config.storage",
+    "feature": "agent-config",
+    "level": "integration",
+    "file": "tests/features/agent-config/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "agent-config.legacy",
+    "feature": "agent-config",
+    "level": "integration",
+    "file": "tests/features/agent-config/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "agent-config.requests",
+    "feature": "agent-config",
+    "level": "unit",
+    "file": "tests/features/agent-config/requests.unit.test.ts",
+    "model": "scripted",
+    "environment": "node",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "agent-config.settings",
+    "feature": "agent-config",
+    "level": "e2e",
+    "file": "tests/features/agent-config/settings.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["models", "sessions"]
+  },
+  {
+    "id": "agent-config.admission",
+    "feature": "agent-config",
+    "level": "integration",
+    "file": "tests/features/agent-config/admission.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["lifecycle", "tools"]
   }
 ]

@@ -132,6 +132,18 @@ export const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 10,
+    sql: `
+      CREATE TABLE agent_config_revisions (
+        revision INTEGER PRIMARY KEY AUTOINCREMENT, snapshot TEXT NOT NULL
+      );
+      CREATE TABLE session_agent_configs (
+        session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+        snapshot TEXT NOT NULL
+      );
+    `,
+  },
 ];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec(

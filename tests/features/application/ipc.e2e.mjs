@@ -13,6 +13,7 @@ export const cases = {
     try {
       const { page } = app;
       await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByRole('tab', { name: '本地与诊断', exact: true }).click();
       await page.getByText('应用诊断', { exact: true }).click();
       await page.getByRole('button', { name: '检查本地引擎' }).click();
       await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();

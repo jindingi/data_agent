@@ -17,6 +17,7 @@ const inspectSchema = z.object({
   deny: z.array(z.string()),
 });
 export interface PolicyContext {
+  readonlyRoots?: string[];
   workspace: string;
   workingDirectory?: string;
   protectedRoots: string[];
@@ -49,6 +50,9 @@ export class PolicyService {
     const roots = await Promise.all(
       context.protectedRoots.map((path) => canonicalPath(path, workspace)),
     );
+    const readonlyRoots = await Promise.all(
+      (context.readonlyRoots ?? []).map((path) => canonicalPath(path, workspace)),
+    );
     const runtimeRoot = await canonicalPath(this.runtime.root, workspace);
     const helpers = await canonicalPath(dirname(this.runtime.helpers), workspace);
     const inputs = await Promise.all(context.inputs.map((path) => canonicalPath(path, workspace)));
@@ -70,6 +74,10 @@ export class PolicyService {
       )
         mark('deny', '凭证或工作台控制文件禁止访问');
       else if (action !== 'read') {
+        if (readonlyRoots.some((root) => inside(root, actual) || inside(actual, root))) {
+          mark('deny', '禁止修改内置 skill 配置快照');
+          return actual;
+        }
         if (
           inside(actual, runtimeRoot) ||
           inside(actual, helpers) ||

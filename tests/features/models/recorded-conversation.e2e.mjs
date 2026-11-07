@@ -28,6 +28,20 @@ async function scenario(dir, mode) {
     await configure(app.page, 'synthetic-record-replay-key');
     const session = await createStoredSession(app.page);
     transport.bind('WORKSPACE', session.workspace);
+    // Same bundled skill content and prompt; its immutable snapshot now has a portable root.
+    const agentConfig = await rpc(app.page, {
+      type: 'sessions.agentConfig',
+      sessionId: session.id,
+    });
+    const skillPath = agentConfig.binding.skills[0].filePath;
+    assert.equal(
+      readFileSync(skillPath, 'utf8'),
+      readFileSync('resources/skills/data-analysis/SKILL.md', 'utf8'),
+    );
+    transport.bind(
+      'APP_ROOT',
+      skillPath.slice(0, -'/resources/skills/data-analysis/SKILL.md'.length),
+    );
     await app.page
       .getByRole('textbox', { name: '分析需求' })
       .fill(

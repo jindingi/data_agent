@@ -1,3 +1,8 @@
+import {
+  agentConfigSchema,
+  type AgentConfigSettings,
+  type SessionAgentConfig,
+} from '../agent-config';
 import { z } from 'zod';
 import {
   inputSchema,
@@ -14,6 +19,18 @@ import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maint
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ ...base, type: z.literal('agentConfig.get') }).strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('agentConfig.save'),
+      config: agentConfigSchema,
+      expectedRevision: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({ ...base, type: z.literal('sessions.agentConfig'), sessionId: z.string().uuid() })
+    .strict(),
   z.object({ ...base, type: z.literal('files.choose') }).strict(),
   z.object({ ...base, type: z.literal('workspace.choose') }).strict(),
   z
@@ -266,6 +283,9 @@ export type AppEvent =
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'agentConfig.get': AgentConfigSettings;
+  'agentConfig.save': AgentConfigSettings;
+  'sessions.agentConfig': SessionAgentConfig;
   'files.choose': SelectedFile[];
   'files.inspect': SelectedFile[];
   'workspace.choose': string | null;

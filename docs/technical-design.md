@@ -127,10 +127,11 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
     figures/*.png / tables/*.csv
     .cache/ / .tmp/
   logs/
+  agent-resources/{sha256}/resources/skills/{skillId}/SKILL.md
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`run_files`、`tool_logs`、`deletion_jobs`、`deletion_files`、`interactions`、`output_versions`、`artifacts`、`submission_receipts`、`conversation_intents`、`app_metadata`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字和路径，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。`run_files` 记录提交时选用的路径/登记大小，`tool_logs` 只存工具输出文件索引、结束原因和进程树采样峰值 RSS；`deletion_jobs`/`deletion_files` 保留明确清理选择与每个路径的进度。仍不另建永久聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`run_files`、`tool_logs`、`deletion_jobs`、`deletion_files`、`interactions`、`output_versions`、`artifacts`、`submission_receipts`、`conversation_intents`、`app_metadata`、`agent_config_revisions`、`session_agent_configs`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字和路径，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。`run_files` 记录提交时选用的路径/登记大小，`tool_logs` 只存工具输出文件索引、结束原因和进程树采样峰值 RSS；`deletion_jobs`/`deletion_files` 保留明确清理选择与每个路径的进度。仍不另建永久聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
 
 添加 CSV 时按文件元数据校验单文件及选用合计 ≤100,000,000 bytes；提交任务时检查原路径是否缺失，记录当时选用的路径和已登记大小。排队任务沿用提交时的引用；不冻结文件内容、不检测外部替换，也不按内容解析 CSV。实际读取失败由通用工具返回。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
 
@@ -186,6 +187,24 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 模型 UI 仅开放 DeepSeek/OpenRouter，使用 `/models` 返回 ID 与锁定 pi 聊天模型目录的交集，展示 SDK 能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、Base URL、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
 
 模型设置的 `ModelPicker` 将搜索与选择合为一个入口，使用锁定的 Radix Popover 1.1.15 和 cmdk 1.1.1。弹层内搜索当前提供方的缓存列表（名称/ID），未确认前不改变已保存模型；打开聚焦搜索框，支持键盘移动、输入法确认保护、Escape 和选择后的焦点恢复。弹层按视口避让并限制高度，列表独立滚动，沿用现有主题。目录获取、保存与 IPC 合同不变。
+
+### Agent 配置与会话固定版本
+
+`shared/agent-config.ts` 定义 schemaVersion=1、行为提示词（最多 32,000 字符）、固定工具 ID 与内置 skill ID。只接受白名单并按固定顺序归一化；skill 开启要求 read，纯聊天允许工具与 skills 均为空。`composeAgentPrompt` 将可编辑行为、只读工作区约束及与启用能力一致的说明组合；关闭 data-analysis 时不再留下固定读取指令。默认组合保留此前完整提示词字节，减少非必要上下文变化。
+
+`main/services/agent-config.ts` 是 SQLite 唯一写者。迁移 10 新增 `agent_config_revisions(revision,snapshot)` 与 `session_agent_configs(session_id,snapshot)`；snapshot 包括配置、提示词协议版本、skill 正文/描述/路径/哈希和指纹。最新修订作为默认配置，不为旧会话覆盖绑定；无实际变化不增版本，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存修订均在 SQLite 事务内。会话创建事务同时写入绑定，故首次输入排队前已固定；未接收的首页草稿仍不创建会话。配置与 skill 正文是配置数据，不是第二份聊天记录。
+
+Main 从可信打包目录取内置 skill，将启用正文按内容哈希物化到 `agent-resources/{sha256}/resources/skills/{id}/SKILL.md`，拒绝缓存路径符号链接及正文哈希不符。文件缺失可从 SQLite 快照恢复；创建缓存后数据库事务失败产生的孤立缓存不影响绑定，不自动清理仍可能被引用的版本。已保存的启用 skill 保持原内容，应用升级不隐式更新旧默认配置；新的未启用资源可在明确启用并保存时纳入修订。配置资源允许读取，但可检测写入/删除被策略拒绝。这仍是尽力规则检查，不宣称文件系统不可绕过。
+
+Host 接收 `agentConfig` 快照，通过现有 `createAgentSession` 初始化：只声明/注册启用工具；ResourceLoader 只返回启用 skill 的元数据，正文继续按需 read。Main 使用 Task 绑定再次检查工具名，拒绝被禁用工具，不能只隐藏模型声明。普通产品 Host 始终带配置与工具代理；未带配置的低层测试入口保留兼容，不作为产品选项。
+
+原生 JSONL 用 custom entry `data_agent.agent_config` 记录修订与指纹，不注入模型上下文。DB 绑定先提交，Host 启动时补齐缺失标记；已有标记不匹配则停止，不改写历史。恢复前还比较原生当前 preamble、skill 索引及完整工具声明（含顺序），避免 SDK 自动重建导致前缀变化。不另造会话内容格式。后续 SDK/工具接口升级不兼容时必须显式迁移，不能忽略此检查。
+
+历史无绑定会话仅在原生历史格式正常、活动分支的提示词/工具集合能核对旧默认值、原 skill 路径内容与可信内置资源一致时恢复，显示“历史配置”而非任意 vN。保留原 skill 声明路径与系统前缀；Main 将该 skill 的 read 定向到内容快照。若历史已含配置标记但 SQLite 绑定丢失、历史 skill 不可确认或格式未知，则返回“配置待确认”，保留记录且停止新任务，提示恢复备份或新建会话。无模型历史的空草稿可以绑定当前默认值。
+
+Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Agent 配置、本地与诊断；Agent 编辑与只读会话详情位于 `features/agent-config/`。IPC 为 `agentConfig.get/save` 和 `sessions.agentConfig`，Renderer 不提供文件路径。编辑页保留跨分类草稿，关闭时确认未保存修改，统一保存/撤销；默认版本与会话实际版本分别显示，旧版本不视为故障。
+
+开发服务使用构建配置提供的资源根，避免 Vite `--entry` 使 `app.getAppPath()` 指向构建入口后找不到内置 skill/runtime；真实目录只在 serve 模式注入，生产构建为空字符串并使用应用自身资源路径，不将开发者绝对路径带入 .app。恢复会话时校验完整系统段（含顺序）和工具声明，不删除无法识别的历史段；不兼容时停止并提示配置待确认。
 
 本地真实测试固定：
 

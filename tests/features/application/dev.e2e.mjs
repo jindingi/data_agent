@@ -12,7 +12,14 @@ export const cases = {
       const result = await page.evaluate(() => window.dataAgent.request({ type: 'system.info' }));
       assert.equal(result.ok, true, JSON.stringify({ url: page.url(), result }));
       assert.match(page.url(), /^http:\/\/localhost:\d+\/$/);
+      const config = await page.evaluate(() =>
+        window.dataAgent.request({ type: 'agentConfig.get' }),
+      );
+      assert(config.ok);
+      assert.equal(config.value.current.skills[0].name, 'data-analysis');
+      assert(config.value.current.skills[0].content.includes('Data analysis in the workbench'));
       await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByRole('tab', { name: '本地与诊断', exact: true }).click();
       await page.getByText('应用诊断', { exact: true }).click();
       await page.getByRole('button', { name: '检查本地引擎' }).click();
       await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();

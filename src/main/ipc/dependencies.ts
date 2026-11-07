@@ -1,3 +1,4 @@
+import type { AgentConfigService } from '../services/agent-config';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { SystemInfo } from '../../shared/contracts/ipc';
 import type { AgentProcess } from '../services/agent-process';
@@ -10,6 +11,7 @@ import type { DeletionService } from '../services/deletion';
 import type { LogService } from '../services/logs';
 import type { InteractionBroker } from '../services/interactions';
 export interface HandlerDependencies {
+  agentConfigs: AgentConfigService;
   trusted: (event: IpcMainInvokeEvent) => boolean;
   info: () => SystemInfo;
   host: AgentProcess;

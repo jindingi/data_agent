@@ -1,3 +1,5 @@
+import type { AgentBinding } from '../shared/agent-config';
+import { bindAgentConfiguration } from './agent-configuration';
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai';
 import { RequestBudget } from './request-budget';
 import { TurnUsageLedger } from './turn-usage';
@@ -42,6 +44,7 @@ export interface RuntimeConfig {
   testBaseUrl?: string;
   baseUrl?: string;
   skillsDirectory?: string;
+  agentConfig?: AgentBinding;
   protectedRoots: string[];
 }
 /** One Host, one native session writer. The caller owns admission and process lifetime. */
@@ -154,13 +157,35 @@ export class SessionRuntime {
         false,
       );
     }
+    const registeredTools = dependencies?.tools
+      ? genericTools(dependencies.tools, redact).filter(
+          (tool) =>
+            !config.agentConfig ||
+            config.agentConfig.config.enabledTools.includes(
+              tool.name as import('../shared/agent-config').ToolId,
+            ),
+        )
+      : [readTool(config.workspace, config.protectedRoots)];
+    if (config.agentConfig && !dependencies?.tools)
+      throw new Error('Configured Agent requires a tool executor');
+    const configured = config.agentConfig
+      ? bindAgentConfiguration(
+          instance.manager,
+          config.agentConfig,
+          priorCwd ?? config.workspace,
+          registeredTools,
+        )
+      : undefined;
     const loader = createResourceLoader({
       systemPrompt:
+        configured?.prompt ??
         priorSystem?.sections?.preamble ??
         systemPrompt(config.workspace, Boolean(dependencies?.tools)),
-      skills: config.skillsDirectory
-        ? loadSkillsFromDir({ dir: config.skillsDirectory, source: 'bundled' }).skills
-        : [],
+      skills:
+        configured?.skills ??
+        (config.skillsDirectory
+          ? loadSkillsFromDir({ dir: config.skillsDirectory, source: 'bundled' }).skills
+          : []),
       extensions: { extensions: [handlers], errors: [], runtime: createExtensionRuntime() },
     });
     const { session } = await createAgentSession({
@@ -178,12 +203,8 @@ export class SessionRuntime {
         cacheWarming: 'off',
       }),
       resourceLoader: loader,
-      tools: dependencies?.tools
-        ? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'ask_clarification']
-        : ['read'],
-      customTools: dependencies?.tools
-        ? genericTools(dependencies.tools, redact)
-        : [readTool(config.workspace, config.protectedRoots)],
+      tools: registeredTools.map((tool) => tool.name),
+      customTools: registeredTools,
     });
     instance.session = session;
     instance.unsubscribeTools = dependencies?.tools?.subscribe((interactions) => {

@@ -1,3 +1,7 @@
+import type { AgentConfigService } from './agent-config';
+import type { AgentBinding } from '../../shared/agent-config';
+import { frozenSkillPath } from '../../node/agent-config-resources';
+import { resolve } from 'node:path';
 import { submissionDigest } from '../../node/submission-digest';
 import { RunLedger } from './runtime/run-ledger';
 import { RunAdmission } from './runtime/admission';
@@ -38,6 +42,7 @@ type HostFactory = (
   cancelTool: (toolCallId: string) => void,
 ) => RuntimeHost;
 interface Task {
+  agentConfig?: AgentBinding;
   thinkingLevel: ThinkingLevel;
   filePaths: string[];
   startPromise?: Promise<void>;
@@ -54,6 +59,7 @@ interface Task {
   versionId?: string;
 }
 interface RuntimeDependencies {
+  agentConfigs?: AgentConfigService;
   db: Database.Database;
   sessions: SessionService;
   credentials: CredentialService;
@@ -69,6 +75,7 @@ interface RuntimeDependencies {
 }
 /** Global admission only; pi owns each conversation's steer/follow-up queue. */
 export class RuntimeService {
+  private agentConfigs: AgentConfigService | undefined;
   private tasks = new Map<string, Task>();
   private admission = new RunAdmission<Task>(2);
   private ledger: RunLedger;
@@ -91,6 +98,7 @@ export class RuntimeService {
   private artifacts: ArtifactService;
   private skillsDirectory: string | undefined;
   constructor(dependencies: RuntimeDependencies) {
+    this.agentConfigs = dependencies.agentConfigs;
     this.db = dependencies.db;
     this.sessions = dependencies.sessions;
     this.credentials = dependencies.credentials;
@@ -291,6 +299,7 @@ export class RuntimeService {
     const session = this.sessions.get(sessionId);
     if (session.archived || !['draft', 'persisted'].includes(session.state))
       throw new AppError('SESSION_UNAVAILABLE', session.error || '请先恢复会话后再提问');
+    const agentConfig = this.agentConfigs?.require(sessionId);
     const existingFiles = this.sessions.files(sessionId);
     const files = inspectFiles([...existingFiles.map((file) => file.path), ...(input.paths ?? [])]);
 
@@ -314,6 +323,7 @@ export class RuntimeService {
     if (isActive(this.tasks.get(sessionId)?.snapshot.state ?? 'completed'))
       throw new AppError('ALREADY_RUNNING', '该会话已有任务');
     const task: Task = {
+      agentConfig,
       thinkingLevel,
       filePaths: files.map((file) => file.path),
       input,
@@ -496,6 +506,21 @@ export class RuntimeService {
         async (toolCallId, operation, observers) => {
           if (!task.host?.pid || !isActive(task.snapshot.state))
             return { output: '当前任务无法执行工具', isError: true };
+          if (task.agentConfig && !task.agentConfig.config.enabledTools.includes(operation.name))
+            return { output: `工具 ${operation.name} 在此会话中未启用`, isError: true };
+          // Legacy skill locations remain in the prompt, but reads use frozen content.
+          const readPath =
+            operation.name === 'read'
+              ? resolve(task.outputDirectory ?? session.workspace, operation.path)
+              : undefined;
+          const skill =
+            operation.name === 'read' &&
+            task.agentConfig?.skills.find((s) => s.filePath === readPath);
+          if (skill && this.agentConfigs)
+            operation = {
+              ...operation,
+              path: frozenSkillPath(this.agentConfigs.resourcesRoot, skill.sha256, skill.id),
+            } as typeof operation;
           return this.tools.execute(
             {
               sessionId: session.id,
@@ -511,6 +536,7 @@ export class RuntimeService {
                 `${this.paths.database}-shm`,
                 this.paths.logs,
               ],
+              readonlyRoots: this.agentConfigs ? [this.agentConfigs.resourcesRoot] : [],
               inputs: task.filePaths,
               published: this.artifacts.legacyPaths(session.id),
             },
@@ -534,6 +560,7 @@ export class RuntimeService {
           thinkingLevel: task.thinkingLevel,
           apiKey,
           skillsDirectory: this.skillsDirectory,
+          ...(task.agentConfig ? { agentConfig: task.agentConfig } : {}),
           ...(task.baseUrl ? { baseUrl: task.baseUrl } : {}),
           ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
           protectedRoots: [
@@ -547,8 +574,13 @@ export class RuntimeService {
         input: task.input,
       });
       task.starting = false;
-    } catch {
-      this.fail(task, '无法启动任务，请检查模型凭证或重新打开会话。');
+    } catch (error) {
+      this.fail(
+        task,
+        error instanceof AppError && error.code === 'AGENT_CONFIG_UNAVAILABLE'
+          ? error.message
+          : '无法启动任务，请检查模型凭证或重新打开会话。',
+      );
     } finally {
       task.apiKey = undefined;
     }

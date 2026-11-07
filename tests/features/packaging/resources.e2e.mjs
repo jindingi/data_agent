@@ -16,6 +16,7 @@ export const cases = {
     const app = await startApp(join(dir, 'packaged'), { packaged: true });
     try {
       await app.page.getByRole('button', { name: '设置', exact: true }).click();
+      await app.page.getByRole('tab', { name: '本地与诊断', exact: true }).click();
       await app.page.getByText('应用诊断', { exact: true }).click();
       await app.page.getByRole('button', { name: '检查本地引擎' }).click();
       await app.page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
@@ -23,6 +24,17 @@ export const cases = {
       assert.equal(system.packaged, true);
       assert.equal(system.architecture, 'arm64');
       assert.ok(system.sqliteVersion);
+      await app.page.getByRole('tab', { name: 'Agent 配置', exact: true }).click();
+      await app.page.getByRole('textbox', { name: '系统提示词', exact: true }).waitFor();
+      assert(
+        await app.page.getByRole('switch', { name: '启用 data-analysis', exact: true }).isChecked(),
+      );
+      const config = await app.page.evaluate(() =>
+        window.dataAgent.request({ type: 'agentConfig.get' }),
+      );
+      assert(config.ok);
+      assert.equal(config.value.current.revision, 1);
+      assert(existsSync(config.value.current.skills[0].filePath));
       await app.page.screenshot({ path: join(dir, 'packaged.png') });
       assert.deepEqual(app.errors, []);
       return { info: system, screenshot: 'packaged.png' };

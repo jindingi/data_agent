@@ -1,4 +1,5 @@
-import { SettingsDialog } from '../features/models/SettingsDialog';
+import { SessionAgentConfigDialog } from '../features/agent-config/SessionAgentConfigDialog';
+import { SettingsDialog } from '../features/settings/SettingsDialog';
 import { RunControls } from '../features/runtime/RunControls';
 import { useActivity } from '../features/runtime/use-activity';
 import { Composer } from '../features/composer/Composer';
@@ -40,6 +41,7 @@ export function App() {
   const [search, setSearch] = useState('');
   const [archived, setArchived] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [configSession, setConfigSession] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const activity = useActivity(setError);
   const modelSettings = useModelSettings();
@@ -160,6 +162,7 @@ export function App() {
             }}
             onArchive={() => act(sessions.archiveCurrent())}
             onDelete={() => setDeleting(current!.id)}
+            onAgentConfig={() => setConfigSession(current!.id)}
           />
           {error && (
             <div role="alert" className="error-banner">
@@ -275,6 +278,13 @@ export function App() {
           initialTitle={current.title}
           rename={sessions.rename}
           close={() => setRenaming(false)}
+        />
+      )}
+      {configSession && (
+        <SessionAgentConfigDialog
+          sessionId={configSession}
+          close={() => setConfigSession(null)}
+          newConversation={() => sessions.select(null)}
         />
       )}
       <SettingsDialog open={settings} onOpenChange={setSettings} modelSettings={modelSettings} />

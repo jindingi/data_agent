@@ -1,5 +1,5 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Settings2 } from 'lucide-react';
 import {
   Moon,
   Sun,
@@ -24,6 +24,7 @@ export function SessionHeader({
   onRename,
   onArchive,
   onDelete,
+  onAgentConfig,
 }: {
   current?: SessionRecord;
   sidebar: boolean;
@@ -35,6 +36,7 @@ export function SessionHeader({
   onRename: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  onAgentConfig: () => void;
 }) {
   return (
     <header className="workspace-header">
@@ -71,6 +73,10 @@ export function SessionHeader({
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content className="menu-content" align="end" sideOffset={6}>
+                <Menu.Item className="menu-item" onSelect={onAgentConfig}>
+                  <Settings2 size={16} />
+                  Agent 配置
+                </Menu.Item>
                 <Menu.Item className="menu-item" onSelect={onRename}>
                   <Pencil size={16} />
                   重命名会话

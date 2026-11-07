@@ -1,3 +1,4 @@
+import { agentBindingSchema } from '../agent-config';
 import { z } from 'zod';
 import { turnUsageSchema } from '../usage';
 import {
@@ -24,6 +25,7 @@ const runtimeConfigSchema = z
     testBaseUrl: z.string().url().optional(),
     baseUrl: z.string().url().optional(),
     skillsDirectory: z.string().optional(),
+    agentConfig: agentBindingSchema.optional(),
   })
   .strict();
 export const hostRequestSchema = z.discriminatedUnion('type', [

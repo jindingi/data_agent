@@ -158,6 +158,7 @@ export const cases = {
         await page.setViewportSize({ width, height });
         const body = page.locator('.settings-body');
         for (const theme of ['light', 'dark']) {
+          await page.getByRole('tab', { name: '模型与连接', exact: true }).click();
           await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
           await body.evaluate((el) => {
             el.scrollTop = 0;
@@ -198,9 +199,6 @@ export const cases = {
             path: join(root, `settings-${width}-${theme}-thinking.png`),
             animations: 'disabled',
           });
-          await page.getByText('应用诊断', { exact: true }).click();
-          await page.getByRole('button', { name: '检查本地引擎', exact: true }).click();
-          await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
           const geometry = await page.locator('.settings-dialog').evaluate((dialog) => {
             const body = dialog.querySelector('.settings-body'),
               header = dialog.querySelector('.settings-header');
@@ -215,7 +213,10 @@ export const cases = {
           assert.equal(geometry.scrolled, true);
           assert(Math.abs(geometry.headerTop - geometry.dialogTop) < 2);
           await page.screenshot({ path: join(root, `settings-${width}-${theme}-bottom.png`) });
+          await page.getByRole('tab', { name: '本地与诊断', exact: true }).click();
           await page.getByText('应用诊断', { exact: true }).click();
+          await page.getByRole('button', { name: '检查本地引擎', exact: true }).click();
+          await page.getByRole('status').filter({ hasText: '本地引擎正常' }).waitFor();
         }
       }
       assert.equal(fixture.requests.length, 2, 'Local health check must not call the model');

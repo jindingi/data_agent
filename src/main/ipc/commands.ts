@@ -14,6 +14,7 @@ function success<K extends keyof CommandResponses>(
 export async function dispatchCommand(
   command: Command,
   {
+    agentConfigs,
     info,
     host,
     sessions,
@@ -31,6 +32,12 @@ export async function dispatchCommand(
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'agentConfig.get':
+      return success(command.type, agentConfigs.settings());
+    case 'agentConfig.save':
+      return success(command.type, agentConfigs.save(command.config, command.expectedRevision));
+    case 'sessions.agentConfig':
+      return success(command.type, agentConfigs.details(command.sessionId));
     case 'files.choose':
       return success(command.type, inspectFiles(await picker.chooseFiles()));
     case 'files.inspect':
