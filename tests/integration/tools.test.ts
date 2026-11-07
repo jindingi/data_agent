@@ -415,3 +415,16 @@ it('P6-LOG-LIMIT retains at most 10 MiB across actual tools in one run with boun
     readdirSync(logDir).reduce((sum, file) => sum + statSync(join(logDir, file)).size, 0),
   ).toBe(10 * 1024 * 1024);
 }, 15_000);
+
+it('R-RESOURCE-RELEASE repeated settled runs release tool registries and process log budgets', async () => {
+  for (let i = 0; i < 5; i++) {
+    context.runId = randomUUID();
+    const result = await execute({ name: 'bash', command: "printf 'resource-test'" });
+    expect(result.isError).toBe(false);
+    tools.cancelRun(context.runId);
+    expect((await execute({ name: 'ls', path: context.workspace })).isError).toBe(true);
+    await tools.settled(context.runId);
+    tools.releaseRun(context.runId);
+    expect(tools.resourceCounts()).toEqual({ active: 0, tails: 0, closed: 0, processBudgets: 0 });
+  }
+});

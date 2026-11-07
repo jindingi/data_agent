@@ -179,3 +179,9 @@ App 已拆出 SessionSidebar、SessionHeader、Composer/useComposer、RunControl
 ### R4 实施记录（2026-11-07）
 
 运行账本 RunLedger、FIFO/许可 RunAdmission、终态写者收束 RunLifecycle 已提取，RuntimeService 改用命名依赖。元数据仅在运行状态/输入 ACK 变化时写入，JSONL 继续由 pi 写；R-WRITES 证明连续文本 snapshot 不增加 SQL 写入，ACK/终态仍耐久。停止等待 Host、工具及版本发布后释放许可；终态缓存最多保留 8 个 task 和 8 个恢复 snapshot，历史仍可按需从 JSONL 读取。工具计数在写者结束后显式释放（与 R5 共用）。R-WRITES、P2-PREFLIGHT、P5-SWITCH、unit 和 quality 通过，完整 P5/删除/崩溃门禁留待最终汇总。
+
+### R5 实施记录（2026-11-07）
+
+SessionRuntime 保留唯一 pi 生命周期，system/current context、请求证据和请求/活跃时间预算已分别提取。ToolService 继续拥有 policy→审批→重新检查→取消的统一外壳，ToolOperations 只执行已检查的通用操作。releaseRun 显式释放工具 closed/tails 与进程日志计数。
+
+导出使用同一已验证文件描述符、64 KiB chunk 和 SHA256 校验，先在独占目标目录的隐藏 staging 中写入/同步，全部校验后提交；失败清理本次 staging/新导出，已有同名导出拒绝覆盖。预览仍按已有 Markdown/PNG 上限有界读取。R-EXPORT（20 MiB）、R-RESOURCE-RELEASE（5 轮）、P2-REQUEST-LIMIT、P3-CANCEL、unit 和 quality 通过。完整安全策略/产物门禁在 R6 继续验证。

@@ -1,6 +1,7 @@
+import { readVerified, writeAll } from './artifacts-io';
 import type Database from 'better-sqlite3';
 import { constants } from 'node:fs';
-import { mkdir, open, readdir, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, open, readdir, realpath, rm, rename, lstat } from 'node:fs/promises';
 import { join, relative, dirname, extname } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { canonicalPath, inside } from '../../node/path-policy';
@@ -218,39 +219,9 @@ export class ArtifactService {
     }
     this.changed(version.sessionId);
   }
-  private async verifiedBytes(file: ArtifactRecord) {
+  private async verifyRead(file: ArtifactRecord, consume: (chunk: Buffer) => Promise<void>) {
     try {
-      const version = this.version(file.versionId);
-      if (
-        (await realpath(version.directory)) !== version.directory ||
-        (await realpath(file.path)) !== file.path ||
-        !inside(file.path, version.directory)
-      )
-        throw new Error('文件路径已变更');
-      const handle = await open(file.path, constants.O_RDONLY | constants.O_NOFOLLOW);
-      try {
-        const stat = await handle.stat();
-        if (!stat.isFile() || stat.size !== file.size || stat.size > MAX_VERSION_BYTES)
-          throw new Error('文件大小已变更');
-        const buffer = Buffer.alloc(file.size + 1);
-        let length = 0;
-        while (length < buffer.length) {
-          const result = await handle.read(
-            buffer,
-            length,
-            Math.min(64 * 1024, buffer.length - length),
-            null,
-          );
-          if (!result.bytesRead) break;
-          length += result.bytesRead;
-        }
-        const bytes = buffer.subarray(0, length);
-        if (bytes.length !== file.size || sha256(bytes) !== file.sha256)
-          throw new Error('文件内容已变更');
-        return bytes;
-      } finally {
-        await handle.close();
-      }
+      await readVerified(file, this.version(file.versionId).directory, consume);
     } catch (error) {
       const state = (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'changed';
       this.db
@@ -266,6 +237,13 @@ export class ArtifactService {
         state === 'missing' ? '文件已不存在' : '文件已变更，请生成新版本',
       );
     }
+  }
+  private async verifiedBytes(file: ArtifactRecord) {
+    const chunks: Buffer[] = [];
+    await this.verifyRead(file, async (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+    return Buffer.concat(chunks);
   }
   async preview(sessionId: string, id: string): Promise<ArtifactPreview> {
     const file = this.file(sessionId, id);
@@ -283,13 +261,46 @@ export class ArtifactService {
     const root = join(await realpath(parent), `Data-Agent-${version.id}`);
     if (inside(root, this.sessions.get(sessionId).workspace))
       throw new AppError('INVALID_EXPORT', '请选择工作区外的导出目录');
+    // Reserve the final name exclusively. Only a hidden staging directory contains bytes until all hashes pass.
     await mkdir(root, { mode: 0o700 });
-    for (const file of this.list(sessionId).files.filter((file) => file.versionId === versionId)) {
-      const data = await this.verifiedBytes(file),
-        target = join(root, file.relativePath);
-      if (!inside(target, root)) throw new AppError('INVALID_EXPORT', '产物相对路径无效');
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, data, { flag: 'wx', mode: 0o600 });
+    const staging = join(root, `.partial-${randomUUID()}`);
+    await mkdir(staging, { mode: 0o700 });
+    const created: string[] = [];
+    try {
+      for (const file of this.list(sessionId).files.filter(
+        (file) => file.versionId === versionId,
+      )) {
+        const target = join(staging, file.relativePath);
+        if (!inside(target, staging)) throw new AppError('INVALID_EXPORT', '产物相对路径无效');
+        await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+        const handle = await open(target, 'wx', 0o600);
+        try {
+          await this.verifyRead(file, (chunk) => writeAll(handle, chunk));
+          await handle.sync();
+        } finally {
+          await handle.close();
+        }
+      }
+      for (const entry of await readdir(staging)) {
+        const target = join(root, entry);
+        // The root is exclusively allocated above; never intentionally replace an existing path.
+        try {
+          await lstat(target);
+          throw new AppError('EXPORT_CONFLICT', '导出位置出现同名文件');
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+        await rename(join(staging, entry), target);
+        created.push(target);
+      }
+      await rm(staging, { recursive: true });
+    } catch (error) {
+      await rm(staging, { recursive: true, force: true });
+      for (const target of created) await rm(target, { recursive: true, force: true });
+      // Remove only the newly reserved empty directory, never a pre-existing export.
+      const { rmdir } = await import('node:fs/promises');
+      await rmdir(root).catch(() => {});
+      throw error;
     }
     return root;
   }

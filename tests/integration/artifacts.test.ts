@@ -127,3 +127,47 @@ it('P4-VERSIONS preserves earlier bytes and IDs, guards their writes, and export
     'missing',
   );
 });
+
+it('R-EXPORT streams large artifacts in bounded chunks, preserves exports and cleans failed staging', async () => {
+  const { createHash } = await import('node:crypto');
+  const { readVerified } = await import('../../src/main/services/artifacts-io');
+  const { stat } = await import('node:fs/promises');
+  const v = await version(),
+    path = join(v.directory, 'large.bin');
+  const chunk = Buffer.alloc(64 * 1024, 37),
+    hash = createHash('sha256');
+  const handle = await open(path, 'w');
+  try {
+    for (let i = 0; i < 320; i++) {
+      await handle.write(chunk);
+      hash.update(chunk);
+    }
+  } finally {
+    await handle.close();
+  }
+  await artifacts.publish(v.id);
+  const file = artifacts.list(sessionId).files.find((f) => f.versionId === v.id)!;
+  let largest = 0,
+    total = 0;
+  const readHash = createHash('sha256');
+  await readVerified(file, v.directory, async (part) => {
+    largest = Math.max(largest, part.length);
+    total += part.length;
+    readHash.update(part);
+  });
+  expect(largest).toBeLessThanOrEqual(64 * 1024);
+  expect(total).toBe(20 * 1024 * 1024);
+  expect(readHash.digest('hex')).toBe(hash.digest('hex'));
+  const exported = await artifacts.exportVersion(sessionId, v.id, root);
+  expect((await stat(join(exported, 'large.bin'))).size).toBe(total);
+  await expect(artifacts.exportVersion(sessionId, v.id, root)).rejects.toThrow();
+  const broken = await version();
+  await writeFile(join(broken.directory, 'report.md'), 'before');
+  await artifacts.publish(broken.id);
+  await writeFile(join(broken.directory, 'report.md'), 'changed');
+  await expect(artifacts.exportVersion(sessionId, broken.id, root)).rejects.toThrow('变更');
+  await expect(stat(join(root, `Data-Agent-${broken.id}`))).rejects.toMatchObject({
+    code: 'ENOENT',
+  });
+  expect((await stat(join(exported, 'large.bin'))).size).toBe(total);
+});
