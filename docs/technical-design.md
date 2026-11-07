@@ -185,6 +185,8 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 模型 UI 仅开放 DeepSeek/OpenRouter，使用 `/models` 返回 ID 与锁定 pi 聊天模型目录的交集，展示 SDK 能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、Base URL、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
 
+模型设置的 `ModelPicker` 将搜索与选择合为一个入口，使用锁定的 Radix Popover 1.1.15 和 cmdk 1.1.1。弹层内搜索当前提供方的缓存列表（名称/ID），未确认前不改变已保存模型；打开聚焦搜索框，支持键盘移动、输入法确认保护、Escape 和选择后的焦点恢复。弹层按视口避让并限制高度，列表独立滚动，沿用现有主题。目录获取、保存与 IPC 合同不变。
+
 本地真实测试固定：
 
 | 配置             | 值                                  |

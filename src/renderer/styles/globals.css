@@ -653,6 +653,108 @@ summary:focus-visible {
   padding: 5px;
   margin-right: 8px;
 }
+.model-picker {
+  margin: 14px 0;
+}
+.model-picker-trigger {
+  width: 100%;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 400;
+}
+.model-picker-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-picker-popover {
+  z-index: 70;
+  width: var(--radix-popover-trigger-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--radix-popover-content-available-height));
+  display: flex;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 8px 24px #0003;
+}
+.model-picker-popover [cmdk-root] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+.model-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.model-picker-search svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.model-picker-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  padding: 3px;
+}
+.model-picker-popover [cmdk-list] {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0;
+  scroll-padding: 4px;
+}
+.model-picker-empty {
+  padding: 16px 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.model-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.model-picker-option[data-selected='true'] {
+  background: var(--surface-selected);
+}
+.model-picker-option[data-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.model-picker-check {
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+.model-picker-option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.model-picker-option-text small,
+.model-picker-capability {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.model-picker-capability {
+  margin-left: auto;
+  flex-shrink: 0;
+}
 .key-actions {
   display: flex;
   gap: 8px;

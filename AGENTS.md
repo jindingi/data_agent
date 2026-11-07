@@ -59,6 +59,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - 检查 components.json、现有 Radix/shadcn 组件及 globals.css；保留语义 tokens、data-theme 和现有图标体系，不引入第二套主题状态。
 - 文件预览通过已登记 ID 的 Main 接口读取，不传任意路径。SourcePreview 使用固定版本 highlight.js 的显式语言包，仅展示转义后的源码；大文件截断/高亮限制见技术设计，不引入 CSV 解析或代码执行。
 - 明确空态、加载、失败、审批、禁用、hover/focus 的行为；纯图标按钮同时提供可访问名称和 Tooltip。
+- 可搜索模型列表复用 `features/models/ModelPicker`（Radix Popover + cmdk），搜索置于弹层内；保留键盘、输入法和关闭后焦点恢复，不另设常驻搜索框。
 - 校验独立滚动、长 Markdown、局部横滚、焦点恢复和三种窗口尺寸；流式消息不得抢阅读位置。
 - 新会话只打开首页草稿，接收第一条输入后创建正式会话；附件按提交快照清除，不清掉期间新增内容。
 

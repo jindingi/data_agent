@@ -9,6 +9,19 @@ export async function rpc(page, command) {
 export async function snapshot(page, sessionId) {
   return rpc(page, { type: 'runtime.snapshot', sessionId });
 }
+export async function selectModel(page, model) {
+  await page.getByRole('button', { name: '选择模型', exact: true }).click();
+  await page.getByRole('combobox', { name: '搜索模型', exact: true }).fill(model);
+  await page
+    .getByRole('option')
+    .filter({ has: page.getByText(model, { exact: true }) })
+    .click();
+  await page.locator('.model-picker-popover').waitFor({ state: 'hidden' });
+  await until(
+    async () => (await rpc(page, { type: 'models.settings' })).selected.model === model,
+    'model selected',
+  );
+}
 export async function configure(
   page,
   key = 'synthetic-p3-fixture-key',
@@ -22,13 +35,7 @@ export async function configure(
   await page.getByRole('textbox', { name: 'API key', exact: true }).fill(key);
   await page.getByRole('button', { name: '保存凭证', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
-  await page
-    .getByLabel('选择模型', { exact: true })
-    .selectOption(JSON.stringify({ provider, model }));
-  await until(
-    async () => (await rpc(page, { type: 'models.settings' })).selected.model === model,
-    'model selected',
-  );
+  await selectModel(page, model);
   await page.getByRole('button', { name: '关闭对话框' }).click();
 }
 export async function submit(page, text = 'Execute the requested fixture action.') {

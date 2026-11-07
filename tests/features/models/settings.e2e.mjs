@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { startApp, until } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
-import { rpc, configure, submit, settled } from '../../support/desktop.mjs';
+import { rpc, configure, submit, settled, selectModel } from '../../support/desktop.mjs';
 
 export const cases = {
   async 'models.settings'({ dir }) {
@@ -52,9 +52,7 @@ export const cases = {
         (m) => m.provider === 'deepseek' && m.model !== 'deepseek-flash',
       );
       assert(alternate);
-      await page
-        .getByLabel('选择模型')
-        .selectOption(JSON.stringify({ provider: alternate.provider, model: alternate.model }));
+      await selectModel(page, alternate.model);
       await until(
         async () =>
           (await rpc(page, { type: 'models.settings' })).selected.model === alternate.model,
@@ -95,9 +93,7 @@ export const cases = {
       await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
       const basic = (await rpc(page, { type: 'models.settings' })).models.find((m) => !m.reasoning);
       assert(basic);
-      await page
-        .getByLabel('选择模型')
-        .selectOption(JSON.stringify({ provider: basic.provider, model: basic.model }));
+      await selectModel(page, basic.model);
       await until(
         async () => (await rpc(page, { type: 'models.settings' })).selected.model === basic.model,
         'nonreasoning model selected',

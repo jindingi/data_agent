@@ -43,6 +43,8 @@ AI 和日常开发禁止使用 `--no-verify`、`HUSKY=0` 或改 hooksPath 绕过
 
 统一文件预览新增直接依赖 highlight.js 11.11.1，按语言显式导入 core/grammar；职责与大小限制见 [技术设计](technical-design.md)。它不替代 ESLint/Prettier，也不执行预览代码；安全展示及文件访问边界由 `UX-FILE-PREVIEW` 与 `P4-ARTIFACT` 回归。
 
+模型选择器直接依赖固定版本 `@radix-ui/react-popover` 1.1.15 与 `cmdk` 1.1.1，复用弹层定位/焦点和可搜索列表键盘行为；不自建另一套主题或手写完整组合框。`models.connections-ui` 验证搜索空态、选择、键盘/输入法、焦点和三种尺寸的深浅主题布局。
+
 ## 例外与评审规则
 
 - 只允许局部、附原因的规则抑制。本轮保留 async generation counter 在 effect cleanup 中递增的语义：它是失效票据，不是 React DOM ref，不能机械改成捕获旧值。

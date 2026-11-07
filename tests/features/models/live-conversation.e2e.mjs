@@ -1,4 +1,4 @@
-import { openExecutionProcesses } from '../../support/desktop.mjs';
+import { openExecutionProcesses, selectModel } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -72,9 +72,7 @@ async function liveScenario(dir) {
       } finally {
         if (await keyField.isEditable().catch(() => false)) await keyField.fill('').catch(() => {});
       }
-      await page
-        .getByLabel('选择模型')
-        .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
+      await selectModel(page, 'deepseek-flash');
       await page.getByRole('button', { name: '关闭对话框' }).click();
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
 

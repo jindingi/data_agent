@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { startApp, until } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
-import { configure, rpc } from '../../support/desktop.mjs';
+import { configure, rpc, selectModel } from '../../support/desktop.mjs';
 
 async function assertKeyAlignment(page) {
   const alignment = await page.locator('.saved-credential').evaluate((row) => {
@@ -61,10 +61,45 @@ export const cases = {
       fixture.setListingStatus(200);
       await page.getByRole('button', { name: '获取模型列表', exact: true }).click();
       await page.getByRole('status').filter({ hasText: '已获取' }).waitFor();
+      assert.equal(await page.getByLabel('搜索模型', { exact: true }).count(), 0);
+      await page.getByRole('button', { name: '选择模型', exact: true }).click();
       await page.getByLabel('搜索模型', { exact: true }).fill('no-such-model-xyz');
       await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor();
-      assert.equal(await page.getByLabel('选择模型', { exact: true }).count(), 0);
-      await page.getByLabel('搜索模型', { exact: true }).fill('');
+      assert.equal(await page.locator('.model-picker-popover').getByRole('option').count(), 0);
+      await page.getByLabel('搜索模型', { exact: true }).press('Escape');
+      assert(await page.getByRole('dialog', { name: '设置', exact: true }).isVisible());
+      await until(
+        () =>
+          page
+            .getByRole('button', { name: '选择模型', exact: true })
+            .evaluate((el) => el === document.activeElement),
+        'picker focus restored',
+      );
+      await page.getByRole('button', { name: '选择模型', exact: true }).press('Enter');
+      const search = page.getByRole('combobox', { name: '搜索模型', exact: true });
+      await until(
+        () => search.evaluate((el) => el === document.activeElement),
+        'search auto focused',
+      );
+      await search.press('Home');
+      const firstOption = await search.getAttribute('aria-activedescendant');
+      await search.press('ArrowDown');
+      assert.notEqual(await search.getAttribute('aria-activedescendant'), firstOption);
+      await search.press('ArrowUp');
+      assert.equal(await search.getAttribute('aria-activedescendant'), firstOption);
+      await search.fill('DeepSeek-V41-Flash');
+      await search.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true });
+      assert(await page.locator('.model-picker-popover').isVisible());
+      await search.press('Enter');
+      await page.locator('.model-picker-popover').waitFor({ state: 'hidden' });
+      assert.deepEqual((await rpc(page, { type: 'models.settings' })).selected, initial.selected);
+      await until(
+        () =>
+          page
+            .getByRole('button', { name: '选择模型', exact: true })
+            .evaluate((el) => el === document.activeElement),
+        'selection restores focus',
+      );
       await page.getByRole('button', { name: '更换 Key', exact: true }).click();
       await page.getByLabel('API key', { exact: true }).fill('synthetic-unsaved');
       await page.getByLabel('连接提供方', { exact: true }).selectOption('openrouter');
@@ -97,9 +132,7 @@ export const cases = {
         (await rpc(page, { type: 'models.settings' })).endpoints.deepseek,
         fixture.baseUrl,
       );
-      await page
-        .getByLabel('选择模型', { exact: true })
-        .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
+      await selectModel(page, 'deepseek-flash');
       fixture.set({ status: 401, error: 'synthetic-unsaved' });
       await page.getByRole('button', { name: '测试模型连接', exact: true }).click();
       await page.getByRole('alert').filter({ hasText: '鉴权失败' }).waitFor();
@@ -133,6 +166,22 @@ export const cases = {
           await page.getByLabel('已保存 API key', { exact: true }).scrollIntoViewIfNeeded();
           await assertKeyAlignment(page);
           await page.screenshot({ path: join(root, `settings-${width}-${theme}-credential.png`) });
+          await page.getByRole('button', { name: '选择模型', exact: true }).click();
+          const popup = page.locator('.model-picker-popover');
+          const box = await popup.boundingBox();
+          assert(
+            box &&
+              box.x >= 0 &&
+              box.y >= 0 &&
+              box.x + box.width <= width &&
+              box.y + box.height <= height,
+          );
+          assert.equal(await popup.evaluate((el) => el.scrollWidth > el.clientWidth), false);
+          await page.screenshot({
+            path: join(root, `settings-${width}-${theme}-picker.png`),
+            animations: 'disabled',
+          });
+          await page.getByRole('combobox', { name: '搜索模型', exact: true }).press('Escape');
           await page.getByLabel('思考级别', { exact: true }).scrollIntoViewIfNeeded();
           await assertThinkingAlignment(page);
           const reset = page.getByRole('button', { name: '恢复推荐级别', exact: true });
