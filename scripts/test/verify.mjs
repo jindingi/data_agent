@@ -1,3 +1,4 @@
+import { cases as turnUsage } from '../../tests/e2e/turn-usage.mjs';
 import { cases as ux } from '../../tests/e2e/ux.mjs';
 import { cases as filePreview } from '../../tests/e2e/file-preview.mjs';
 import { cases as executionProcess } from '../../tests/e2e/execution-process.mjs';
@@ -78,6 +79,7 @@ function nativeCase(id) {
 }
 const cases = mergeCases(
   executionProcess,
+  turnUsage,
   filePreview,
   ux,
   p0,

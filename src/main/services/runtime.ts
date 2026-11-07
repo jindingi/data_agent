@@ -144,6 +144,11 @@ export class RuntimeService {
       snapshot = {
         ...snapshot,
         activity: null,
+        turnUsage: snapshot.turnUsage?.map((turn) =>
+          turn.status === 'running'
+            ? { ...turn, status: 'interrupted' as const, complete: false }
+            : turn,
+        ),
         interactions: [],
         messages: snapshot.messages.map((message) => ({ ...message, pending: false })),
         tools: snapshot.tools.map((tool) =>
@@ -292,14 +297,16 @@ export class RuntimeService {
     const files = inspectFiles([...existingFiles.map((file) => file.path), ...(input.paths ?? [])]);
 
     let messages: MessageView[] = [];
-    if (session.piSessionId && session.state === 'persisted')
-      messages = (
-        (await this.reader.readHistory(
-          session.sessionFile,
-          session.workspace,
-          session.piSessionId,
-        )) as { messages: MessageView[] }
-      ).messages;
+    let turnUsage: RuntimeSnapshot['turnUsage'] = [];
+    if (session.piSessionId && session.state === 'persisted') {
+      const history = (await this.reader.readHistory(
+        session.sessionFile,
+        session.workspace,
+        session.piSessionId,
+      )) as { messages: MessageView[]; turnUsage?: RuntimeSnapshot['turnUsage'] };
+      messages = history.messages;
+      turnUsage = history.turnUsage ?? [];
+    }
     // A read RPC yields: recheck admission before creating another task for the same session.
     if (this.closing) throw new AppError('QUITTING', '应用正在退出');
     const latest = this.sessions.get(sessionId);
@@ -322,6 +329,7 @@ export class RuntimeService {
         seq: 0,
         state: 'queued',
         messages,
+        turnUsage,
         tools: [],
         inputs: [{ inputId: input.inputId, kind: input.kind, state: 'pending' }],
         queuedInputs: [input],
@@ -371,13 +379,19 @@ export class RuntimeService {
       { id: string; host_epoch: string; state: RuntimeSnapshot['state'] } | undefined;
     if (!run) return null;
     let messages: MessageView[] = [];
+    let turnUsage: RuntimeSnapshot['turnUsage'] = [];
     if (session.state === 'persisted' && session.piSessionId) {
       const history = (await this.reader.readHistory(
         session.sessionFile,
         session.workspace,
         session.piSessionId,
-      )) as { messages: MessageView[]; inputs?: RuntimeSnapshot['inputs'] };
+      )) as {
+        messages: MessageView[];
+        inputs?: RuntimeSnapshot['inputs'];
+        turnUsage?: RuntimeSnapshot['turnUsage'];
+      };
       messages = history.messages;
+      turnUsage = history.turnUsage ?? [];
       this.db.transaction(() => {
         for (const input of history.inputs ?? [])
           if (input.state === 'committed') {
@@ -411,6 +425,7 @@ export class RuntimeService {
       state: run.state,
       messages,
       tools: terminalTools(messages),
+      turnUsage,
       inputs: inputs.map(({ entryId, ...input }) => ({
         ...input,
         ...(entryId ? { entryId } : {}),

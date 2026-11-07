@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '../../components/ui/button';
 import { ExecutionProcess } from './ExecutionProcess';
+import { TurnUsage } from './TurnUsage';
+import type { TurnUsage as Usage } from '../../../shared/usage';
 import { transcriptTurns } from './transcript-turns';
 import type { MessageView, ToolView } from '../../../shared/runtime';
 
@@ -54,11 +56,13 @@ export function Transcript({
   messages,
   tools,
   active = false,
+  turnUsage = [],
 }: {
   sessionId: string;
   messages: MessageView[];
   tools: ToolView[];
   active?: boolean;
+  turnUsage?: Usage[];
 }) {
   const list = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -66,6 +70,10 @@ export function Transcript({
   const [away, setAway] = useState(false);
   const anchor = useRef<{ height: number; top: number } | null>(null);
   const turns = useMemo(() => transcriptTurns(messages), [messages]);
+  const usageMap = useMemo(
+    () => new Map(turnUsage.map((usage) => [usage.inputId, usage])),
+    [turnUsage],
+  );
   const start = first ?? Math.max(0, turns.length - 10);
   useLayoutEffect(() => {
     if (first === null && turns.length) setFirst(Math.max(0, turns.length - 10));
@@ -146,6 +154,14 @@ export function Transcript({
                 .map((message) => (
                   <MessageContent key={message.id} message={message} />
                 ))}
+              {usageMap.has(turn.id) && (
+                <TurnUsage
+                  usage={usageMap.get(turn.id)!}
+                  onInspect={() => {
+                    follow.current = false;
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>

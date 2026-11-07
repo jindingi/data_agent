@@ -1,4 +1,5 @@
 import { RequestBudget } from './request-budget';
+import { TurnUsageLedger } from './turn-usage';
 import { requestEvidence } from './request-evidence';
 import { systemPrompt, currentContext } from './runtime-context';
 import { dirname } from 'node:path';
@@ -55,6 +56,7 @@ export class SessionRuntime {
   private adapter!: EventAdapter;
   private budget = new RequestBudget();
   private requestEvidence: NonNullable<RuntimeSnapshot['requests']> = [];
+  private turnUsage!: TurnUsageLedger;
   private usage: RuntimeSnapshot['usage'];
   private responseModel: string | undefined;
   private redact = <T>(value: T): T => value;
@@ -96,6 +98,7 @@ export class SessionRuntime {
     instance.outputDirectory = config.outputDirectory;
     instance.manager = SessionManager.open(config.file, dirname(config.file), config.workspace);
     instance.identity = new InputIdentity(instance.manager);
+    instance.turnUsage = new TurnUsageLedger(instance.manager);
     instance.adapter = new EventAdapter(config, instance.identity);
     instance.adapter.restore(instance.manager);
     const redact = redactor(config.apiKey);
@@ -230,11 +233,14 @@ export class SessionRuntime {
           instance.identity.snapshot().find((input) => input.inputId === id)?.kind === 'followUp'
         )
           instance.nextOutputInput = id;
+        if (id) instance.turnUsage.begin(id);
         instance.identity.consumed(event.message);
       }
       instance.adapter.accept(redact(event));
       if (event.type === 'turn_end' || event.type === 'agent_settled')
         instance.identity.reconcile();
+      if (['turn_end', 'compaction_end', 'agent_settled'].includes(event.type))
+        instance.turnUsage.refresh();
       if (event.type === 'message_end' && event.message.role === 'assistant') {
         const modelError = '模型请求失败，请检查凭证、网络或模型额度后重试。';
         if (event.message.stopReason === 'error' && !instance.cancelled && !instance.adapter.error)
@@ -269,6 +275,7 @@ export class SessionRuntime {
   snapshot() {
     return this.redact({
       ...this.adapter.snapshot(),
+      turnUsage: this.turnUsage.snapshot(),
       ...(this.outputDirectory ? { outputDirectory: this.outputDirectory } : {}),
       interactions: structuredClone(this.interactions),
       requests: structuredClone(this.requestEvidence),
@@ -306,6 +313,7 @@ export class SessionRuntime {
     }
     if (this.running) throw new AppError('ALREADY_RUNNING', '该会话正在运行，请选择插话或后续提问');
     const text = this.identity.submit(input);
+    this.turnUsage.begin(input.inputId);
     this.running = true;
     this.adapter.state = 'running';
     this.flush();
@@ -327,6 +335,7 @@ export class SessionRuntime {
           : this.cancelled
             ? 'cancelled'
             : 'completed';
+        this.turnUsage.end(this.adapter.state);
         this.flush();
       });
   }

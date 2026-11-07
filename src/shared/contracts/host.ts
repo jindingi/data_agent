@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { turnUsageSchema } from '../usage';
 import {
   inputSchema,
   thinkingLevelSchema,
@@ -85,6 +86,7 @@ export const hostResponseSchema = z.discriminatedUnion('type', [
       piSessionId: z.string(),
       items: z.array(z.object({ id: z.string(), role: z.string(), text: z.string() })),
       messages: z.array(messageSchema),
+      turnUsage: z.array(turnUsageSchema),
       inputs: z.array(
         z.object({ inputId: id, state: z.literal('committed'), entryId: z.string() }),
       ),

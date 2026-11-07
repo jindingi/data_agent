@@ -209,7 +209,11 @@ export const cases = {
       await configure(page);
       fixture.set(
         { status: 400, error: 'overloaded: synthetic temporary provider failure' },
-        { text: 'Recovered after real SDK retry.', delay: 800 },
+        {
+          text: 'Recovered after real SDK retry.',
+          delay: 800,
+          usage: { prompt_tokens: 40, completion_tokens: 20, total_tokens: 60 },
+        },
       );
       const retryId = await submit(page, 'Exercise the SDK retry lifecycle.');
       await page.locator('[data-runtime-activity="retry"]').waitFor({ timeout: 15_000 });
@@ -219,6 +223,9 @@ export const cases = {
       const retried = await settled(page, retryId);
       assert.equal(retried.state, 'completed');
       assert.equal(retried.error, null);
+      assert.equal(retried.turnUsage[0].totalTokens, 60);
+      assert.equal(retried.turnUsage[0].calls, 2);
+      assert.equal(retried.turnUsage[0].complete, false, 'failed request had no usage');
       assert.equal(fixture.requests.length, 2);
       fixture.set(
         { status: 400, error: 'overloaded: stop during retry' },
@@ -240,7 +247,11 @@ export const cases = {
             'PRE_COMPACTION_MARKER\n' + 'Long synthetic context for real compaction. '.repeat(3000),
           usage: { prompt_tokens: 4_000_000, completion_tokens: 100, total_tokens: 4_000_100 },
         },
-        { text: 'COMPACTED_FIXTURE_MEMORY: user requested synthetic history.', delay: 1500 },
+        {
+          text: 'COMPACTED_FIXTURE_MEMORY: user requested synthetic history.',
+          delay: 1500,
+          usage: { prompt_tokens: 40, completion_tokens: 20, total_tokens: 60 },
+        },
       );
       const compactId = await submit(page, 'Create enough synthetic history to compact.');
       await page.locator('[data-runtime-activity="compaction"]').waitFor({ timeout: 15_000 });
@@ -250,6 +261,9 @@ export const cases = {
       );
       const compacted = await settled(page, compactId);
       assert.equal(compacted.state, 'completed');
+      assert.equal(compacted.turnUsage[0].totalTokens, 4_000_160);
+      assert.equal(compacted.turnUsage[0].compactions, 1);
+      assert.equal(compacted.turnUsage[0].complete, true);
       const records = readFileSync(join(root, 'data/sessions', `${compactId}.jsonl`), 'utf8')
         .trim()
         .split('\n')

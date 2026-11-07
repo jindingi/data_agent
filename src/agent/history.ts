@@ -1,4 +1,5 @@
 import { dirname } from 'node:path';
+import { projectTurnUsage } from './turn-usage';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { inspectSessionFile } from '../node/session-integrity';
 import { AppError } from '../shared/errors';
@@ -60,5 +61,11 @@ export function readHistory(file: string, workspace: string, expectedId: string)
       ? [{ inputId: id, state: 'committed' as const, entryId: entry.id }]
       : [];
   });
-  return { piSessionId: manager.getSessionId(), items, messages, inputs };
+  return {
+    piSessionId: manager.getSessionId(),
+    items,
+    messages,
+    inputs,
+    turnUsage: projectTurnUsage(manager.getEntries()),
+  };
 }

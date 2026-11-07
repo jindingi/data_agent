@@ -186,6 +186,7 @@ export function App() {
                 sessionId={sessions.selected!}
                 messages={history}
                 tools={runtime.snapshot?.tools ?? []}
+                turnUsage={runtime.snapshot?.turnUsage ?? []}
                 active={
                   !!runtime.snapshot &&
                   !runtime.snapshot.queuedInputs?.some((input) => input.kind === 'prompt') &&

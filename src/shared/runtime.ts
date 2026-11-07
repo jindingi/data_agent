@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { turnUsageSchema } from './usage';
 import { interactionSchema } from './tools';
 
 export const modelChoiceSchema = z
@@ -112,6 +113,7 @@ export const snapshotSchema = z
         }),
       )
       .optional(),
+    turnUsage: z.array(turnUsageSchema).optional(),
     usage: z
       .object({
         input: z.number(),
