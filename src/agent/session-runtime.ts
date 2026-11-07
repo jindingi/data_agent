@@ -68,6 +68,7 @@ export class SessionRuntime {
     publish: (snapshot: RuntimeSnapshot) => void,
     dependencies?: {
       runtime?: ModelRuntime;
+      fetch?: typeof fetch;
       tools?: ToolExecutor;
       onRequest?: (payload: unknown) => void;
       onContext?: (event: ContextEvent) => void;
@@ -212,6 +213,7 @@ export class SessionRuntime {
       const [selectedModel, context, options] = args;
       return stream(selectedModel, context, {
         ...options,
+        ...(dependencies?.fetch ? { fetch: dependencies.fetch } : {}),
         maxTokens: Math.min(options?.maxTokens ?? 16_384, 16_384),
       });
     };

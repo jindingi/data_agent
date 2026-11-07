@@ -183,7 +183,7 @@ tools 使用明确名称白名单，customTools 提供受控实现；`tools: []`
 
 ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；SettingsManager、模型配置、agentDir、session 文件均显式指定，避免读取 workspace/global `.pi` 的任意扩展与配置。分析 skills 指导 Agent 自主写脚本，而不是把业务步骤固定为工具 API。
 
-模型 UI 使用 pi 可用的 API-key provider/model 清单，展示能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、Base URL、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
+模型 UI 仅开放 DeepSeek/OpenRouter，使用 `/models` 返回 ID 与锁定 pi 聊天模型目录的交集，展示 SDK 能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、Base URL、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
 
 本地真实测试固定：
 
@@ -324,11 +324,20 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 
 ## 模型连接设置（2026-11-07）
 
-- `features/models/ModelSettings` 管理立即保存的默认模型和思考级别；`ProviderConnection` 管理独立的提供方连接，切换连接提供方不切换默认模型。支持搜索、提供方分组、已配置优先和无结果状态。设置固定标题/关闭区域，正文独立滚动。
-- 连接保存是显式操作。`models.connection` 通过 Main 校验 Base URL；只允许 HTTPS 或本机 HTTP，禁止地址内凭证、query 和 fragment。空字符串表示 SDK 内置地址。所有内置模型保留原来的 API 协议，不将 Anthropic/Google 强制转成 OpenAI 格式。
+- `ProviderConnection` 按提供方 → Base URL → Key → 获取模型 → 选择模型组织设置，只有 DeepSeek/OpenRouter；其内嵌 `ModelSettings` 搜索当前提供方列表并立即保存模型/思考级别。切换提供方本身不改默认模型；连接编辑未保存时禁止选模型或探测。未获取列表、列表为空、搜索无匹配、刷新失败分别显示；设置固定标题/关闭区域，正文独立滚动。
+- 连接保存是显式操作。`models.connection` 通过 Main 校验 Base URL；只允许 HTTPS 或本机 HTTP，禁止地址内凭证、query 和 fragment。空字符串表示 SDK 内置地址。模型沿用 SDK 对对应提供方的 API 适配，`openai-completions` / `openai-responses` 是协议而非产品中的提供方。
 - `app_metadata` 的 `endpoint.{provider}` 保存可选覆盖地址，`credential.{provider}` 仍存 safeStorage 密文。两者在 SQLite 单事务内保存；地址变更（包括恢复默认）要求重新输入 Key，失败全部回滚。旧数据库无 endpoint 键时自然使用内置地址，无需表结构迁移；移除凭证保留地址，重启不会恢复未保存的草稿。
 - Renderer 根据配置存在性显示固定八位遮罩，不请求已保存密钥。更换/显示/隐藏仅作用于新输入；提供方草稿存在 SettingsDialog 内存中，切换模型、提供方或关闭弹窗不丢失，退出应用后清除。移除凭证需明确确认其提供方级别影响。
 - `models.test` 使用已保存的 Key/地址及指定的内置模型，在诊断 Host 中创建独立临时 ModelRuntime，经实际 SDK 发一条 `Reply with OK.` 请求，无会话、工具、文件或持久化结果；输出上限 32，超时 20 秒、禁用重试，Host 同时只接受一次测试。错误分类为鉴权、地址/模型不存在、限流/额度、HTTP 响应、网络/协议及超时；不向 Renderer 转发原始服务端错误正文。连接成功以 pi SDK 首个非空 text/thinking delta 为准，立即 abort 并清理计时器，不等待完整生成或最终 usage/DONE；HTTP 200、role-only 帧不算成功。20 秒内无响应与已连接但无有效内容分别提示，503 明确提示服务繁忙。成功只代表收到有效模型内容，不等于完整生成或工具/思考兼容性验收，测试用量不计入任何会话轮次。
 - `system.ping` 明确标为“检查本地引擎”，与模型连接测试分开。普通自动化仍强制使用隔离 loopback 模型地址，不能因连接测试访问线上提供方。
 - 推荐思考级别为产品默认值，并非 SDK/模型提供方保证：DeepSeek 优先 high；其他模型若支持 medium 则用 medium，否则使用支持的最低非 off 级别或 off。已有按 provider/model 保存的显式选择优先；可恢复推荐值。可用级别仍唯一来自锁定 SDK 的 `getSupportedThinkingLevels`，不同模型同名级别不代表相同预算。
 - Base URL 与 Key/模型/级别一起在提交预检时快照，排队后修改设置不改变原任务。后续新任务才应用新设置；不改写会话上下文、工具或历史消息。连接测试自身不参加会话队列。
+
+### 动态模型目录与连接迁移
+
+- `src/shared/providers.ts` 是产品提供方允许清单和默认地址的唯一入口。Agent 的 `models.list` 只返回这两个提供方的 SDK 元数据用于能力校验，不是对外 `/models` 结果。Main `models.discover` 用已保存的密钥请求 `${baseUrl}/models`；列表读取不消耗生成 token，但不保证该 Key 有权调用每个模型。OpenRouter 的地区、额度、账户偏好等限制仍以实际生成请求为准。
+- `model-discovery.ts` 限定 20 秒、8 MB、10,000 条，禁止重定向和原始错误正文透传；只保留 SDK 认识的聊天模型，排除明确不支持 tools、非文本输出和 `:batch` 模型。不根据名字猜未知模型的能力，不悄悄退回全部静态列表。失败保留同一连接上次成功列表和更新时间；更换/移除 Key 或改变地址会立即失效旧列表。保存失败仍保留表单草稿；保存成功但发现失败可用“获取模型列表”重试。
+- SQLite `app_metadata` 的 `catalog.{provider}` 存 `{ids, fetchedAt}`，`connectionRevision.{provider}` 存配置修订号；不存凭证摘要或响应正文。无需改变表结构。重启用缓存 ID 与当前 SDK 重新求交集，损坏缓存要求重新获取；无旧缓存的升级用户需获取一次列表。发送/选择都校验所选模型仍在当前连接列表中，失败不创建新运行。并发发现采用配置修订号和请求票据，过期结果不能覆盖新配置/新列表。
+- 启动时清理已退役提供方的 credential/endpoint/catalog/connectionRevision/thinking 元数据；退役的默认提供方回到 DeepSeek，要求配置后再使用。不删除 JSONL、会话、报告或工作区；历史模型名称仍可阅读。
+- Main 发现和 UtilityProcess 的探测/正式 SDK 请求使用 Electron `net.fetch`，遵循系统代理，禁用 Cookie 和 HTTP 缓存；生产不读取 shell key/proxy。SDK 的工具、上下文、请求序列化和原生会话格式不变。403 明确提示地区/权限受限，区别于 401 Key 鉴权失败。
+- API 依据：[DeepSeek List Models](https://api-docs.deepseek.com/api/list-models)、[OpenRouter Models](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)、[Electron net](https://www.electronjs.org/docs/latest/api/net)。DeepSeek 的实际 `/models` 响应与 OpenRouter 文档/实测共同验证接口；这些协议资料不代表逐模型产品验收。

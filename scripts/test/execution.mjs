@@ -81,6 +81,7 @@ export async function execute(plan, dir, onResult) {
         args.push('-t', items.map((item) => `(?:^| )${escaped(item.id)} `).join('|'));
       const env = { ...process.env };
       delete env.DEEPSEEK_API_KEY;
+      delete env.OPENROUTER_API_KEY;
       env.DATA_AGENT_TEST_MODEL_MODE = 'none';
       const native = level === 'integration';
       if (native) env.ELECTRON_RUN_AS_NODE = '1';

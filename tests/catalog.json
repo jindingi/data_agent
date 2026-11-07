@@ -928,5 +928,25 @@
     "environment": "built",
     "tags": [],
     "related": []
+  },
+  {
+    "id": "models.live-openrouter",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/live-connection.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.discovery-store",
+    "feature": "models",
+    "level": "integration",
+    "file": "tests/features/models/runtime-service.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["conversation"]
   }
 ]

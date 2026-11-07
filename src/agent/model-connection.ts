@@ -4,11 +4,14 @@ import { normalizeEndpoint } from '../shared/model-configuration';
 import { createModelRuntime } from './models';
 
 /** One bounded, isolated SDK request. No conversation, tools, files, or persisted response. */
-export async function testModelConnection(config: {
-  model: ModelChoice;
-  apiKey: string;
-  baseUrl?: string;
-}): Promise<number> {
+export async function testModelConnection(
+  config: {
+    model: ModelChoice;
+    apiKey: string;
+    baseUrl?: string;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<number> {
   const started = Date.now();
   const controller = new AbortController();
   const { signal } = controller;
@@ -34,7 +37,7 @@ export async function testModelConnection(config: {
         maxRetries: 0,
         timeoutMs: 20_000,
         fetch: async (input, init) => {
-          const response = await fetch(input, init);
+          const response = await fetcher(input, init);
           status = response.status;
           return response;
         },
@@ -61,8 +64,12 @@ export async function testModelConnection(config: {
         );
       throw new AppError('MODEL_TIMEOUT', '20 秒内未收到服务响应，请检查网络或 Base URL');
     }
-    if (status === 401 || status === 403)
-      throw new AppError('MODEL_AUTH', '鉴权失败，请检查 API key 及模型访问权限');
+    if (status === 401) throw new AppError('MODEL_AUTH', '鉴权失败，请检查 API key');
+    if (status === 403)
+      throw new AppError(
+        'MODEL_FORBIDDEN',
+        '模型访问被拒绝（HTTP 403），请检查地区限制或模型权限；不一定是 Key 错误',
+      );
     if (status === 404)
       throw new AppError('MODEL_NOT_FOUND', '地址或模型不存在，请检查 Base URL 和模型名称');
     if (status === 429) throw new AppError('MODEL_RATE_LIMIT', '提供方限流或额度不足，请稍后重试');

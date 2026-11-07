@@ -1,6 +1,8 @@
 import { useId, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ModelController } from './use-model-settings';
 import { normalizeEndpoint } from '../../../shared/model-configuration';
+import { PROVIDERS, providerDefinition } from '../../../shared/providers';
+import { ModelSettings } from './ModelSettings';
 import { Button } from '../../components/ui/button';
 import { request } from '../../lib/desktop';
 
@@ -22,27 +24,37 @@ export function ProviderConnection({
   const { value, busy, change } = controller;
   const savedKeyId = useId();
   const [provider, setProvider] = useState(value?.selected.provider ?? 'deepseek');
-  const [testModel, setTestModel] = useState('');
   const [visible, setVisible] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [testing, setTesting] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const models = value?.models.filter((m) => m.provider === provider) ?? [];
-  const model =
-    models.find((m) => m.model === testModel) ??
-    models.find((m) => m.model === value?.selected.model) ??
-    models[0];
+  const model = models.find(
+    (m) => m.provider === value?.selected.provider && m.model === value?.selected.model,
+  );
   const configured = value?.configuredProviders.includes(provider) ?? false;
   const savedEndpoint = value?.endpoints[provider] ?? '';
   const draft = drafts[provider] ?? { key: '', baseUrl: savedEndpoint, editing: false };
   const dirty = !!draft.key || draft.baseUrl !== savedEndpoint;
-  const locked = busy || testing;
-  const providers = [...new Set(value?.models.map((m) => m.provider))].sort(
-    (a, b) =>
-      Number(value?.configuredProviders.includes(b)) -
-        Number(value?.configuredProviders.includes(a)) || a.localeCompare(b),
-  );
+  const locked = busy || testing || discovering;
+  const providers = PROVIDERS.map((p) => p.id);
+  const definition = providerDefinition(provider);
+  async function discover() {
+    setDiscovering(true);
+    setNotice('');
+    try {
+      const result = await change({ type: 'models.discover', provider: definition.id });
+      if (result)
+        setNotice(
+          `已获取 ${result.catalogs[provider]?.count ?? 0} 个兼容模型。获取列表不代表连接测试通过。`,
+        );
+      return result;
+    } finally {
+      setDiscovering(false);
+    }
+  }
   function update(patch: Partial<ConnectionDraft>) {
     setDrafts((all) => ({ ...all, [provider]: { ...draft, ...patch } }));
     setNotice('');
@@ -71,7 +83,9 @@ export function ProviderConnection({
       });
       if (result) {
         reset();
-        setNotice('API key 已保存，连接尚未测试');
+        const discovered = await discover();
+        if (discovered) setNotice('API key 已保存，模型列表已更新，请选择模型。');
+        else setNotice('API key 已保存，获取模型列表失败，请重试。');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败');
@@ -99,7 +113,9 @@ export function ProviderConnection({
   return (
     <section className="settings-section model-settings" aria-labelledby="provider-heading">
       <h3 id="provider-heading">提供方连接</h3>
-      <p>管理连接不会切换默认模型。地址与凭证需手动保存；未保存的编辑在本次应用运行期间保留。</p>
+      <p>
+        先选择提供方，配置地址与 Key，再获取模型列表。选择模型后用于新任务，已运行或排队的任务不变。
+      </p>
       <label>
         提供方
         <select
@@ -108,7 +124,6 @@ export function ProviderConnection({
           value={provider}
           onChange={(e) => {
             setProvider(e.target.value);
-            setTestModel('');
             setVisible(false);
             setNotice('');
             setError('');
@@ -132,16 +147,14 @@ export function ProviderConnection({
           aria-label="API Base URL"
           disabled={locked}
           value={draft.baseUrl}
-          placeholder={model?.baseUrl || '使用内置地址'}
+          placeholder={definition.baseUrl}
           onChange={(e) => update({ baseUrl: e.target.value })}
           autoComplete="off"
           spellCheck={false}
         />
       </label>
       <div className="connection-endpoint">
-        <span>
-          内置地址：{model?.baseUrl || '由提供方 SDK 决定'} · 协议：{model?.api || '内置协议'}
-        </span>
+        <span>默认地址：{definition.baseUrl}</span>
         <Button
           size="sm"
           variant="ghost"
@@ -252,25 +265,34 @@ export function ProviderConnection({
         </div>
       )}
       {!value?.encryptionAvailable && <p role="alert">系统安全存储不可用，无法保存凭证。</p>}
-      <label>
-        测试模型
-        <select
-          aria-label="测试模型"
-          value={model?.model ?? ''}
-          disabled={locked}
-          onChange={(e) => {
-            setTestModel(e.target.value);
-            setNotice('');
-            setError('');
-          }}
-        >
-          {models.map((m) => (
-            <option key={m.model} value={m.model}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={locked || dirty || !configured}
+        onClick={() => void discover()}
+      >
+        {discovering ? '正在获取模型列表…' : '获取模型列表'}
+      </Button>
+      {value?.catalogs[provider] ? (
+        <>
+          <p>
+            模型列表更新于 {new Date(value.catalogs[provider].fetchedAt).toLocaleString()}
+            。仅展示接口返回且 SDK 支持的聊天/工具模型，未逐一验证。
+          </p>
+          {models.length ? (
+            <ModelSettings
+              key={provider}
+              controller={controller}
+              provider={provider}
+              disabled={locked || dirty}
+            />
+          ) : (
+            <p role="status">当前地址没有与 SDK 兼容的模型，请检查地址或更新 SDK。</p>
+          )}
+        </>
+      ) : (
+        <p>保存凭证并获取列表后，可选择模型。</p>
+      )}
       <p>
         收到有效模型内容即结束探测，最多等待 20 秒，输出上限 32 token。
         可能产生少量费用，不发送会话或文件。
@@ -278,7 +300,7 @@ export function ProviderConnection({
       <Button
         size="sm"
         variant="outline"
-        disabled={locked || dirty || !configured}
+        disabled={locked || dirty || !configured || !model}
         onClick={() => void test()}
       >
         {testing ? '正在测试模型…' : '测试模型连接'}

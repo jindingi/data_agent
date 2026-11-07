@@ -4,7 +4,10 @@ import type { CommandInput } from '../../../shared/contracts/ipc';
 import { request } from '../../lib/desktop';
 type Change = Extract<
   CommandInput,
-  { type: 'models.select' | 'models.thinking' | 'models.key' | 'models.connection' }
+  {
+    type:
+      'models.select' | 'models.thinking' | 'models.key' | 'models.connection' | 'models.discover';
+  }
 >;
 /** One owner for both the composer and settings dialog; changes are serialized. */
 export function useModelSettings() {

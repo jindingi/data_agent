@@ -134,6 +134,11 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   const sentinel = 'sk-synthetic-credential-do-not-persist';
   credentials.saveConnection('deepseek', 'https://first.example/v1/', sentinel);
   expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');
+  await credentials.discover(
+    'deepseek',
+    undefined,
+    async () => new Response(JSON.stringify({ data: [{ id: 'deepseek-flash' }] })),
+  );
   expect(() => credentials.saveConnection('deepseek', 'https://second.example/v1')).toThrow(
     '重新输入',
   );
@@ -177,4 +182,68 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   expect(JSON.stringify(events)).not.toContain(sentinel);
   credentials.save('deepseek', '');
   expect(credentials.settings().configuredProviders).toEqual([]);
+});
+
+it('models.discovery-store discovered catalogs persist, retire unsupported keys and invalidate stale connection results', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'data-agent-catalog-'));
+  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+  const db = openDatabase(join(root, 'state.sqlite'));
+  cleanups.push(() => {
+    db.close();
+  });
+  const encryption = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(value),
+    decryptString: (value: Buffer) => value.toString(),
+  };
+  const catalog = [
+    {
+      provider: 'deepseek',
+      model: 'deepseek-flash',
+      name: 'DeepSeek',
+      reasoning: true,
+      vision: false,
+      verified: true,
+      thinkingLevels: ['off', 'high'] as ('off' | 'high')[],
+    },
+  ];
+  const credentials = new CredentialService(db, encryption);
+  db.prepare('INSERT INTO app_metadata VALUES (?,?)').run('credential.openai', 'retired');
+  db.prepare('INSERT INTO app_metadata VALUES (?,?)').run(
+    'model.selected',
+    JSON.stringify({ provider: 'openai', model: 'retired' }),
+  );
+  credentials.setCatalog(catalog);
+  expect(credentials.selected().provider).toBe('deepseek');
+  expect(credentials.settings().configuredProviders).toEqual([]);
+  expect(() => credentials.save('openai', 'key')).toThrow('仅支持');
+  credentials.save('deepseek', 'synthetic');
+  expect(credentials.settings().models).toEqual([]);
+  expect(() => credentials.select(catalog[0])).toThrow('获取模型列表');
+  const list = async () =>
+    new Response(JSON.stringify({ data: [{ id: 'deepseek-flash' }, { id: 'unknown' }] }));
+  await credentials.discover('deepseek', undefined, list);
+  expect(credentials.settings().models).toEqual(catalog);
+  credentials.select(catalog[0]);
+  const restored = new CredentialService(db, encryption);
+  restored.setCatalog(catalog);
+  expect(restored.settings().models).toEqual(catalog);
+  let respond!: (value: Response) => void;
+  const pending = credentials.discover(
+    'deepseek',
+    undefined,
+    () =>
+      new Promise((resolve) => {
+        respond = resolve;
+      }),
+  );
+  credentials.saveConnection('deepseek', 'https://new.example/v1', 'synthetic-new');
+  expect(credentials.settings().models).toEqual([]);
+  respond(await list());
+  await expect(pending).rejects.toMatchObject({ code: 'CONNECTION_CHANGED' });
+  expect(credentials.settings().models).toEqual([]);
+  await credentials.discover('deepseek', undefined, list);
+  credentials.save('deepseek', '');
+  expect(credentials.settings().models).toEqual([]);
+  expect(credentials.settings().catalogs).toEqual({});
 });

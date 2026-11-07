@@ -15,7 +15,7 @@
 - 产品是支持数据分析的通用 AI 工作台，保证外围流程与交互，不保证 Agent 的代码、方法或分析结论正确。
 - CSV 由选择器取得原文件路径；只校验路径、存在性、每文件和单次选用总量均不超过 100,000,000 bytes。不做 CSV 解析、编码转换、表格预览、内容复制或文件版本管理；允许按文件 ID 有界读取 UTF-8 原始文本供只读预览。
 - 使用通用工具与内置 skills，不新增 inspect_csv 等产品专用解析工具。首版仅内置 Python 库，不允许安装额外依赖。
-- pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。支持 pi 内置模型、BYOK 与内置提供方的 Base URL 覆盖；修改地址必须重新输入凭证。自定义提供方/模型清单与用户 skills 后置。
+- pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。只开放 DeepSeek / OpenRouter 的 BYOK 与 Base URL 覆盖；先保存地址/凭证，再通过 `/models` 获取与锁定 SDK 聊天模型目录的交集。修改地址必须重新输入凭证，修改连接清除缓存列表。自定义提供方/未知模型与用户 skills 后置。
 - 两个会话可同时运行，其余 FIFO；同会话 steer/follow-up 由 pi 队列处理。关闭窗口继续任务，Cmd+Q 停止全部并保存。
 
 ## 架构与目录
@@ -92,7 +92,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - 正式测试使用合成 fixture、独立 userData/业务目录，通过真实 CDP 点击、键盘、滚动及状态/存储断言；mock 模型可用于确定性分支，不能替代规定的 live 用例。
 - UI 修复要看实际截图和阅读尾部、焦点、滚动行为；按钮存在或截图成功生成不等于体验通过。仅文档改动运行静态/链接检查，不启动无关 live/打包测试。
 - 程序验证看工作台流程与交付（例如 report.md 存在且非空）；分析准确性由独立 LLM-as-a-judge 评价。UX 视觉评审另记，三者不能互相冒充。
-- Live 使用 `DEEPSEEK_API_KEY`、显示模型 DeepSeek-V41-Flash、API model `deepseek-flash`；复用 `scripts/test/live-key.mjs` 读取环境或 `.zshrc` 字面量，禁止 source 整份 shell 文件。生产 BYOK 不读取 shell。预算/审批/失败分类见开发计划。
+- Live 使用 `DEEPSEEK_API_KEY`、显示模型 DeepSeek-V41-Flash、API model `deepseek-flash`；复用 `scripts/test/live-key.mjs` 读取环境或 `.zshrc` 字面量，禁止 source 整份 shell 文件。OpenRouter 连通性用 `OPENROUTER_API_KEY` 和 `models.live-openrouter` 单独测试；不能拿公共模型列表成功冒充鉴权/模型可用。生产 BYOK 不读取 shell。预算/审批/失败分类见开发计划。
 - 缺凭证、网络失败、缺测试、skip/todo 不算通过；报告实际范围和限制，不无限重试直到偶然通过。
 
 ## 文档、Git 与工具

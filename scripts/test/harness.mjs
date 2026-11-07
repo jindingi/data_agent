@@ -1,3 +1,4 @@
+import { serveModelListing } from '../../tests/support/model/listing.mjs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
@@ -50,7 +51,8 @@ export async function startApp(
   // A missing fixture must never accidentally use the real provider in ordinary regression.
   let deniedModel;
   if (automation && !testModelBaseUrl && process.env.DATA_AGENT_TEST_MODEL_MODE !== 'live') {
-    deniedModel = createHttpServer((_request, response) => {
+    deniedModel = createHttpServer((request, response) => {
+      if (serveModelListing(request, response)) return;
       response.writeHead(400);
       response.end('Unexpected model request: configure a scripted or replay fixture.');
     });
@@ -88,6 +90,7 @@ export async function startApp(
   if (automation && pickDirectory) env.DATA_AGENT_TEST_PICK_DIRECTORY = pickDirectory;
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.DEEPSEEK_API_KEY;
+  delete env.OPENROUTER_API_KEY;
   const logFile = join(root, 'electron.log');
   const fd = openSync(logFile, 'a');
   // Test-only OS network denial; the product itself never uses sandbox-exec.

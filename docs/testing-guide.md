@@ -134,3 +134,10 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 连接探测还覆盖“首段内容已到达，但服务端始终不发结束事件”的流：收到非空内容即通过并 abort，避免把等不到 DONE 误报为连接失败；只收到空帧不能通过。虚拟时钟验证无响应/首内容等待的 20 秒超时分类与计时器清理。CDP 对三种尺寸和深浅主题断言“更换 Key”与输入框中心差不超过 1 px，并保存凭证区域截图。
 
 `pnpm test -- --case models.live-connection --live` 仅运行一次真实 DeepSeek 设置页探测，使用 `live-key.mjs` 读取测试 Key，不创建会话、不发文件、不自动重试、不保留原始响应。它独立于录制重放与普通回归；服务端不可用时如实失败，不改为 skip 或反复重试取绿。
+
+### 动态模型目录与 OpenRouter
+
+- `models.configuration` 覆盖 `/models` schema、类型/工具过滤、未知提供方排除与脱敏错误；`models.discovery-store` 覆盖 SQLite 缓存恢复、连接修订竞态、清理退役凭证及连接变更后的列表失效。`models.connections-ui` 覆盖 provider-first 表单、保存后获取、获取失败与重试、只显示支持提供方、草稿保留、遮罩、尺寸/主题和滚动；`models.settings` 覆盖选模型、级别、下一轮配置与重启。
+- `tests/support/model/listing.mjs` 是明确的合成目录响应，普通 scripted/replay/拒绝模型服务器仅对 `GET /v1/models` 返回此列表。重放的 POST 请求哈希/原始响应校验不变，目录设置不计入录制中的模型调用次数，不能把它说成线上目录录制或真实鉴权。普通 runner 同时移除 DeepSeek/OpenRouter 环境密钥。
+- `pnpm test -- --case models.live-connection,models.live-openrouter --live` 使用真实设置/IPC/SDK，各做一次短探测（另有目录 GET）。OpenRouter 测试密钥为 `OPENROUTER_API_KEY`，只从环境或 `.zshrc` 字面量读取；默认测试模型 `deepseek/deepseek-v4.1-flash`，不自动遍历模型直到通过。成功只证明此组合当前连通，失败不计为通过。
+- 所有 UI 测试使用隔离、后台隐藏窗口。模型网络栈变更需运行普通全量回归，以验证实际工具、前缀和重放链路未变。

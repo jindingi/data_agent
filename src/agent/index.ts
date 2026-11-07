@@ -1,3 +1,4 @@
+import { net } from 'electron';
 import { hostRequestSchema } from '../shared/contracts/host';
 import { readHistory } from './history';
 import { AppError } from '../shared/errors';
@@ -5,6 +6,15 @@ import { SessionRuntime } from './session-runtime';
 import { createModelRuntime, modelCatalog } from './models';
 import { testModelConnection } from './model-connection';
 import { ToolClient } from './tool-client';
+
+// Use the same system proxy as Main model discovery, without cookies or cached responses.
+const modelFetch: typeof fetch = (input, init) =>
+  net.fetch(input instanceof URL ? input.href : input, {
+    ...init,
+    credentials: 'omit',
+    cache: 'no-store',
+    redirect: 'error',
+  });
 
 // This entry is deliberately independent from Main and Renderer implementations.
 const parent = (
@@ -53,7 +63,7 @@ parent.on('message', ({ ports }) => {
           if (testing) throw new AppError('TEST_BUSY', '连接测试正在进行');
           testing = true;
           try {
-            const elapsedMs = await testModelConnection(request);
+            const elapsedMs = await testModelConnection(request, modelFetch);
             port.postMessage({ type: 'model.tested', id: request.id, elapsedMs });
           } finally {
             testing = false;
@@ -67,7 +77,7 @@ parent.on('message', ({ ports }) => {
             runtime = await SessionRuntime.create(
               request.config,
               (snapshot) => port.postMessage({ type: 'runtime.event', snapshot }),
-              { tools },
+              { tools, fetch: modelFetch },
             );
             await runtime.submit(request.input);
             port.postMessage({ type: 'accepted', id: request.id });

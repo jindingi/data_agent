@@ -98,6 +98,13 @@ export const commandSchema = z.discriminatedUnion('type', [
   z
     .object({
       ...base,
+      type: z.literal('models.discover'),
+      provider: z.enum(['deepseek', 'openrouter']),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
       type: z.literal('models.connection'),
       provider: z.string().min(1).max(100),
       baseUrl: z.string().max(2048),
@@ -267,6 +274,7 @@ export interface CommandResponses {
   'system.info': SystemInfo;
   'system.ping': { type: 'pong'; id: string; text: string; pid: number };
   'models.settings': ModelSettings;
+  'models.discover': ModelSettings;
   'models.connection': ModelSettings;
   'models.test': { elapsedMs: number };
   'models.select': ModelSettings;

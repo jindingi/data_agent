@@ -1,3 +1,5 @@
+import { PROVIDERS, providerDefinition } from '../../shared/providers';
+import { discoverModelIds } from './model-discovery';
 import type Database from 'better-sqlite3';
 import { normalizeEndpoint, recommendedThinking } from '../../shared/model-configuration';
 import { AppError } from '../../shared/errors';
@@ -18,12 +20,27 @@ interface Encryption {
 /** Only Main decrypts saved BYOK. Renderer receives presence metadata, never saved keys. */
 export class CredentialService {
   private models: ModelOption[] = [];
+  private discoveryTickets = new Map<string, number>();
   constructor(
     private db: Database.Database,
     private encryption: Encryption,
   ) {}
   setCatalog(models: ModelOption[]) {
-    this.models = models;
+    this.models = models.filter((m) => PROVIDERS.some((p) => p.id === m.provider));
+    // Retire unsupported connection metadata without touching session history or artifacts.
+    this.db.transaction(() => {
+      for (const row of this.db.prepare('SELECT key FROM app_metadata').all() as {
+        key: string;
+      }[]) {
+        const match = /^(credential|endpoint|catalog|connectionRevision)\.(.+)$/.exec(row.key);
+        const thinking = /^thinking\.([^/]+)\//.exec(row.key);
+        const provider = match?.[2] ?? thinking?.[1];
+        if (provider && !PROVIDERS.some((p) => p.id === provider))
+          this.db.prepare('DELETE FROM app_metadata WHERE key=?').run(row.key);
+      }
+      const selected = this.selected();
+      this.set('model.selected', JSON.stringify(selected));
+    })();
   }
   private get(key: string) {
     return (
@@ -40,7 +57,9 @@ export class CredentialService {
   }
   selected(): ModelChoice {
     try {
-      return modelChoiceSchema.parse(JSON.parse(this.get('model.selected') || 'null'));
+      const model = modelChoiceSchema.parse(JSON.parse(this.get('model.selected') || 'null'));
+      providerDefinition(model.provider);
+      return model;
     } catch {
       return DEFAULT_MODEL;
     }
@@ -48,14 +67,25 @@ export class CredentialService {
   settings(): ModelSettings {
     return {
       thinkingLevel: this.thinking(),
-      endpoints: Object.fromEntries(
-        [...new Set(this.models.map((model) => model.provider))].map((provider) => [
-          provider,
-          this.endpoint(provider) ?? '',
-        ]),
-      ),
+      endpoints: Object.fromEntries(PROVIDERS.map(({ id }) => [id, this.endpoint(id) ?? ''])),
       selected: this.selected(),
-      models: this.models,
+      models: this.availableModels(),
+      catalogs: Object.fromEntries(
+        PROVIDERS.flatMap(({ id }) => {
+          const cache = this.catalog(id);
+          return cache
+            ? [
+                [
+                  id,
+                  {
+                    fetchedAt: cache.fetchedAt,
+                    count: this.availableModels().filter((m) => m.provider === id).length,
+                  },
+                ],
+              ]
+            : [];
+        }),
+      ),
       configuredProviders: this.db
         .prepare("SELECT key FROM app_metadata WHERE key LIKE 'credential.%'")
         .all()
@@ -65,7 +95,13 @@ export class CredentialService {
   }
   validate(model: ModelChoice) {
     if (!this.models.some((item) => item.provider === model.provider && item.model === model.model))
-      throw new AppError('UNKNOWN_MODEL', '所选模型不在内置模型列表中');
+      throw new AppError('UNKNOWN_MODEL', '所选模型不受当前 SDK 支持');
+    if (!this.get(`credential.${model.provider}`))
+      throw new AppError('MISSING_KEY', '请在设置中配置所选模型提供方的 API key');
+    if (
+      !this.availableModels().some((m) => m.provider === model.provider && m.model === model.model)
+    )
+      throw new AppError('MODEL_LIST_REQUIRED', '请先获取模型列表并选择可用模型');
   }
   thinking(model = this.selected()): ThinkingLevel {
     const levels = this.models.find(
@@ -99,36 +135,81 @@ export class CredentialService {
     return this.settings();
   }
   save(provider: string, key: string) {
-    if (!this.models.some((model) => model.provider === provider))
-      throw new AppError('UNKNOWN_PROVIDER', '不支持此模型提供方');
+    providerDefinition(provider);
     if (!key.trim()) {
+      this.invalidateCatalog(provider);
       this.db.prepare('DELETE FROM app_metadata WHERE key=?').run(`credential.${provider}`);
       return this.settings();
     }
     if (!this.encryption.isEncryptionAvailable())
       throw new AppError('KEYCHAIN_UNAVAILABLE', '系统安全存储不可用，无法保存 API key');
-    this.set(
-      `credential.${provider}`,
-      this.encryption.encryptString(key.trim()).toString('base64'),
-    );
+    const encrypted = this.encryption.encryptString(key.trim()).toString('base64');
+    this.db.transaction(() => {
+      this.invalidateCatalog(provider);
+      this.set(`credential.${provider}`, encrypted);
+    })();
     return this.settings();
   }
   endpoint(provider: string): string | undefined {
     return this.get(`endpoint.${provider}`) || undefined;
   }
   saveConnection(provider: string, baseUrl: string, key?: string) {
-    if (!this.models.some((model) => model.provider === provider))
-      throw new AppError('UNKNOWN_PROVIDER', '不支持此模型提供方');
+    providerDefinition(provider);
     const endpoint = baseUrl.trim() ? normalizeEndpoint(baseUrl) : '';
     if (endpoint !== (this.endpoint(provider) ?? '') && !key?.trim())
       throw new AppError('ENDPOINT_KEY_REQUIRED', '修改地址时请重新输入此地址使用的 API key');
     this.db.transaction(() => {
       if (key !== undefined) this.save(provider, key);
+      if (endpoint !== (this.endpoint(provider) ?? '')) this.invalidateCatalog(provider);
       this.set(`endpoint.${provider}`, endpoint);
     })();
     return this.settings();
   }
+  private invalidateCatalog(provider: string) {
+    this.db.prepare('DELETE FROM app_metadata WHERE key=?').run(`catalog.${provider}`);
+    this.set(
+      `connectionRevision.${provider}`,
+      String(Number(this.get(`connectionRevision.${provider}`) ?? 0) + 1),
+    );
+  }
+  private catalog(provider: string): { ids: string[]; fetchedAt: string } | undefined {
+    try {
+      const value = JSON.parse(this.get(`catalog.${provider}`) ?? 'null');
+      if (
+        value &&
+        Array.isArray(value.ids) &&
+        value.ids.every((id: unknown) => typeof id === 'string') &&
+        typeof value.fetchedAt === 'string'
+      )
+        return value;
+    } catch {
+      /* Corrupt cache is refetched explicitly, never replaced by a static list. */
+    }
+  }
+  private availableModels() {
+    const ids = new Map(PROVIDERS.map((p) => [p.id as string, new Set(this.catalog(p.id)?.ids)]));
+    return this.models.filter((m) => ids.get(m.provider)?.has(m.model));
+  }
+  async discover(provider: string, testBaseUrl?: string, fetcher?: typeof fetch) {
+    const definition = providerDefinition(provider);
+    const ticket = (this.discoveryTickets.get(provider) ?? 0) + 1;
+    this.discoveryTickets.set(provider, ticket);
+    const revision = this.get(`connectionRevision.${provider}`);
+    const ids = await discoverModelIds(
+      testBaseUrl ?? this.endpoint(provider) ?? definition.baseUrl,
+      this.key(provider),
+      fetcher,
+    );
+    if (
+      revision !== this.get(`connectionRevision.${provider}`) ||
+      ticket !== this.discoveryTickets.get(provider)
+    )
+      throw new AppError('CONNECTION_CHANGED', '连接配置已变更，请重新获取模型列表');
+    this.set(`catalog.${provider}`, JSON.stringify({ ids, fetchedAt: new Date().toISOString() }));
+    return this.settings();
+  }
   key(provider: string): string {
+    providerDefinition(provider);
     const encoded = this.get(`credential.${provider}`);
     if (!encoded) throw new AppError('MISSING_KEY', '请在设置中配置所选模型提供方的 API key');
     if (!this.encryption.isEncryptionAvailable())

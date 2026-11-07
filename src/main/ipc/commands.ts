@@ -1,5 +1,5 @@
 import { inspectFiles } from '../services/file-selection';
-import { shell, clipboard } from 'electron';
+import { shell, clipboard, net } from 'electron';
 import type { Command, CommandResponses, Result } from '../../shared/contracts/ipc';
 import { AppError } from '../../shared/errors';
 import type { HistoryItem } from '../../shared/models';
@@ -101,6 +101,18 @@ export async function dispatchCommand(
     case 'models.settings':
       await catalogReady;
       return success(command.type, credentials.settings());
+    case 'models.discover':
+      await catalogReady;
+      return success(
+        command.type,
+        await credentials.discover(command.provider, testBaseUrl, (input, init) =>
+          net.fetch(input instanceof URL ? input.href : input, {
+            ...init,
+            credentials: 'omit',
+            cache: 'no-store',
+          }),
+        ),
+      );
     case 'models.connection':
       await catalogReady;
       return success(

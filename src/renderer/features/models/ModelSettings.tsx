@@ -13,12 +13,22 @@ const labels = {
   xhigh: '更高',
   max: '最高',
 };
-export function ModelSettings({ controller }: { controller: ModelController }) {
+export function ModelSettings({
+  controller,
+  provider,
+  disabled,
+}: {
+  controller: ModelController;
+  provider: string;
+  disabled: boolean;
+}) {
   const { value, busy, change } = controller;
   const [search, setSearch] = useState('');
   const matches =
-    value?.models.filter((m) =>
-      `${m.provider} ${m.name} ${m.model}`.toLowerCase().includes(search.trim().toLowerCase()),
+    value?.models.filter(
+      (m) =>
+        m.provider === provider &&
+        `${m.provider} ${m.name} ${m.model}`.toLowerCase().includes(search.trim().toLowerCase()),
     ) ?? [];
   const providers = [...new Set(matches.map((m) => m.provider))].sort(
     (a, b) =>
@@ -26,7 +36,10 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
         Number(value?.configuredProviders.includes(a)) || a.localeCompare(b),
   );
   const model = value?.models.find(
-    (m) => m.provider === value.selected.provider && m.model === value.selected.model,
+    (m) =>
+      m.provider === provider &&
+      m.provider === value.selected.provider &&
+      m.model === value.selected.model,
   );
   return (
     <section className="settings-section model-settings" aria-labelledby="default-model-heading">
@@ -47,12 +60,15 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
           <select
             aria-label="选择模型"
             size={search.trim() ? 5 : 1}
-            disabled={!value || busy}
-            value={value ? JSON.stringify(value.selected) : ''}
+            disabled={!value || busy || disabled}
+            value={model ? JSON.stringify(value!.selected) : ''}
             onChange={(e) =>
               void change({ type: 'models.select', model: JSON.parse(e.target.value) })
             }
           >
+            <option value="" disabled>
+              选择此提供方的模型
+            </option>
             {providers.map((provider) => (
               <optgroup
                 key={provider}
@@ -92,7 +108,7 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
                 <select
                   aria-label="思考级别"
                   value={value?.thinkingLevel}
-                  disabled={busy}
+                  disabled={busy || disabled}
                   onChange={(e) =>
                     void change({ type: 'models.thinking', level: e.target.value as ThinkingLevel })
                   }
@@ -108,7 +124,7 @@ export function ModelSettings({ controller }: { controller: ModelController }) {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={busy || value?.thinkingLevel === recommendedThinking(model)}
+                disabled={busy || disabled || value?.thinkingLevel === recommendedThinking(model)}
                 onClick={() =>
                   void change({ type: 'models.thinking', level: recommendedThinking(model) })
                 }

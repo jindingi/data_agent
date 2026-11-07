@@ -27,11 +27,13 @@ it('validates endpoint destinations and recommends only model-supported thinking
     ),
   ).toBe('high');
   expect(
-    recommendedThinking(catalog.find((m) => m.provider === 'openai' && m.model === 'gpt-4o')),
+    recommendedThinking(
+      catalog.find((m) => m.provider === 'openrouter' && m.model === 'openai/gpt-4o-mini'),
+    ),
   ).toBe('off');
   expect(
     recommendedThinking(
-      catalog.find((m) => m.provider === 'anthropic' && m.model === 'claude-sonnet-4-5'),
+      catalog.find((m) => m.provider === 'openrouter' && m.model === 'anthropic/claude-sonnet-4.5'),
     ),
   ).toBe('medium');
 });
@@ -59,7 +61,7 @@ it('tests the saved endpoint through the real SDK with a bounded prompt and sani
   };
   for (const [code, expected] of [
     [401, 'MODEL_AUTH'],
-    [403, 'MODEL_AUTH'],
+    [403, 'MODEL_FORBIDDEN'],
     [404, 'MODEL_NOT_FOUND'],
     [429, 'MODEL_RATE_LIMIT'],
     [500, 'MODEL_RESPONSE'],
@@ -178,3 +180,39 @@ it.each([false, true])(
     expect(vi.getTimerCount()).toBe(0);
   },
 );
+
+it('discovers bounded model IDs without exposing provider errors or unsupported model types', async () => {
+  const { discoverModelIds } = await import('../../../src/main/services/model-discovery');
+  let body: unknown = {
+    data: [
+      {
+        id: 'chat',
+        supported_parameters: ['tools'],
+        architecture: { output_modalities: ['text'] },
+      },
+      { id: 'chat' },
+      { id: 'image', architecture: { output_modalities: ['image'] } },
+      { id: 'no-tools', supported_parameters: ['temperature'] },
+    ],
+  };
+  const fetcher = vi.fn(async () => new Response(JSON.stringify(body)));
+  expect(await discoverModelIds('https://example.com/v1/', 'synthetic', fetcher)).toEqual(['chat']);
+  expect(fetcher.mock.calls[0]).toMatchObject([
+    'https://example.com/v1/models',
+    { redirect: 'error', headers: { Authorization: 'Bearer synthetic' } },
+  ]);
+  body = { data: [{ id: 42 }] };
+  await expect(
+    discoverModelIds('https://example.com/v1', 'synthetic', fetcher),
+  ).rejects.toMatchObject({ code: 'MODEL_LIST_FAILED' });
+  await expect(
+    discoverModelIds(
+      'https://example.com/v1',
+      'synthetic',
+      async () => new Response('secret', { status: 401 }),
+    ),
+  ).rejects.toMatchObject({ code: 'MODEL_LIST_HTTP' });
+  expect(new Set(modelCatalog(await createModelRuntime()).map((m) => m.provider))).toEqual(
+    new Set(['deepseek', 'openrouter']),
+  );
+});

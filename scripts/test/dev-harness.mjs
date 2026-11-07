@@ -23,6 +23,7 @@ export async function startDevApp(root) {
     'ELECTRON_ENTRY',
     'ELECTRON_CLI_ARGS',
     'DEEPSEEK_API_KEY',
+    'OPENROUTER_API_KEY',
     'DATA_AGENT_TEST_MODEL_BASE_URL',
   ])
     delete env[key];

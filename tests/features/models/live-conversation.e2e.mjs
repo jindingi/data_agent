@@ -61,9 +61,6 @@ async function liveScenario(dir) {
       app = await startApp(root, { pickFiles: [sourceA, sourceB] });
       const page = app.page;
       await page.getByRole('button', { name: '设置', exact: true }).click();
-      await page
-        .getByLabel('选择模型')
-        .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
       const keyField = page.getByRole('textbox', { name: 'API key' });
       try {
         await keyField.fill(key);
@@ -75,6 +72,9 @@ async function liveScenario(dir) {
       } finally {
         if (await keyField.isEditable().catch(() => false)) await keyField.fill('').catch(() => {});
       }
+      await page
+        .getByLabel('选择模型')
+        .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
       await page.getByRole('button', { name: '关闭对话框' }).click();
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
 

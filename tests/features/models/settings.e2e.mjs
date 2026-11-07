@@ -88,7 +88,12 @@ export const cases = {
       await page.getByRole('button', { name: '移除凭证', exact: true }).click();
       await page.getByRole('button', { name: '确认移除凭证', exact: true }).click();
       await page.getByRole('status').filter({ hasText: '已移除凭证' }).waitFor();
-      const basic = restored.models.find((m) => !m.reasoning);
+      assert.equal(await page.getByLabel('选择模型').count(), 0);
+      await page.getByLabel('连接提供方', { exact: true }).selectOption('openrouter');
+      await page.getByLabel('API key', { exact: true }).fill('synthetic-openrouter');
+      await page.getByRole('button', { name: '保存凭证', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
+      const basic = (await rpc(page, { type: 'models.settings' })).models.find((m) => !m.reasoning);
       assert(basic);
       await page
         .getByLabel('选择模型')

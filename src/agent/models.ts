@@ -1,6 +1,7 @@
 import { InMemoryCredentialStore, InMemoryModelsStore } from '@earendil-works/pi-ai';
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai/compat';
 import { ModelRuntime } from '@earendil-works/pi-coding-agent';
+import { PROVIDERS } from '../shared/providers';
 import type { ModelOption } from '../shared/runtime';
 
 export async function createModelRuntime() {
@@ -15,7 +16,7 @@ export async function createModelRuntime() {
 export function modelCatalog(runtime: ModelRuntime): ModelOption[] {
   return runtime
     .getModels()
-    .filter((model) => runtime.getProvider(model.provider)?.auth.apiKey)
+    .filter((model) => PROVIDERS.some((p) => p.id === model.provider))
     .map((model) => ({
       provider: model.provider,
       model: model.id,
@@ -30,12 +31,5 @@ export function modelCatalog(runtime: ModelRuntime): ModelOption[] {
       api: model.api,
       verified: model.provider === 'deepseek' && model.id === 'deepseek-flash',
     }))
-    .sort(
-      (a, b) =>
-        (a.provider === 'deepseek'
-          ? -1
-          : b.provider === 'deepseek'
-            ? 1
-            : a.provider.localeCompare(b.provider)) || a.name.localeCompare(b.name),
-    );
+    .sort((a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name));
 }

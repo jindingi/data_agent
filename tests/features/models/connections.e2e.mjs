@@ -33,13 +33,31 @@ export const cases = {
       );
       await assertKeyAlignment(page);
       const initial = await rpc(page, { type: 'models.settings' });
+      assert.deepEqual(
+        await page
+          .getByLabel('连接提供方', { exact: true })
+          .locator('option')
+          .evaluateAll((nodes) => nodes.map((n) => n.value)),
+        ['deepseek', 'openrouter'],
+      );
+      assert(!initial.models.some((m) => m.model === 'unknown-new-model'));
+      fixture.setListingStatus(401);
+      await page.getByRole('button', { name: '获取模型列表', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: '模型列表鉴权失败' }).waitFor();
+      assert(
+        !(await page.locator('.settings-dialog').innerText()).includes('synthetic-private-error'),
+      );
+      assert.deepEqual((await rpc(page, { type: 'models.settings' })).models, initial.models);
+      fixture.setListingStatus(200);
+      await page.getByRole('button', { name: '获取模型列表', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: '已获取' }).waitFor();
       await page.getByLabel('搜索模型', { exact: true }).fill('no-such-model-xyz');
       await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor();
       assert.equal(await page.getByLabel('选择模型', { exact: true }).count(), 0);
       await page.getByLabel('搜索模型', { exact: true }).fill('');
       await page.getByRole('button', { name: '更换 Key', exact: true }).click();
       await page.getByLabel('API key', { exact: true }).fill('synthetic-unsaved');
-      await page.getByLabel('连接提供方', { exact: true }).selectOption('openai');
+      await page.getByLabel('连接提供方', { exact: true }).selectOption('openrouter');
       assert.deepEqual((await rpc(page, { type: 'models.settings' })).selected, initial.selected);
       await page.getByLabel('API key', { exact: true }).fill('synthetic-other-provider');
       await page.getByLabel('连接提供方', { exact: true }).selectOption('deepseek');
@@ -47,16 +65,7 @@ export const cases = {
         await page.getByLabel('API key', { exact: true }).inputValue(),
         'synthetic-unsaved',
       );
-      const alternate = initial.models.find(
-        (m) => m.provider === 'deepseek' && m.model !== initial.selected.model,
-      );
-      await page
-        .getByLabel('选择模型', { exact: true })
-        .selectOption(JSON.stringify({ provider: alternate.provider, model: alternate.model }));
-      assert.equal(
-        await page.getByLabel('API key', { exact: true }).inputValue(),
-        'synthetic-unsaved',
-      );
+      assert(await page.getByLabel('选择模型', { exact: true }).isDisabled());
       await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       await page.getByRole('button', { name: '设置', exact: true }).click();
       assert.equal(
@@ -78,7 +87,9 @@ export const cases = {
         (await rpc(page, { type: 'models.settings' })).endpoints.deepseek,
         fixture.baseUrl,
       );
-      await page.getByLabel('测试模型', { exact: true }).selectOption('deepseek-flash');
+      await page
+        .getByLabel('选择模型', { exact: true })
+        .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
       fixture.set({ status: 401, error: 'synthetic-unsaved' });
       await page.getByRole('button', { name: '测试模型连接', exact: true }).click();
       await page.getByRole('alert').filter({ hasText: '鉴权失败' }).waitFor();
@@ -146,7 +157,7 @@ export const cases = {
       const restored = await rpc(app.page, { type: 'models.settings' });
       assert.equal(restored.endpoints.deepseek, fixture.baseUrl);
       assert(!JSON.stringify(restored).includes('synthetic-unsaved'));
-      assert(!restored.configuredProviders.includes('openai'));
+      assert(!restored.configuredProviders.includes('openrouter'));
       assert.deepEqual(app.errors, []);
       return {
         maskedKey: true,

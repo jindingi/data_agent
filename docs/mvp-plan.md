@@ -72,8 +72,8 @@
 
 ## 5. 模型、工具与 Skills
 
-- 提供模型选择与 BYOK，开放 pi 内置的 API-key 模型配置；只有完成产品测试的组合标为已验证，其他组合标为未验证兼容性。
-- 本期真实集成验收固定 **DeepSeek-V41-Flash**。支持对内置 provider 设置 API Base URL（沿用其协议与模型清单）；新增自定义 provider/model、OAuth 订阅登录不纳入首版。
+- 提供模型选择与 BYOK，仅开放 DeepSeek 和 OpenRouter。设置依次选择提供方、填写可选 Base URL、保存 API key、获取模型列表并选择模型；列表来自 `/models` 与锁定 SDK 支持范围的交集，排除非文本输出、明确不支持工具和 batch 模型。只有完成产品测试的组合标为已验证，其他组合标为未验证兼容性。
+- 本期真实集成验收固定 **DeepSeek-V41-Flash**。支持对这两个 provider 设置 API Base URL（沿用 SDK 协议，动态获取模型 ID）；新增自定义 provider/model、OAuth 订阅登录不纳入首版。
 - 同一会话的模型切换在两次执行之间生效，不改变正在运行的任务配置。
 - 展示模型实际返回的正文、thinking、tool call、tool result；不支持或未返回 thinking 时不伪造。
 - 工具保持通用：读取、写入、编辑、目录浏览、搜索、命令执行和用户澄清。分析方法放在内置 skills，不增加绑定 CSV/pandas 的专用 Agent 工具。

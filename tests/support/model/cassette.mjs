@@ -1,3 +1,4 @@
+import { serveModelListing } from './listing.mjs';
 import assert from 'node:assert/strict';
 import { portableSse } from './portable-sse.mjs';
 import { createServer } from 'node:http';
@@ -68,6 +69,7 @@ export async function modelCassette({
     controllers = new Set();
   let cursor = 0;
   const server = createServer(async (request, response) => {
+    if (serveModelListing(request, response)) return;
     const controller = new AbortController();
     controllers.add(controller);
     const timeout = setTimeout(() => controller.abort(), 90_000);

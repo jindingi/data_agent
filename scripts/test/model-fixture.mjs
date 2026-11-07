@@ -1,3 +1,4 @@
+import { serveModelListing } from '../../tests/support/model/listing.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
@@ -6,7 +7,14 @@ export async function modelFixture() {
   const requests = [],
     replies = [],
     authorizations = [];
+  let listingStatus = 200;
   const server = createServer(async (request, response) => {
+    if (request.method === 'GET' && request.url === '/v1/models' && listingStatus !== 200) {
+      response.writeHead(listingStatus);
+      response.end('synthetic-private-error');
+      return;
+    }
+    if (serveModelListing(request, response)) return;
     let body = '';
     for await (const chunk of request) body += chunk;
     authorizations.push(request.headers.authorization ?? '');
@@ -65,6 +73,9 @@ export async function modelFixture() {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     requests,
     authorizations,
+    setListingStatus: (status) => {
+      listingStatus = status;
+    },
     set: (...values) => {
       replies.splice(0, replies.length, ...values);
     },

@@ -228,3 +228,16 @@ P7 清单由 71 项增至 74 项；本次未运行完整 P7、真实付费模型
 - `pnpm quality` 通过；7 项模型定向用例全部通过（含 5 个 configuration 单元断言、原生前置校验、原生凭证、设置 CDP、严格录制重放、连接 UI 与真实连接），证据：`test-results/2026-11-07T07-49-57.687Z/summary.json`。
 - 最终 `models.live-connection` 经后台设置页实际发送一次 DeepSeek-V41-Flash 请求，约 967 ms 通过。调试及验收共 6 次有界真实短请求，未重试到偶然通过；最初失败、诊断结果与最后修复后的结果分别保留。未获得完整最终 usage 的中断探测不宣称有精确 token 统计。
 - 三种尺寸、深浅主题均断言输入框/更换按钮中心差 ≤1 px，查看了最终窄窗浅色与宽窗深色凭证区域截图。测试使用隔离目录、后台隐藏窗口，没有动用户会话或在用构建。本轮未重跑全量回归、打包或 Judge。
+
+## 2026-11-07：提供方收敛与动态模型目录
+
+模型配置从 pi 静态全量目录改为 DeepSeek/OpenRouter 的 provider-first 流程：可选 Base URL → Key → 保存并请求 `/models` → 选择与锁定 SDK 兼容的模型。其他提供方的连接元数据在启动时清理，历史会话和产物保留；既有支持提供方升级后需获取一次列表。目录缓存、更新时间、配置修订与过期请求保护保存在 SQLite 元数据中；连接变更清除目录，失败可重试，不回退静态全量列表。设置只使用一个当前模型选择器，思考能力继续按 SDK 模型元数据决定。
+
+Main 列表发现、Host 连接探测与会话请求接入 Electron 网络栈以遵循系统代理。实测 Node 直连 OpenRouter 超时、系统代理可达；改后 DeepSeek 官方短探测通过（861 ms），OpenRouter `deepseek/deepseek-v4.1-flash` 短探测通过（795 ms）。OpenRouter 初次测试 `openai/gpt-4o-mini` 返回 403，直接请求确认“当前地区不可用”；Key 的官方鉴权端点返回 200。因此保留失败记录，403 提示地区/权限限制而不是一律归因于错误 Key。此次没有逐一测试整个 OpenRouter 模型目录，也没有重做完整 live 分析或 .app 打包验收。
+
+验证证据（均为忽略目录中的本机记录）：
+
+- 最终普通全量 **78/78**：`test-results/2026-11-07T08-08-43.300Z/summary.json`。覆盖原生集成、隐藏 CDP、严格模型重放、上下文前缀、工具/审批、用量/恢复。首次全量仅失败于新缓存测试重复注册旧 ID；改为独立 `models.discovery-store` 后通过，初次记录保留在 `2026-11-07T08-05-28.353Z`。
+- 收敛单元测试中的非推理模型样本后，`models.configuration` 补跑通过：`test-results/2026-11-07T08-10-28.655Z/summary.json`。
+- 真实 DeepSeek：`test-results/2026-11-07T08-01-36.149Z/summary.json` 中 `models.live-connection` 通过，同报告保留 OpenRouter GPT 地区失败；OpenRouter 新指定的 DeepSeek 模型：`test-results/2026-11-07T08-04-22.530Z/summary.json` 中 `models.live-openrouter` 通过。每次模型测试只发一个有界短请求，目录 GET 不计作生成调用。
+- `pnpm quality` 与测试选择器检查通过；3 种窗口尺寸 × 深浅主题的滚动、Key 对齐、焦点检查通过，并复核设置顶部、凭证区和底部截图。未覆盖正在使用的构建/应用目录，测试窗口保持后台隐藏。

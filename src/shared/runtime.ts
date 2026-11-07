@@ -30,6 +30,7 @@ export interface ModelSettings {
   selected: ModelChoice;
   models: ModelOption[];
   configuredProviders: string[];
+  catalogs: Record<string, { fetchedAt: string; count: number }>;
   endpoints: Record<string, string>;
   encryptionAvailable: boolean;
 }

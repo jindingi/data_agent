@@ -9,17 +9,26 @@ export async function rpc(page, command) {
 export async function snapshot(page, sessionId) {
   return rpc(page, { type: 'runtime.snapshot', sessionId });
 }
-export async function configure(page, key = 'synthetic-p3-fixture-key') {
+export async function configure(
+  page,
+  key = 'synthetic-p3-fixture-key',
+  provider = 'deepseek',
+  model = 'deepseek-flash',
+) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page
-    .getByLabel('选择模型')
-    .selectOption(JSON.stringify({ provider: 'deepseek', model: 'deepseek-flash' }));
-  await page.getByLabel('连接提供方', { exact: true }).selectOption('deepseek');
+  await page.getByLabel('连接提供方', { exact: true }).selectOption(provider);
   const edit = page.getByRole('button', { name: '更换 Key', exact: true });
   if (await edit.count()) await edit.click();
   await page.getByRole('textbox', { name: 'API key', exact: true }).fill(key);
   await page.getByRole('button', { name: '保存凭证', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
+  await page
+    .getByLabel('选择模型', { exact: true })
+    .selectOption(JSON.stringify({ provider, model }));
+  await until(
+    async () => (await rpc(page, { type: 'models.settings' })).selected.model === model,
+    'model selected',
+  );
   await page.getByRole('button', { name: '关闭对话框' }).click();
 }
 export async function submit(page, text = 'Execute the requested fixture action.') {

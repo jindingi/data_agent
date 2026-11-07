@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Activity, FolderOpen } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
-import { ModelSettings } from './ModelSettings';
 import { ProviderConnection, type ConnectionDrafts } from './ProviderConnection';
 import type { ModelController } from './use-model-settings';
 import type { SystemInfo } from '../../../shared/contracts/ipc';
@@ -75,7 +74,6 @@ export function SettingsDialog({
             )
           ) : (
             <>
-              <ModelSettings controller={modelSettings} />
               <ProviderConnection
                 controller={modelSettings}
                 drafts={drafts}
