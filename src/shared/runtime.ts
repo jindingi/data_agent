@@ -76,7 +76,6 @@ export const snapshotSchema = z
     schemaVersion: z.literal(1),
     sessionId: z.string().uuid(),
     runId: z.string().uuid(),
-    hostEpoch: z.string().uuid(),
     seq: z.number().int().nonnegative(),
     state: z.enum([
       'starting',
@@ -168,7 +167,7 @@ export function terminalTools(messages: MessageView[]): ToolView[] {
 export function isActive(state: RuntimeSnapshot['state']) {
   return ['starting', 'queued', 'running', 'waiting_approval', 'waiting_input'].includes(state);
 }
-/** Cross-epoch changes are accepted only through an authoritative snapshot response. */
+/** Cross-run changes are accepted only through an authoritative snapshot response. */
 export function acceptSnapshot(
   current: RuntimeSnapshot | null,
   incoming: RuntimeSnapshot,
@@ -177,8 +176,7 @@ export function acceptSnapshot(
 ): RuntimeSnapshot | null {
   if (incoming.sessionId !== sessionId) return current;
   if (!current) return authoritative ? incoming : current;
-  if (current.hostEpoch !== incoming.hostEpoch || current.runId !== incoming.runId)
-    return authoritative ? incoming : current;
+  if (current.runId !== incoming.runId) return authoritative ? incoming : current;
   return incoming.seq > current.seq || (authoritative && incoming.seq === current.seq)
     ? incoming
     : current;

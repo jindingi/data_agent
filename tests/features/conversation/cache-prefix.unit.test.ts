@@ -47,7 +47,6 @@ it.each([false, true])(
         {
           sessionId: randomUUID(),
           runId: randomUUID(),
-          hostEpoch: randomUUID(),
           file: join(root, 'sessions/session.jsonl'),
           workspace: firstWorkspace,
           piSessionId: null,
@@ -100,7 +99,6 @@ it.each([false, true])(
         {
           sessionId: randomUUID(),
           runId: randomUUID(),
-          hostEpoch: randomUUID(),
           file,
           workspace: join(root, 'workspace'),
 
@@ -146,7 +144,6 @@ it.each([false, true])(
         {
           sessionId: randomUUID(),
           runId: randomUUID(),
-          hostEpoch: randomUUID(),
           file,
           workspace: join(root, 'workspace'),
           piSessionId,

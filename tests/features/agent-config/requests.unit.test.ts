@@ -88,7 +88,6 @@ it.each([true, false])(
     const config: RuntimeConfig = {
       sessionId: randomUUID(),
       runId: randomUUID(),
-      hostEpoch: randomUUID(),
       workspace: join(root, 'workspace'),
       file: join(root, 'sessions/session.jsonl'),
       piSessionId: null,
@@ -179,7 +178,7 @@ it.each([true, false])(
     await runtime.dispose();
     snapshot = undefined;
     runtime = await SessionRuntime.create(
-      { ...config, piSessionId: records[0].id, runId: randomUUID(), hostEpoch: randomUUID() },
+      { ...config, piSessionId: records[0].id, runId: randomUUID() },
       (value) => {
         snapshot = value;
       },
@@ -230,7 +229,6 @@ it('registers no fallback tools when all tools and skills are disabled', async (
     {
       sessionId: randomUUID(),
       runId: randomUUID(),
-      hostEpoch: randomUUID(),
       workspace: join(root, 'workspace'),
       file: join(root, 'sessions/s.jsonl'),
       piSessionId: null,

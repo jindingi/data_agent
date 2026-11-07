@@ -33,6 +33,8 @@
 | `scripts/build/`、`scripts/test/`、`tests/` | 构建、正式测试 runner、按功能分组的 unit/integration/e2e 与测试目录                                           |
 | `evaluations/`、`validation/`               | 独立 Agent 效果评测、可复用技术探针；不是产品入口                                                             |
 
+执行身份统一为 runId：sessions 仅保存 run_id/run_state/run_error；input_submissions.run_id 关联输入。没有独立 execution/epoch 层，旧事件/审批按 sessionId/runId 隔离，同 run 事件按 seq 排序。每次新执行必须生成新 runId，重启不自动恢复旧任务。
+
 Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信。IPC 必须验证参数、发送窗口、主 frame 与可信完整 URL；不能为了修复 dev 问题放宽成任意 localhost/任意 frame。优先查锁定依赖、本地源码和配置，不照抄最新框架模板。
 
 状态默认在 `~/.data_agent/`：`state.sqlite` 存元数据，`sessions/{sessionId}.jsonl` 复用 pi 原生 session tree，`workspace/{sessionId}/` 存本地产物；同一会话所有 run/steer/follow-up 共用该目录，不再分配 run/version 子目录；不维护 output_versions/artifacts 兼容；旧目录只是普通文件目录。删除会话始终保留 workspace。SQLite 仅保留 schema_migrations、app_metadata、sessions、agent_config_revisions、input_submissions、session_sources；完整日志直接读受控磁盘路径，不新增索引/manifest。测试不得使用真实业务目录。新增持久化须有迁移/恢复设计，不能假设数据库与 JSONL/文件系统天然原子提交。

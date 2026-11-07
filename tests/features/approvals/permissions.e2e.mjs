@@ -25,7 +25,6 @@ async function late(page, value, changes = {}) {
     interactionId: value.id,
     sessionId: value.sessionId,
     runId: value.runId,
-    hostEpoch: value.hostEpoch,
     digest: value.digest,
     answer: {
       kind: value.kind,

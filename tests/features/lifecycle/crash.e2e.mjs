@@ -110,7 +110,6 @@ export const cases = {
           interactionId: pending.id,
           sessionId,
           runId: pending.runId,
-          hostEpoch: pending.hostEpoch,
           digest: pending.digest,
           answer: { kind: 'approval', decision: 'allow_once' },
         });

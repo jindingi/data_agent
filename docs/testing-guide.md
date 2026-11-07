@@ -153,3 +153,5 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 `agent-config.requests` 同时比较预览与最终 HTTP 请求中的 system 文本，覆盖启用/关闭 skill 和全工具关闭；历史预览必须等于原生记录且 JSONL 字节不变。`agent-config.settings` 验证展开加载、草稿更新、真实 XML 标签与顺序、工具/skill 关闭后的预览、会话详情与实际请求逐字一致，并检查预览不增加模型调用或会话数量。
 
 存储简化回归：sessions.storage-migration 使用旧 schema 10 的 WAL fixture，覆盖六表迁移、完整输入顺序、配置引用/覆盖、事务失败回滚、旧删除清单废弃、备份与未知高版本拒绝。普通测试不读取真实用户库。工作区用例验证实际目录，不再等待产物登记或 output_versions 发布。
+
+执行身份简化回归：`sessions.run-migration` 验证 schema 11 → 12 的字段改名/删除、状态与错误/待投递输入保留、DDL 失败回滚、WAL 一致性备份及重复打开不再备份；`sessions.metadata-writes`、`conversation.snapshot` 和 `approvals.policy` 覆盖旧 run 的状态/ACK、快照和审批不能作用于当前 run。普通全量回归继续覆盖队列、重启及实际请求前缀。

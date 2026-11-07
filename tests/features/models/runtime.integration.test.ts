@@ -49,7 +49,6 @@ async function harness(
   const config = options.config ?? {
     sessionId: randomUUID(),
     runId: randomUUID(),
-    hostEpoch: randomUUID(),
     file: join(root, 'sessions/session.jsonl'),
     workspace: join(root, 'workspace'),
     piSessionId: null,

@@ -110,8 +110,8 @@ export class RuntimeService {
     this.ledger = new RunLedger(db);
     this.lifecycle = new RunLifecycle({ tools });
     db.prepare(
-      "UPDATE sessions SET execution_state='interrupted',execution_ended_at=? WHERE execution_state IN ('queued','starting','running','waiting_approval','waiting_input')",
-    ).run(new Date().toISOString());
+      "UPDATE sessions SET run_state='interrupted' WHERE run_state IN ('queued','starting','running','waiting_approval','waiting_input')",
+    ).run();
     db.prepare("UPDATE input_submissions SET state='unknown' WHERE state='pending'").run();
   }
   activeStates(): Record<string, RuntimeSnapshot['state']> {
@@ -138,7 +138,7 @@ export class RuntimeService {
     if (
       !isActive(task.snapshot.state) ||
       this.tasks.get(snapshot.sessionId) !== task ||
-      task.snapshot.hostEpoch !== snapshot.hostEpoch ||
+      task.snapshot.runId !== snapshot.runId ||
       snapshot.seq <= task.snapshot.seq
     )
       return;
@@ -331,7 +331,6 @@ export class RuntimeService {
         schemaVersion: 1,
         sessionId,
         runId: randomUUID(),
-        hostEpoch: randomUUID(),
         seq: 0,
         state: 'queued',
         messages,
@@ -344,17 +343,8 @@ export class RuntimeService {
     };
     this.db.transaction(() => {
       this.db
-        .prepare(
-          `UPDATE sessions SET execution_id=?,execution_epoch=?,execution_state='queued',execution_provider=?,execution_model=?,execution_started_at=?,execution_ended_at=NULL,execution_error=NULL WHERE id=?`,
-        )
-        .run(
-          task.snapshot.runId,
-          task.snapshot.hostEpoch,
-          model.provider,
-          model.model,
-          new Date().toISOString(),
-          sessionId,
-        );
+        .prepare(`UPDATE sessions SET run_id=?,run_state='queued',run_error=NULL WHERE id=?`)
+        .run(task.snapshot.runId, sessionId);
       this.insertInput(
         task,
         input,
@@ -379,11 +369,10 @@ export class RuntimeService {
     const session = this.sessions.get(sessionId);
     const run = this.db
       .prepare(
-        'SELECT execution_id AS id,execution_epoch AS host_epoch,execution_state AS state,execution_error AS error FROM sessions WHERE id=? AND execution_id IS NOT NULL',
+        'SELECT run_id AS id,run_state AS state,run_error AS error FROM sessions WHERE id=? AND run_id IS NOT NULL',
       )
       .get(sessionId) as
-      | { id: string; host_epoch: string; state: RuntimeSnapshot['state']; error: string | null }
-      | undefined;
+      { id: string; state: RuntimeSnapshot['state']; error: string | null } | undefined;
     if (!run) return null;
     let messages: MessageView[] = [];
     let turnUsage: RuntimeSnapshot['turnUsage'] = [];
@@ -413,14 +402,13 @@ export class RuntimeService {
     if (this.tasks.has(sessionId)) return this.tasks.get(sessionId)!.snapshot;
     const inputs = this.db
       .prepare(
-        'SELECT input_id AS inputId,kind,state,entry_id AS entryId FROM input_submissions WHERE execution_id=? ORDER BY sequence',
+        'SELECT input_id AS inputId,kind,state,entry_id AS entryId FROM input_submissions WHERE run_id=? ORDER BY sequence',
       )
       .all(run.id) as (RuntimeSnapshot['inputs'][number] & { entryId: string | null })[];
     const snapshot: RuntimeSnapshot = {
       schemaVersion: 1,
       sessionId,
       runId: run.id,
-      hostEpoch: run.host_epoch,
       seq: 0,
       state: run.state,
       messages,
@@ -510,7 +498,6 @@ export class RuntimeService {
             {
               sessionId: session.id,
               runId: task.snapshot.runId,
-              hostEpoch: task.snapshot.hostEpoch,
               hostPid: task.host.pid,
               workspace: session.workspace,
               workingDirectory: task.outputDirectory,
@@ -537,7 +524,6 @@ export class RuntimeService {
         config: {
           sessionId: session.id,
           runId: task.snapshot.runId,
-          hostEpoch: task.snapshot.hostEpoch,
           file: session.sessionFile,
           workspace: session.workspace,
           piSessionId: session.piSessionId,

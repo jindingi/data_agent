@@ -55,13 +55,11 @@ beforeEach(() => {
   ensureAppPaths(paths);
   db = openDatabase(paths.database);
   const session = new SessionService(db, paths).create();
-  const runId = randomUUID(),
-    hostEpoch = randomUUID();
+  const runId = randomUUID();
   tools = new ToolService(resources, paths.logs, new InteractionBroker());
   context = {
     sessionId: session.id,
     runId,
-    hostEpoch,
     hostPid: process.pid,
     workspace: session.workspace,
     protectedRoots: [paths.sessions, paths.database, paths.logs],

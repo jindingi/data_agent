@@ -52,7 +52,6 @@ export const interactionSchema = z
     id: z.string().uuid(),
     sessionId: z.string().uuid(),
     runId: z.string().uuid(),
-    hostEpoch: z.string().uuid(),
     toolCallId: z.string().min(1),
     kind: z.enum(['approval', 'clarification']),
     digest: z.string().length(64),

@@ -75,11 +75,7 @@ export class SessionService {
       this.rollbackEmpty(row.session_id);
   }
   rollbackEmpty(id: string) {
-    if (
-      this.db
-        .prepare('SELECT execution_id FROM sessions WHERE id=? AND execution_id IS NOT NULL')
-        .get(id)
-    ) {
+    if (this.db.prepare('SELECT run_id FROM sessions WHERE id=? AND run_id IS NOT NULL').get(id)) {
       this.db.prepare('UPDATE sessions SET creation_pending=0 WHERE id=?').run(id);
       return;
     }

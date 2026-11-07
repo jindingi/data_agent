@@ -67,16 +67,16 @@ export class EventAdapter {
   private currentId: string | null = null;
   private ordinal = 0;
   private seq = 0;
-  private ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId' | 'hostEpoch'>;
+  private ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId'>;
   state: RuntimeSnapshot['state'] = 'starting';
   error: string | null = null;
   activity: RuntimeSnapshot['activity'] = null;
   constructor(
-    ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId' | 'hostEpoch'>,
+    ids: Pick<RuntimeSnapshot, 'sessionId' | 'runId'>,
     private identity: InputIdentity,
   ) {
     // TypeScript Pick is not runtime filtering: never retain/spread the full run config.
-    this.ids = { sessionId: ids.sessionId, runId: ids.runId, hostEpoch: ids.hostEpoch };
+    this.ids = { sessionId: ids.sessionId, runId: ids.runId };
   }
   restore(manager: SessionManager) {
     this.messages = [];
@@ -119,13 +119,13 @@ export class EventAdapter {
       event.type === 'agent_settled'
     )
       this.activity = null;
-    if (event.type === 'message_start') this.currentId = `${this.ids.hostEpoch}:${++this.ordinal}`;
+    if (event.type === 'message_start') this.currentId = `${this.ids.runId}:${++this.ordinal}`;
     if (
       event.type === 'message_start' ||
       event.type === 'message_update' ||
       event.type === 'message_end'
     ) {
-      const id = this.currentId ?? `${this.ids.hostEpoch}:${++this.ordinal}`;
+      const id = this.currentId ?? `${this.ids.runId}:${++this.ordinal}`;
       const message = projectMessage(id, event.message, (text) => this.identity.strip(text));
       message.pending = event.type !== 'message_end';
       const index = this.messages.findIndex((m) => m.id === id);

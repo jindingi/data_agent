@@ -77,12 +77,11 @@ it('models.preflight credentials and model errors leave no run or permit; later 
             starts++;
             usedKeys.push(input.config.apiKey);
             usedEndpoints.push(input.config.baseUrl);
-            const { sessionId, runId, hostEpoch } = input.config;
+            const { sessionId, runId } = input.config;
             current = {
               schemaVersion: 1,
               sessionId,
               runId,
-              hostEpoch,
               seq: 1,
               state: 'running',
               messages: [],
@@ -123,9 +122,9 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   expect(service.snapshot(session.id)).toBeNull();
   expect(starts).toBe(0);
   expect(() => credentials.select({ provider: 'deepseek', model: 'wrong-name' })).toThrow('模型');
-  expect(
-    db.prepare('SELECT count(*) n FROM sessions WHERE execution_id IS NOT NULL').get(),
-  ).toEqual({ n: 0 });
+  expect(db.prepare('SELECT count(*) n FROM sessions WHERE run_id IS NOT NULL').get()).toEqual({
+    n: 0,
+  });
   const sentinel = 'sk-synthetic-credential-do-not-persist';
   credentials.saveConnection('deepseek', 'https://first.example/v1/', sentinel);
   expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');

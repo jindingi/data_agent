@@ -13,7 +13,7 @@ export class RunLedger {
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO input_submissions(input_id,session_id,execution_id,kind,state,digest,pending_text,pending_paths)
+          `INSERT INTO input_submissions(input_id,session_id,run_id,kind,state,digest,pending_text,pending_paths)
         VALUES (?,?,?,?,'pending',?,?,?)`,
         )
         .run(
@@ -36,30 +36,21 @@ export class RunLedger {
     this.db.transaction(() => {
       if (
         !this.db
-          .prepare('SELECT id FROM sessions WHERE id=? AND execution_id=? AND execution_epoch=?')
-          .get(next.sessionId, next.runId, next.hostEpoch)
+          .prepare('SELECT id FROM sessions WHERE id=? AND run_id=?')
+          .get(next.sessionId, next.runId)
       )
         return;
       if (previous.state !== next.state || previous.error !== next.error)
         this.db
-          .prepare(
-            'UPDATE sessions SET execution_state=?,execution_ended_at=?,execution_error=? WHERE id=? AND execution_id=? AND execution_epoch=?',
-          )
-          .run(
-            next.state,
-            isActive(next.state) ? null : new Date().toISOString(),
-            next.error,
-            next.sessionId,
-            next.runId,
-            next.hostEpoch,
-          );
+          .prepare('UPDATE sessions SET run_state=?,run_error=? WHERE id=? AND run_id=?')
+          .run(next.state, next.error, next.sessionId, next.runId);
       for (const input of next.inputs) {
         const old = prior.get(input.inputId);
         if (old?.state === input.state && old.entryId === input.entryId) continue;
         this.db
           .prepare(
             `UPDATE input_submissions SET state=?,entry_id=?,pending_text=CASE WHEN ?='committed' THEN NULL ELSE pending_text END,
-          pending_paths=CASE WHEN ?='committed' THEN NULL ELSE pending_paths END WHERE input_id=? AND execution_id=? AND session_id=?`,
+          pending_paths=CASE WHEN ?='committed' THEN NULL ELSE pending_paths END WHERE input_id=? AND run_id=? AND session_id=?`,
           )
           .run(
             input.state,
@@ -76,7 +67,7 @@ export class RunLedger {
   withDrafts(snapshot: RuntimeSnapshot): RuntimeSnapshot {
     const drafts = this.db
       .prepare(
-        `SELECT input_id AS inputId,kind,pending_text AS text,pending_paths AS paths,execution_id AS runId,state
+        `SELECT input_id AS inputId,kind,pending_text AS text,pending_paths AS paths,run_id AS runId,state
       FROM input_submissions WHERE session_id=? AND pending_text IS NOT NULL ORDER BY sequence`,
       )
       .all(snapshot.sessionId) as (Omit<RunInput, 'paths'> & {

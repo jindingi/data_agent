@@ -66,18 +66,18 @@ session_sources
 新增或明确以下字段组（最终 SQL 名称可按现有约定统一）：
 
 - `creation_pending`：首次发送创建流程尚未完成，替代 conversation_intents。
-- `execution_id / execution_epoch / execution_state / execution_started_at / execution_ended_at / execution_error`：最新执行身份和状态。启动模型等 UI 确实使用的最新执行字段一并迁入；不重建历次运行历史。
+- `run_id / run_state / run_error`：当前或最近一次执行的身份、状态及错误。迁移 12 统一命名，删除重复 epoch 与未被读取的执行时间、提供方和模型字段；不重建历次运行历史。
 - `agent_config_revision`：引用不可变配置版本。
 - `agent_config_override`：仅保留无法引用现有修订的历史绑定；普通新会话为 NULL。
 - 删除仍使用明确的 `deleting` 生命周期状态和错误信息。无需再存 delete_artifacts 开关或删除目标清单。
 
-同一会话只允许一个活跃执行。每次启动生成新 execution ID；状态更新必须同时匹配 session ID、execution ID 和 epoch，旧回调不能覆盖新执行。停止、审批、工具进程和预算仍按执行身份隔离。两个会话并发、FIFO 许可及同会话 pi steer/follow-up 队列保持不变。
+同一会话只允许一个活跃执行。每次启动生成新 runId；状态更新必须同时匹配 sessionId 和 runId，旧回调不能覆盖新执行。停止、审批、工具进程和预算仍按执行身份隔离。两个会话并发、FIFO 许可及同会话 pi steer/follow-up 队列保持不变。
 
 重启把未结束执行标记为 interrupted；不恢复运行进程、不重放用户任务、不复活审批。SQLite 不承担持久化任务调度器职责。
 
 ### 2.3 input_submissions：一个输入一条投递记录
 
-建议字段：`input_id`、`session_id`、`execution_id`、`kind`、`state`、`entry_id`、`digest`、`pending_text`、`pending_paths`、显式接收顺序。
+建议字段：`input_id`、`session_id`、`run_id`、`kind`、`state`、`entry_id`、`digest`、`pending_text`、`pending_paths`、显式接收顺序。
 
 - 接收输入时同一事务保存投递记录和来源保护路径；之后才向 Host 投递。
 - 同 input ID、同摘要返回已接收结果；同 ID 不同内容拒绝，不能重复创建会话或执行。
@@ -85,7 +85,7 @@ session_sources
 - 确认 JSONL 实际用户消息落盘后清空 pending_text/pending_paths，只留轻量身份与摘要，不长期重复保存聊天正文。
 - SQLite ACK 落后于 JSONL 时，以实际消息修正；unknown 输入不自动重发。历史执行结束后尚未消费的输入仍可恢复。
 - 迁移使用旧接收顺序生成显式序号；不要依赖合表后的隐式 rowid 恰好不变。普通新记录按事务分配顺序。
-- execution_id 只是关联标记，不再外键依赖 runs；不因删除 runs 丢掉历史未确认输入。
+- run_id 只是关联标记，不再外键依赖 runs；不因删除 runs 丢掉历史未确认输入。
 
 ### 2.4 配置去重和来源保护
 
@@ -113,10 +113,10 @@ session_sources
 新日志布局建议为：
 
 ```text
-logs/{session_id}/{sha256(tool_call_id)}/{execution_id}.log
+logs/{session_id}/{sha256(tool_call_id)}/{run_id}.log
 ```
 
-- ProcessRunner 接收可信 session/execution/tool 身份，由 Main 确定路径，删除 LogObserver 的数据库注册链。
+- ProcessRunner 接收可信 session/run/tool 身份，由 Main 确定路径，删除 LogObserver 的数据库注册链。
 - 不把原始 tool call ID 当路径；目录名使用固定 hash，执行 ID 验证格式。每次执行的日志总额仍为 10 MiB，分页仍为 32 KiB，输出截断提示继续显示。
 - 查看前用当前活动工具集合或原生历史确认 tool call 属于该会话，再按确定目录有界列出日志文件；不递归搜索整个日志根。日志列表过多时分页，不无限加载。
 - Renderer 只传 session/tool 身份和 Main 返回的短期日志条目 ID。读取仍检查根、路径归属、普通文件、符号链接和页大小；不能以可猜测文件名替代授权检查。

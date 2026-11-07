@@ -24,7 +24,7 @@ export function useRuntime(sessionId: string | null, onError: (message: string) 
     const unsubscribe = window.dataAgent.subscribe((event) => {
       if (event.type !== 'runtime.event' || event.snapshot.sessionId !== sessionId) return;
       const old = watermark.current;
-      if (!old || old.hostEpoch !== event.snapshot.hostEpoch) {
+      if (!old || old.runId !== event.snapshot.runId) {
         void refresh().catch((error) => onError(error.message));
         return;
       }

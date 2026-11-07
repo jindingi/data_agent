@@ -85,12 +85,11 @@ it('agent-config.admission queued and running sessions retain bindings; Main rej
           if (input.type === 'runtime.start') {
             versions.push(input.config.agentConfig!.revision!);
             handlers.set(input.config.sessionId, tool);
-            const { sessionId, runId, hostEpoch } = input.config;
+            const { sessionId, runId } = input.config;
             current = {
               schemaVersion: 1,
               sessionId,
               runId,
-              hostEpoch,
               seq: 1,
               state: 'running',
               messages: [],

@@ -8,7 +8,6 @@ import type { ToolOperation, ToolResult, Interaction } from '../../shared/tools'
 export interface ToolContext extends PolicyContext {
   sessionId: string;
   runId: string;
-  hostEpoch: string;
   hostPid: number;
 }
 export interface ToolObservers {
@@ -57,7 +56,6 @@ export class ToolService {
               {
                 sessionId: context.sessionId,
                 runId: context.runId,
-                hostEpoch: context.hostEpoch,
                 toolCallId,
                 kind: 'clarification',
                 digest: digest(operation),
@@ -78,7 +76,6 @@ export class ToolService {
           const binding = digest({
             sessionId: context.sessionId,
             runId: context.runId,
-            hostEpoch: context.hostEpoch,
             toolCallId,
             fingerprint: decision.fingerprint,
           });
@@ -100,7 +97,6 @@ export class ToolService {
               {
                 sessionId: context.sessionId,
                 runId: context.runId,
-                hostEpoch: context.hostEpoch,
                 toolCallId,
                 kind: 'approval',
                 digest: binding,

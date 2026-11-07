@@ -53,7 +53,7 @@ flowchart LR
 
 ### Agent Host
 
-一个 Host 对应一个活跃会话，持有 createAgentSession、SessionManager、受控 ResourceLoader、工具代理与当前执行投影。工具代理通过私有端口发送经过 schema 校验的 tool.request；实际文件访问、PolicyService、InteractionBroker 和 ProcessRunner 在 Main 执行。Main 从当前任务绑定 session/run/epoch/workspace/Host PID，不接受模型伪造这些上下文。Host 不直接写 SQLite。停止 A 只终止 A 的进程、审批和输入队列，不触碰 B。
+一个 Host 对应一个活跃会话，持有 createAgentSession、SessionManager、受控 ResourceLoader、工具代理与当前执行投影。工具代理通过私有端口发送经过 schema 校验的 tool.request；实际文件访问、PolicyService、InteractionBroker 和 ProcessRunner 在 Main 执行。Main 从当前任务绑定 session/run/workspace/Host PID，不接受模型伪造这些上下文。Host 不直接写 SQLite。停止 A 只终止 A 的进程、审批和输入队列，不触碰 B。
 
 pi 负责会话内部的 prompt/steer/followUp、重试和压缩；应用只做输入身份关联与外部会话准入。普通输入在空闲时开始新 run；执行中的 steer/follow-up 属同一 run、不同 inputId。全局排队任务重启后不自动恢复执行，保留为未发送。
 
@@ -126,7 +126,7 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
     analysis.py / report.md     # Agent 按任务生成的示例文件，并非强制清单
     figures/*.png / tables/*.csv
     .cache/ / .tmp/
-  logs/{sessionId}/{sha256(toolCallId)}/{executionId}.log
+  logs/{sessionId}/{sha256(toolCallId)}/{runId}.log
   backups/                     # 升级前一致性 SQLite 备份
   agent-resources/{sha256}/resources/skills/{skillId}/SKILL.md
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
@@ -143,13 +143,15 @@ SQLite 仅保留 6 张应用表：
 | input_submissions      | 输入身份、接收顺序、执行 ID、ACK/entry ID/摘要及尚未落盘的正文/附件 |
 | session_sources        | 按会话去重的历史来源路径，仅用于保护原文件                          |
 
-sessions.state/error 表示会话可用性，execution_* 表示最新执行。状态写入匹配 session/execution/epoch，重启把未结束执行设为 interrupted，不重放任务。配置完全匹配修订时保存 agent_config_revision 引用；特殊旧绑定原样保存 agent_config_override，不能套用当前默认值。
+sessions.state/error 表示会话可用性；run_id/run_state/run_error 仅保存当前或最近一次执行的身份、状态和错误。每次新执行生成唯一 runId，不另设 epoch；状态写入匹配 sessionId/runId，重启把未结束执行设为 interrupted，不重放任务。配置完全匹配修订时保存 agent_config_revision 引用；特殊旧绑定原样保存 agent_config_override，不能套用当前默认值。
 
 input_submissions 按 sequence 保存全部执行的未确认输入；原生记录 ACK 后清空 pending_text/pending_paths，保留投递身份与 SHA256 摘要。未知输入不自动重发。session_sources 不是 UI 文件目录、当前选集或模型上下文；prompt/steer/follow-up 接收时和输入记录同事务追加路径。普通追问不 stat 全部历史来源。
 
 每次添加和提交只校验本次附件的路径、存在性、单文件及合计 ≤100,000,000 bytes，不解析 CSV、不冻结内容。实际读取失败由工具返回。路径不是权限令牌，仍走 PolicyService。
 
 迁移 11 在一致性备份后单事务合并旧元数据并删除冗余表，目标没有 tool_logs/output_versions/artifacts 及兼容视图。保留全部未确认输入、配置与原文件保护路径，废弃旧删除目标清单。迁移不打开或改写 JSONL，不搬移/删除 workspace 或旧日志。备份使用 VACUUM INTO，包含已提交 WAL，存于受保护 backups/；未知更高 schema 拒绝打开，失败回滚并报错。禁止用旧二进制打开新库；备份回退不等于后续 JSONL 一并回滚。细节与验收见 [存储简化方案](storage-simplification-plan.md)。
+
+迁移 12 将 execution_id/state/error 统一为 run_id/state/error，input_submissions 的关联列同步改名；删除重复的 execution_epoch，以及没有读取用途的 started_at/ended_at/provider/model 执行字段。旧库升级前一致性备份，迁移事务失败则回滚；不改写原生 JSONL、模型上下文或工作区文件。模型/用量历史仍由原生记录恢复，run 时间字段不承担本轮用量耗时计算。
 
 JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。SessionManager 是唯一 JSONL 写者；Main 是唯一 SQLite 写者；二者没有跨介质原子事务。状态使用 creating/draft/persisted/missing 等，启动对账，不把 `message_end` 当落盘 ACK。
 
@@ -159,7 +161,7 @@ JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。Session
 
 ## 5. 命令、事件与运行状态
 
-IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过 `runtime.event` 发送白名单 `snapshot` 对象，包含 schemaVersion/sessionId/runId/hostEpoch/seq 与完整可序列化投影；控制命令另有按请求 ID 关联的响应。每个 Host 独立 epoch/seq，不能把 A 的快照或 B 的迟到事件应用到另一个会话。
+IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过 `runtime.event` 发送白名单 `snapshot` 对象，包含 schemaVersion/sessionId/runId/seq 与完整可序列化投影；控制命令另有按请求 ID 关联的响应。每个 run 独立 seq 水位；非当前 run 的推送不得直接替换前端投影，只能重新请求 Main 权威快照。Main 同时校验当前任务对象、sessionId/runId 与 seq，拒绝旧 run 的迟到事件。当前不支持保留 runId 重启执行进程；重新执行必须生成新 runId。
 
 - `message_update` 的 text_delta/thinking_delta/toolcall_* 驱动正文与准备调用。
 - `tool_execution_start/update/end` 驱动工具状态，用 toolCallId 关联。
@@ -170,7 +172,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 
 运行状态：queued → starting → running / waiting_approval / waiting_input → 终态 completed/failed/cancelled/interrupted。取消过程中等待实际工具回收，不单独持久化 cancelling 状态。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
 
-运行终态与文件展示分开：sessions.execution_state / RuntimeSnapshot.state 记录 SDK/进程生命周期；WorkspaceFileService 返回当前文件及预览提示，不持久化 ready/published 状态。不存在报告不改写已结束的执行状态，普通聊天允许没有产物。测试可以约定 report.md 非空，产品不据此判断分析正确。
+运行终态与文件展示分开：sessions.run_state / RuntimeSnapshot.state 记录 SDK/进程生命周期；WorkspaceFileService 返回当前文件及预览提示，不持久化 ready/published 状态。不存在报告不改写已结束的执行状态，普通聊天允许没有产物。测试可以约定 report.md 非空，产品不据此判断分析正确。
 
 Host 内保留可序列化的活动投影；快照 = 当前分支持久化历史 + 活动 partial/tool/interaction/queue + seq 水位。Renderer 重载恢复该快照，再补后续事件；Host 崩溃不承诺恢复尚未落盘的每个 token。
 
@@ -261,7 +263,7 @@ Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Ag
 
 静态 shell cd 追踪后续命令的目录，外部只读检查照常允许；未解析的目录变化仍需确认。脚本分析不执行导入；对常见 open/Path/to_csv/savefig/delete 等识别路径，正常可解析输出避免误报；未知代码不能被宣称已完整分析。正则与有界语法分析只能提供尽力检测，任意导入、别名、原生库、动态网络和进程组逃逸不属于可保证覆盖。
 
-审批凭据绑定 session/run/toolCall/hostEpoch、参数、脚本 hash、规范路径、网络摘要及规则版本，原子消费一次；修改、停止、崩溃、Cmd+Q 后无效。关窗口保留等待。恶意文件内容不产生用户批准，不允许将工具输出当授权来源。
+审批凭据绑定 session/run/toolCall、参数、脚本 hash、规范路径、网络摘要及规则版本，原子消费一次；修改、停止、崩溃、Cmd+Q 后无效。关窗口保留等待。恶意文件内容不产生用户批准，不允许将工具输出当授权来源。
 
 实际的路径/审批与分类器探针见 [policy/probe.py](../validation/policy/probe.py)；探针是有限规则机制证明，不是完整生产规则集合。
 
@@ -291,7 +293,7 @@ WorkspacePanel 提供文件/预览 tabs、可调宽度、展开阅读、独立�
 
 100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。正式 P6 基准由 `tests/features/performance/large-input-scenario.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数字见本地阶段结果。
 
-结构化日志含 session/run/tool/input/epoch，避免跨会话串联；脱敏 key/header，保留有限错误、退出码、耗时、版本与 artifact hash。指标和审批信息不是 assistant 正文，不伪造为 thinking。
+结构化日志含 session/run/tool/input，避免跨会话串联；脱敏 key/header，保留有限错误、退出码、耗时、版本与 artifact hash。指标和审批信息不是 assistant 正文，不伪造为 thinking。
 
 ## 11. 测试与证据的解释
 
@@ -379,4 +381,4 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 
 ## 完整工具日志
 
-日志直接保存在 logs/{sessionId}/{sha256(toolCallId)}/{executionId}.log，不建立 SQLite 索引或 sidecar。查看前用活动工具或原生历史确认归属，再有界列举该工具目录（每页 100 条），正文分页 32 KiB；每次执行仍合计最多保存 10 MiB。Main 返回短期日志 ID，读取再次验证归属、根、普通文件和无重定向。没有新布局日志明确提示“未保存可读取的完整日志”；旧布局文件原样保留，不自动迁移或清理。资源峰值仍由执行监督使用，不为 UI 另存日志元数据。
+日志直接保存在 logs/{sessionId}/{sha256(toolCallId)}/{runId}.log，不建立 SQLite 索引或 sidecar。查看前用活动工具或原生历史确认归属，再有界列举该工具目录（每页 100 条），正文分页 32 KiB；每次执行仍合计最多保存 10 MiB。Main 返回短期日志 ID，读取再次验证归属、根、普通文件和无重定向。没有新布局日志明确提示“未保存可读取的完整日志”；旧布局文件原样保留，不自动迁移或清理。资源峰值仍由执行监督使用，不为 UI 另存日志元数据。

@@ -312,3 +312,16 @@ Main 列表发现、Host 连接探测与会话请求接入 Electron 网络栈以
 `pnpm quality` 通过，阶段 C 本地提交为 `59e6d6a`；阶段 D 提交包含最后的测试就绪等待修正及最终文档。所有自动 UI 窗口后台隐藏，构建和 .app 位于独立 test-results 目录，没有覆盖用户 out/release，也没有直接修改用户业务库。本轮未调用真实模型或执行 Judge；live 评测脚本已改用工作区接口，未把静态更新声明为 live 验收。升级在新版实际启动时自动备份并迁移，旧文件原样保留。
 
 收尾检查：按可执行路径筛选 test-results 下的应用进程，残留为 0。性能样本 CDP P95 为 38.92 ms，两会话 Python 聚合峰值约 700.5 MiB，应用进程树峰值约 1.53 GiB；仅代表该固定合成 fixture 的本机测量。
+
+## 2026-11-07：统一 run 身份并删除无用执行字段
+
+已完成：迁移 12 将 sessions.execution_id/state/error 和 input_submissions.execution_id 统一为 run_id/state/error 与 run_id；删除 execution_epoch、execution_started_at、execution_ended_at、execution_provider、execution_model。升级前备份覆盖所有低于当前支持版本的已有库；保留历史迁移，不改写 JSONL 或 workspace。
+
+Main、Host、Renderer、工具和审批 contracts 不再传递 hostEpoch；跨执行隔离使用 sessionId/runId，同 run 保留 seq 水位和当前任务对象校验。新 run 始终使用新 ID，重启不自动重放任务。历史模型与用量仍从原生会话记录读取。
+
+验证：
+
+- 定向 5/5 通过：存储 10 → 12、11 → 12 迁移、DDL 失败回滚/WAL 备份、旧 run 状态与 ACK 拒绝、快照水位、跨 run/会话审批拒绝及一次性消费。证据：test-results/2026-11-07T11-48-53.666Z。
+- 完整普通回归 87/87 通过，包含原生集成、后台 CDP、崩溃/重启、并发、steer/follow-up、澄清/审批、用量和真实 HTTP 边界录制重放，以及最终序列化请求前缀回归。证据：test-results/2026-11-07T11-50-20.211Z。
+- 首次受限环境运行的进程监督相关 6 项失败（supervisor_error/子进程无法执行）；保留 test-results/2026-11-07T11-49-10.130Z。使用相同代码和断言在允许进程监督的环境重跑全量通过，没有绕过断言。
+- pnpm quality 通过；未运行 live 模型、打包或性能基准。测试使用隔离目录、隐藏窗口，不直接升级用户正在使用的业务数据库。

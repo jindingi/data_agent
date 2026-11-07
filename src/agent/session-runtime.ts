@@ -33,7 +33,6 @@ import type { Interaction } from '../shared/tools';
 export interface RuntimeConfig {
   sessionId: string;
   runId: string;
-  hostEpoch: string;
   file: string;
   workspace: string;
   piSessionId: string | null;

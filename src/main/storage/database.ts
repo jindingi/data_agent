@@ -149,6 +149,20 @@ export const migrations: Migration[] = [
     `,
   },
   { version: 11, sql: '', after: simplifyStorage },
+  {
+    version: 12,
+    sql: `
+      ALTER TABLE sessions RENAME COLUMN execution_id TO run_id;
+      ALTER TABLE sessions RENAME COLUMN execution_state TO run_state;
+      ALTER TABLE sessions RENAME COLUMN execution_error TO run_error;
+      ALTER TABLE sessions DROP COLUMN execution_epoch;
+      ALTER TABLE sessions DROP COLUMN execution_started_at;
+      ALTER TABLE sessions DROP COLUMN execution_ended_at;
+      ALTER TABLE sessions DROP COLUMN execution_provider;
+      ALTER TABLE sessions DROP COLUMN execution_model;
+      ALTER TABLE input_submissions RENAME COLUMN execution_id TO run_id;
+    `,
+  },
 ];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec(
@@ -187,7 +201,7 @@ export function openDatabase(file: string) {
       : 0;
     if (version > migrations.at(-1)!.version)
       throw new Error('数据库版本高于此应用支持范围，请升级应用');
-    if (version > 0 && version < 11 && file !== ':memory:') {
+    if (version > 0 && version < migrations.at(-1)!.version && file !== ':memory:') {
       const directory = join(dirname(file), 'backups');
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       if (

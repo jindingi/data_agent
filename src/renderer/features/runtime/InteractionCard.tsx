@@ -22,7 +22,6 @@ export function InteractionCard({
         interactionId: value.id,
         sessionId: value.sessionId,
         runId: value.runId,
-        hostEpoch: value.hostEpoch,
         digest: value.digest,
         answer: response,
       });

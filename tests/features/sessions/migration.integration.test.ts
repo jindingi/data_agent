@@ -109,7 +109,7 @@ it('sessions.storage-migration upgrades populated WAL storage atomically to six 
       join(root, 'old.log'),
     );
     // Failure after all DDL still rolls the whole migration back.
-    const migration = migrations.at(-1)!;
+    const migration = migrations.find((item) => item.version === 11)!;
     expect(() =>
       migrate(db, [
         {
@@ -146,12 +146,12 @@ it('sessions.storage-migration upgrades populated WAL storage atomically to six 
       );
       const snapshot = upgraded
         .prepare(
-          'SELECT execution_id,execution_state,agent_config_revision,agent_config_override FROM sessions WHERE id=?',
+          'SELECT run_id,run_state,agent_config_revision,agent_config_override FROM sessions WHERE id=?',
         )
         .get(session);
       expect(snapshot).toEqual({
-        execution_id: lastRun,
-        execution_state: 'interrupted',
+        run_id: lastRun,
+        run_state: 'interrupted',
         agent_config_revision: 1,
         agent_config_override: null,
       });
@@ -217,6 +217,105 @@ it('sessions.storage-migration upgrades populated WAL storage atomically to six 
     expect(readFileSync(history)).toEqual(bytes[1]);
   } finally {
     db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('sessions.run-migration preserves schema 11 identities, errors and inputs while dropping unused execution metadata', () => {
+  const root = mkdtempSync(join(tmpdir(), 'run-upgrade-'));
+  const file = join(root, 'state.sqlite');
+  const legacy = new Database(file);
+  try {
+    legacy.pragma('journal_mode=WAL');
+    legacy.pragma('foreign_keys=ON');
+    migrate(
+      legacy,
+      migrations.filter((item) => item.version <= 11),
+    );
+    legacy
+      .prepare(
+        `INSERT INTO sessions(id,title,workspace,session_file,state,created_at,updated_at,
+      execution_id,execution_epoch,execution_state,execution_error,execution_provider,execution_model,execution_started_at,execution_ended_at)
+      VALUES ('s','kept',? ,?,'persisted','created','updated','r','epoch','failed','kept error','deepseek','deepseek-flash','start','end')`,
+      )
+      .run(join(root, 'workspace'), join(root, 'history.jsonl'));
+    legacy
+      .prepare(
+        `INSERT INTO input_submissions(input_id,session_id,execution_id,kind,state,digest,pending_text,pending_paths)
+      VALUES ('i','s','r','followUp','unknown','digest','pending','["/source.csv"]')`,
+      )
+      .run();
+    const originalInputs = legacy.prepare('SELECT * FROM input_submissions').all() as Record<
+      string,
+      unknown
+    >[];
+    const migration = migrations.find((item) => item.version === 12)!;
+    expect(() =>
+      migrate(legacy, [
+        {
+          ...migration,
+          after() {
+            throw new Error('injected after DDL');
+          },
+        },
+      ]),
+    ).toThrow('injected after DDL');
+    expect(legacy.prepare('SELECT execution_id,execution_error FROM sessions').get()).toEqual({
+      execution_id: 'r',
+      execution_error: 'kept error',
+    });
+    expect(legacy.prepare('SELECT * FROM input_submissions').all()).toEqual(originalInputs);
+    const upgraded = openDatabase(file);
+    try {
+      const columns = (upgraded.pragma('table_info(sessions)') as { name: string }[]).map(
+        (item) => item.name,
+      );
+      expect(columns.filter((name) => name.startsWith('execution_'))).toEqual([]);
+      expect(columns.filter((name) => name.startsWith('run_')).sort()).toEqual([
+        'run_error',
+        'run_id',
+        'run_state',
+      ]);
+      expect(
+        upgraded
+          .prepare('SELECT run_id,run_state,run_error,title,created_at,updated_at FROM sessions')
+          .get(),
+      ).toEqual({
+        run_id: 'r',
+        run_state: 'failed',
+        run_error: 'kept error',
+        title: 'kept',
+        created_at: 'created',
+        updated_at: 'updated',
+      });
+      expect(upgraded.prepare('SELECT * FROM input_submissions').all()).toEqual(
+        originalInputs.map(({ execution_id, ...rest }) => ({ ...rest, run_id: execution_id })),
+      );
+      expect(upgraded.pragma('foreign_key_check')).toEqual([]);
+      migrate(upgraded);
+      expect(upgraded.prepare('SELECT count(*) n FROM input_submissions').get()).toEqual({ n: 1 });
+      const backups = readdirSync(join(root, 'backups'));
+      expect(backups).toHaveLength(1);
+      const backup = new Database(join(root, 'backups', backups[0]), { readonly: true });
+      try {
+        expect(backup.prepare('SELECT execution_id,execution_error FROM sessions').get()).toEqual({
+          execution_id: 'r',
+          execution_error: 'kept error',
+        });
+        expect(backup.prepare('SELECT max(version) n FROM schema_migrations').get()).toEqual({
+          n: 11,
+        });
+      } finally {
+        backup.close();
+      }
+    } finally {
+      upgraded.close();
+    }
+    const reopened = openDatabase(file);
+    reopened.close();
+    expect(readdirSync(join(root, 'backups'))).toHaveLength(1);
+  } finally {
+    legacy.close();
     rmSync(root, { recursive: true, force: true });
   }
 });

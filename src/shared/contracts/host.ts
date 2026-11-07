@@ -14,7 +14,6 @@ const runtimeConfigSchema = z
   .object({
     sessionId: id,
     runId: id,
-    hostEpoch: id,
     file: z.string().min(1),
     workspace: z.string().min(1),
     piSessionId: z.string().nullable(),

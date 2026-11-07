@@ -58,7 +58,6 @@ async function harness(
   const config = options.config ?? {
     sessionId: randomUUID(),
     runId: randomUUID(),
-    hostEpoch: randomUUID(),
     file: join(root, 'sessions/session.jsonl'),
     workspace: join(root, 'workspace'),
     piSessionId: null,
@@ -144,7 +143,7 @@ it('conversation.streaming real SDK streams thinking, text and matching read too
   expect(readFileSync(h.config.file, 'utf8')).not.toContain(h.config.apiKey);
 });
 
-it('conversation.snapshot watermark rejects stale, cross-session and previous-epoch snapshots', async () => {
+it('conversation.snapshot watermark rejects stale, cross-session and previous-run snapshots', async () => {
   const h = await harness({ speed: 100 });
   h.faux.setResponses([
     fauxAssistantMessage(
@@ -171,12 +170,11 @@ it('conversation.snapshot watermark rejects stale, cross-session and previous-ep
     ),
   ).toBe(restored);
   expect(
-    acceptSnapshot(
-      restored,
-      { ...snapshot, hostEpoch: randomUUID(), seq: 999 },
-      h.config.sessionId,
-    ),
+    acceptSnapshot(restored, { ...snapshot, runId: randomUUID(), seq: 999 }, h.config.sessionId),
   ).toBe(restored);
+  const nextRun = { ...snapshot, runId: randomUUID(), seq: 0 };
+  expect(acceptSnapshot(restored, nextRun, h.config.sessionId, true)).toBe(nextRun);
+  expect(acceptSnapshot(nextRun, { ...snapshot, seq: 999 }, h.config.sessionId)).toBe(nextRun);
   await h.finished();
   expect(acceptSnapshot(restored, h.snapshots.at(-1)!, h.config.sessionId)?.state).toBe(
     'completed',
@@ -187,7 +185,6 @@ it('conversation.snapshot watermark rejects stale, cross-session and previous-ep
       file: join(root, 'sessions/queued.jsonl'),
       sessionId: randomUUID(),
       runId: randomUUID(),
-      hostEpoch: randomUUID(),
     },
   });
   let release!: () => void;
@@ -275,7 +272,6 @@ it('conversation.input-identity duplicate input text keeps distinct IDs and only
   const restarted = await harness({
     config: {
       ...h.config,
-      hostEpoch: randomUUID(),
       runId: randomUUID(),
       piSessionId: records[0].id,
     },
@@ -305,7 +301,6 @@ it('conversation.input-identity duplicate input text keeps distinct IDs and only
       ...h.config,
       file: crashFile,
       piSessionId: manager.getSessionId(),
-      hostEpoch: randomUUID(),
       runId: randomUUID(),
     },
   });

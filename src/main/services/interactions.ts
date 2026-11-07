@@ -36,13 +36,13 @@ export class InteractionBroker {
     });
   }
   answer(
-    binding: Pick<Interaction, 'id' | 'sessionId' | 'runId' | 'hostEpoch' | 'digest'>,
+    binding: Pick<Interaction, 'id' | 'sessionId' | 'runId' | 'digest'>,
     answer: InteractionAnswer,
   ) {
     const pending = this.pending.get(binding.id);
     if (
       !pending ||
-      ['sessionId', 'runId', 'hostEpoch', 'digest'].some(
+      ['sessionId', 'runId', 'digest'].some(
         (key) => pending.value[key as keyof Interaction] !== binding[key as keyof typeof binding],
       ) ||
       pending.value.kind !== answer.kind

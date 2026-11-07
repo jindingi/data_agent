@@ -54,13 +54,11 @@ beforeEach(() => {
   ensureAppPaths(paths);
   db = openDatabase(paths.database);
   const session = new SessionService(db, paths).create();
-  const runId = randomUUID(),
-    hostEpoch = randomUUID();
+  const runId = randomUUID();
   tools = new ToolService(resources, paths.logs, new InteractionBroker());
   context = {
     sessionId: session.id,
     runId,
-    hostEpoch,
     hostPid: process.pid,
     workspace: session.workspace,
     protectedRoots: [paths.sessions, paths.database, paths.logs],
@@ -192,6 +190,17 @@ it('approvals.policy classifies commands, scripts, protected paths and rechecks 
     (await inspect({ name: 'bash', command: `rm -rf ${JSON.stringify(join(root, 'data'))}` }))
       .decision,
   ).toBe('deny');
+  const isolated = await execute(
+    { name: 'write', path: join(external, 'run-bound.txt'), content: 'approved' },
+    (value) => {
+      expect(() => answer({ ...value, runId: randomUUID() })).toThrow('这项请求已结束或不匹配');
+      expect(() => answer({ ...value, sessionId: randomUUID() })).toThrow('这项请求已结束或不匹配');
+      answer(value);
+      expect(() => answer(value)).toThrow('这项请求已结束或不匹配');
+    },
+  );
+  expect(isolated.isError).toBe(false);
+  expect(readFileSync(join(external, 'run-bound.txt'), 'utf8')).toBe('approved');
   // Approval binds the resolved path even if a symlink is retargeted while waiting.
   const link = join(context.workspace, 'target-link');
   symlinkSync(join(external, 'first.txt'), link);

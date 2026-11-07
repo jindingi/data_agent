@@ -159,7 +159,6 @@ export const commandSchema = z.discriminatedUnion('type', [
       interactionId: z.string().uuid(),
       sessionId: z.string().uuid(),
       runId: z.string().uuid(),
-      hostEpoch: z.string().uuid(),
       digest: z.string().length(64),
       answer: interactionAnswerSchema,
     })

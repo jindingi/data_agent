@@ -186,7 +186,6 @@ export async function dispatchCommand(
           id: input.interactionId,
           sessionId: input.sessionId,
           runId: input.runId,
-          hostEpoch: input.hostEpoch,
           digest: input.digest,
         },
         input.answer,
