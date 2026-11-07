@@ -1038,5 +1038,115 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["agent-config", "workspace"]
+  },
+  {
+    "id": "reports.engine",
+    "feature": "reports",
+    "level": "e2e",
+    "file": "tests/features/reports/engine.e2e.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["preview", "packaging"]
+  },
+  {
+    "id": "preview.html",
+    "feature": "preview",
+    "level": "e2e",
+    "file": "tests/features/preview/html.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["reports", "workspace", "agent-config"]
+  },
+  {
+    "id": "packaging.interactive-reports",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/interactive-reports.e2e.mjs",
+    "model": "none",
+    "environment": "packaged",
+    "tags": [],
+    "related": ["reports", "workspace", "agent-config"]
+  },
+  {
+    "id": "preview.html-access-unit",
+    "feature": "preview",
+    "level": "unit",
+    "file": "tests/features/preview/html-access.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["reports", "workspace", "agent-config"]
+  },
+  {
+    "id": "agent-config.report-resources-unit",
+    "feature": "agent-config",
+    "level": "unit",
+    "file": "tests/features/agent-config/report-resources.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["reports", "packaging"]
+  },
+  {
+    "id": "reports.live-interactive",
+    "feature": "reports",
+    "level": "e2e",
+    "file": "tests/features/reports/live-interactive.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview", "agent-config", "artifacts"]
+  },
+  {
+    "id": "preview.html-isolation",
+    "feature": "preview",
+    "level": "e2e",
+    "file": "tests/features/preview/html-isolation.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["reports", "workspace", "lifecycle"]
+  },
+  {
+    "id": "reports.delivery",
+    "feature": "reports",
+    "level": "e2e",
+    "file": "tests/features/reports/delivery.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview", "agent-config", "artifacts"]
+  },
+  {
+    "id": "performance.interactive-reports",
+    "feature": "performance",
+    "level": "e2e",
+    "file": "tests/features/performance/interactive-reports.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["performance"],
+    "related": ["reports", "preview"]
+  },
+  {
+    "id": "preview.html-lifecycle-unit",
+    "feature": "preview",
+    "level": "unit",
+    "file": "tests/features/preview/html-lifecycle.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["reports", "lifecycle"]
+  },
+  {
+    "id": "agent-config.report-migration",
+    "feature": "agent-config",
+    "level": "integration",
+    "file": "tests/features/agent-config/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["reports", "sessions"]
   }
 ]

@@ -42,6 +42,12 @@ async function scenario(dir, mode) {
       'APP_ROOT',
       skillPath.slice(0, -'/resources/skills/data-analysis/SKILL.md'.length),
     );
+    const reportSkill = agentConfig.binding.skills.find((s) => s.id === 'interactive-report');
+    if (reportSkill)
+      transport.bind(
+        'REPORT_SKILL_ROOT',
+        reportSkill.filePath.slice(0, -'/resources/skills/interactive-report/SKILL.md'.length),
+      );
     await app.page
       .getByRole('textbox', { name: '分析需求' })
       .fill(

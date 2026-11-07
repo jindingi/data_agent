@@ -13,7 +13,7 @@ import { ToolService } from '../../../src/main/services/tools';
 import { InteractionBroker } from '../../../src/main/services/interactions';
 import { getRuntimePaths } from '../../../src/node/runtime-paths';
 import { ensureAppPaths, getAppPaths } from '../../../src/node/app-paths';
-import { defaultAgentConfig } from '../../../src/shared/agent-config';
+import { currentDefaultAgentConfig, defaultAgentConfig } from '../../../src/shared/agent-config';
 import type { RuntimeSnapshot } from '../../../src/shared/runtime';
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -123,7 +123,7 @@ it('agent-config.admission queued and running sessions retain bindings; Main rej
   }
   await vi.waitFor(() => expect(versions).toEqual([2, 2]));
   expect(service.snapshot(ids[2])?.state).toBe('queued');
-  configs.save({ ...defaultAgentConfig, systemPrompt: 'New default' }, 2);
+  configs.save({ ...currentDefaultAgentConfig, systemPrompt: 'New default' }, 2);
   const observers = { output: () => {}, interaction: () => {} };
   const denied = await handlers.get(ids[0])!(
     'forged-write',
@@ -147,5 +147,14 @@ it('agent-config.admission queued and running sessions retain bindings; Main rej
   });
   await vi.waitFor(() => expect(versions).toEqual([2, 2, 2, 3]));
   expect(configs.require(next.sessionId).revision).toBe(3);
+  const interactive = configs
+    .require(next.sessionId)
+    .skills.find((s) => s.id === 'interactive-report')!;
+  await handlers.get(next.sessionId)!(
+    'read-interactive',
+    { name: 'read', path: interactive.filePath },
+    observers,
+  );
+  expect(execute.mock.calls.at(-1)![2]).toEqual({ name: 'read', path: interactive.filePath });
   await service.cancel(next.sessionId);
 });

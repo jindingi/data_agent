@@ -4,7 +4,7 @@
 
 P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan.md)，当前实现范围见 [产品说明](mvp-plan.md) 和 [技术设计](technical-design.md)。新增用例须按功能注册；旧门禁记录保留，不能据此宣称新 UX 问题已解决。UI 设计与视觉评审遵循 [设计原则](design-principles.md)。
 
-后续 HTML 交互报告见 [实现计划](interactive-report-plan.md)：按技术验证、资源与配置、新 skill、正式预览、真实交付五个阶段推进，当前均待实施。用例按功能注册，不恢复 Pn 阶段 runner；本计划文档提交不代表功能验收通过。
+HTML 交互报告的实施及验收范围见 [实现计划](interactive-report-plan.md)：资源/配置、独立 skill 与隔离预览已接入，用例已按功能注册。普通回归、打包、真实生成与质量 Judge 分别记录，不恢复 Pn 阶段 runner；未通过的真实生成或未测浏览器不能由静态门禁替代。
 
 ## 1. 两类验证与完成规则
 

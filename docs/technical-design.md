@@ -1,10 +1,10 @@
 # 数据分析客户端：技术设计与验证
 
-更新日期：2026-11-07。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
+更新日期：2026-11-08。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
 
 每会话单个追加式事件文件的后续设计见 [Session 追加日志设计](session-logging-plan.md)，目前待实施；本文其他章节仍描述已实现行为。
 
-HTML 交互报告的后续工作见 [实现计划](interactive-report-plan.md)，目前待实施：新增独立 skill、内置 ECharts、自由 HTML/CSS/JS 生成及隔离预览，不固定报告布局，不定义报告 DSL 或组件生成器。现有 Markdown/PNG 与源码预览行为尚未改变。
+HTML 交互报告已接入独立 skill、内置 ECharts 与隔离查看器；验收范围与未通过项见 [实施计划](interactive-report-plan.md)。不固定报告布局，不定义报告 DSL 或组件生成器。
 
 后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX 修复与 R1–R6 重构已完成；历史验收见 Git 与本地 test-results，当前回归入口见 [测试指南](testing-guide.md)；下文描述实际结构与契约。
 
@@ -214,11 +214,11 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 ### Agent 配置与会话固定版本
 
-`shared/agent-config.ts` 定义 schemaVersion=1、行为提示词（最多 32,000 字符）、固定工具 ID 与内置 skill ID。只接受白名单并按固定顺序归一化；skill 开启要求 read，纯聊天允许工具与 skills 均为空。`composeAgentPrompt` 将可编辑行为、只读工作区约束及与启用能力一致的说明组合；关闭 data-analysis 时不再留下固定读取指令。默认组合保留此前完整提示词字节，减少非必要上下文变化。
+`shared/agent-config.ts` 定义 schemaVersion=1、行为提示词（最多 32,000 字符）、固定工具 ID 与内置 skill ID。只接受白名单并按固定顺序归一化；skill 开启要求 read，纯聊天允许工具与 skills 均为空。`composeAgentPrompt` 将可编辑行为、只读工作区约束及与启用能力一致的说明组合；关闭 data-analysis 时不再留下固定读取指令。promptVersion=1 保留此前完整提示词字节；新保存的配置使用 promptVersion=2，根据交付意图选择两个 skill，新安装默认同时启用。已有默认修订与会话不自动升级。
 
 `main/services/agent-config.ts` 是 SQLite 唯一写者。agent_config_revisions 保存修订，sessions 保存修订引用或特殊历史覆盖；snapshot 包括配置、提示词协议版本、skill 正文/描述/路径/哈希和指纹。最新修订作为默认配置，不为旧会话覆盖绑定；无实际变化不增版本，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存修订均在 SQLite 事务内。会话创建事务同时写入绑定，故首次输入排队前已固定；未接收的首页草稿仍不创建会话。配置与 skill 正文是配置数据，不是第二份聊天记录。
 
-Main 从可信打包目录取内置 skill，将启用正文按内容哈希物化到 `agent-resources/{sha256}/resources/skills/{id}/SKILL.md`，拒绝缓存路径符号链接及正文哈希不符。文件缺失可从 SQLite 快照恢复；创建缓存后数据库事务失败产生的孤立缓存不影响绑定，不自动清理仍可能被引用的版本。已保存的启用 skill 保持原内容，应用升级不隐式更新旧默认配置；新的未启用资源可在明确启用并保存时纳入修订。配置资源允许读取，但可检测写入/删除被策略拒绝。这仍是尽力规则检查，不宣称文件系统不可绕过。
+Main 从可信打包目录取内置 skill，将旧 skill 正文按内容哈希、新 skill 完整资源集合按 bundleHash 物化到 `agent-resources/{sha256}/resources/skills/{id}/SKILL.md`，拒绝缓存路径符号链接及正文哈希不符。文件缺失可从 SQLite 快照恢复；创建缓存后数据库事务失败产生的孤立缓存不影响绑定，不自动清理仍可能被引用的版本。已保存的启用 skill 保持原内容，应用升级不隐式更新旧默认配置；新的未启用资源可在明确启用并保存时纳入修订。配置资源允许读取，但可检测写入/删除被策略拒绝。这仍是尽力规则检查，不宣称文件系统不可绕过。
 
 Host 接收 `agentConfig` 快照，通过现有 `createAgentSession` 初始化：只声明/注册启用工具；ResourceLoader 只返回启用 skill 的元数据，正文继续按需 read。Main 使用 Task 绑定再次检查工具名，拒绝被禁用工具，不能只隐藏模型声明。普通产品 Host 始终带配置与工具代理；未带配置的低层测试入口保留兼容，不作为产品选项。
 
@@ -288,6 +288,20 @@ WorkspacePanel 提供文件/预览 tabs、可调宽度、展开阅读、独立�
 “另存文件”由原生保存对话框选择目标，文件最大 500 MiB，以同一个校验后的描述符分块 64 KiB 复制到临时文件，检查源/目标变化后提交；异常清理本次临时文件，不覆盖源文件。只复制选中的文件，不批量打包相对图片。需要整个目录时通过 Finder 操作。旧版本目录如在 workspace 内，仅作为普通目录；无版本选择器、版本导出或旧索引兼容。
 
 工作台检查文件访问、尺寸与安全渲染，不检查报告业务数值或代码正确性，也不要求 metrics/manifest 文件。Agent 自建 manifest 只是普通文件。语义效果由独立 Judge 评价。
+
+### 隔离 HTML 查看器
+
+`report.open/layout/close` 复用可信主窗口 IPC，使用 sessionId、条目 ID 与一次性 viewer ID，不接受 Renderer 提供 HTML 正文或磁盘路径。WorkspaceFileService 对 `.html/.htm` 完整有界读取，复用文件身份/归属/链接竞态校验，拒绝空文件、无效 UTF-8、NUL 及超过 32 MiB 的文件，不截断后执行。HtmlReportService 串行完整读取、丢弃过期请求；全局仅拥有一个报告 view，旧 close/layout 不能影响后继。
+
+Main 为每次打开创建独立 WebContentsView 与非持久化 session。`data-report://document/{uuid}` 仅提供该次已验证的内存字节，无文件映射；仅允许精确文档的主 frame GET。无 preload、Node 或业务 IPC；sandbox/contextIsolation/webSecurity 均开启。响应 CSP 只允许内联脚本/样式及 data 图片/字体，禁止 eval、外部脚本、connect、frame/object、worker、base、form。独立 session 拒绝额外请求、设备权限与下载，阻止弹窗和跨文档导航，保留页内锚点。WebRTC 禁用非代理 UDP，并为该 session 设置无绕过的封闭本地代理；不改变主窗口网络配置。错误仅发有界通用摘要并去重，不转发报告原文。
+
+HtmlReport 只计算宿主槽位并发送有界位置；Main 再裁剪到窗口范围。调宽、展开、源码切换及隐藏不重建页面；宿主弹窗/菜单/提示浮层出现时隐藏原生 view，避免遮挡。选中文件/会话变化、会话删除和主窗口关闭销毁 view；显式刷新重新读取并重置交互。目录自动刷新不重载 HTML。关闭视图不停止 Agent。主 Renderer/Markdown 的 CSP 和 raw HTML 禁令保持原样。
+
+`interactive-report` 的 SKILL.md 与简短 references 随配置快照保存；vendor/echarts.min.js、LICENSE、NOTICE 只记录路径、字节数和 SHA-256。资源集合按路径排序并规范化字段顺序参与 bundleHash；物化先校验再以临时文件提交，不接受链接或篡改字节。新快照仅 promptVersion=2 使用 assets/bundleHash，旧快照不补默认字段，继续原指纹算法。旧缓存保留；缺失 vendor 只从相同哈希的安装资源恢复，否则报配置待确认，不能替换库版本。报告自身已内嵌资源，不受生成资源缺失影响。文件缓存与 SQLite 不是跨介质原子事务，无引用缓存可保留。
+
+ECharts 6.1.0 锁定为构建依赖，resources/echarts-lock.json 固定浏览器分发与许可哈希。scripts/build/report-runtime.mjs 在构建与正式测试准备阶段从锁定依赖复制到 runtime/report-runtime，已有不一致文件拒绝覆盖；升级时清理这份可重建目录后重新准备，不清理用户 agent-resources。electron-builder 复制到 Contents/Resources/report-runtime，verify-release 检查实际包内字节。运行时无 npm/CDN 下载；库不进入主 Renderer bundle，也不读入模型上下文。Agent 用 Python 装配自由 HTML，局部参考文档不规定报告结构。
+
+导出是宿主另存单个 HTML，外部浏览器不再受应用内 session 策略管理。32 MiB 是有界读取合同，不是任意脚本性能保证；大数据由 Agent 按意图聚合/抽样。普通源码复制仅复制截断文本，不能充当报告导出。
 
 ## 10. 执行限额与可观察性
 

@@ -1,6 +1,6 @@
 # 自动测试与模型录制/重放
 
-更新：2026-11-07。本文是持续维护测试的当前入口。P0–P7 是已经完成的开发阶段，不再用作测试组织方式；历史结果不改写，旧 ID 映射见 [legacy-aliases.json](../tests/legacy-aliases.json)。阶段 JSON 只作历史清单留档，`verify:phase -- Pn` 明确报错并提示新入口，不会静默执行缩水的旧门禁。
+更新：2026-11-08。本文是持续维护测试的当前入口。P0–P7 是已经完成的开发阶段，不再用作测试组织方式；历史结果不改写，旧 ID 映射见 [legacy-aliases.json](../tests/legacy-aliases.json)。阶段 JSON 只作历史清单留档，`verify:phase -- Pn` 明确报错并提示新入口，不会静默执行缩水的旧门禁。
 
 ## 目录与职责
 
@@ -20,10 +20,11 @@ tests/
     approvals/                  # 路径策略、联网、审批、澄清
     artifacts/                  # 文件交付/另存及跨轮工作区（保留原用例 ID）
     workspace/                  # 按层目录、受控文件操作与浏览 UI
-    preview/                    # 有界文本/代码/CSV/Markdown/PNG 预览
+    preview/                    # 有界文本/代码/CSV/Markdown/PNG 与隔离 HTML 预览
+    reports/                    # ECharts 引擎、通用工具交付、真实交互报告
     transcript/                 # 消息阅读、执行过程、渲染安全
     usage/                      # 本轮用量、队列归属、并发与恢复
-    performance/                # 100 MB 固定多表基准
+    performance/                # 100 MB 多表基准与交互报告大小/延迟/内存
     packaging/                  # 实际 .app、离线、迁移路径、内置运行时
   support/                      # CDP 操作、受控模型录制/重放等共用机制
   fixtures/model/               # 审阅过的脱敏真实响应，进入 Git
@@ -155,3 +156,19 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 存储简化回归：sessions.storage-migration 使用旧 schema 10 的 WAL fixture，覆盖六表迁移、完整输入顺序、配置引用/覆盖、事务失败回滚、旧删除清单废弃、备份与未知高版本拒绝。普通测试不读取真实用户库。工作区用例验证实际目录，不再等待产物登记或 output_versions 发布。
 
 执行身份简化回归：`sessions.run-migration` 验证 schema 11 → 12 的字段改名/删除、状态与错误/待投递输入保留、DDL 失败回滚、WAL 一致性备份及重复打开不再备份；`sessions.metadata-writes`、`conversation.snapshot` 和 `approvals.policy` 覆盖旧 run 的状态/ACK、快照和审批不能作用于当前 run。普通全量回归继续覆盖队列、重启及实际请求前缀。
+
+## 交互 HTML 回归
+
+`pnpm test -- --feature reports,preview,agent-config` 默认使用 none/scripted，不调用真实模型。正式 runner 的 prepare 从锁定 npm 字节准备 ECharts 资源，unit-only 与干净 CI 不依赖事先启动应用，不下载库。
+
+- `agent-config.report-resources-unit`、`agent-config.storage`：旧 JSON 指纹、缺失恢复/拒绝、链接/篡改、升级默认不变、数据库事务失败、旧会话绑定；`agent-config.admission` 检查 Main 实际读取完整资源包路径。
+- `agent-config.requests`：旧 skill、新 skill 单独启用、两个 skill 同启用及关闭的最终提供方请求，工具循环/预算变化、steer/follow-up、附件和重启前缀；压缩边界仍由 conversation.retry-compaction 验证。
+- `reports.delivery`：用真实通用 read/write/bash 与内置 Python 读取新 skill/资料、装配自由 HTML、内联锁定库、转义数据、实际筛选；模型响应为 scripted，不代表生成质量。
+- `reports.engine`、`preview.html`：真实隐藏 Electron/CDP，ECharts 筛选/重置、源码/隐藏/弹窗/滚动状态、显式刷新、三尺寸/深浅宿主主题、另存和独立离线 file:// Chromium 打开。宿主截图不含独立原生 view，报告截图单独保留；必须实际检查两者，不能把空白宿主槽位当报告截图。
+- `preview.html-access-unit`、`preview.html-lifecycle-unit`、`preview.html-isolation`：完整读取/上限、串行内存分配/过期请求、跨会话拒绝、无 Node/IPC、CSP/eval、file/HTTP/WebSocket/Worker、权限/导航/弹窗/下载、WebRTC UDP 观测、脚本错误摘要、死循环关闭和删除回收。
+
+`pnpm test -- --case packaging.interactive-reports,performance.interactive-reports` 显式运行打包与性能；前者检查实际 .app 的库/许可哈希、预览/另存/独立离线重开，后者记录固定单图/6 图/近 32 MiB 文档的首次可交互、筛选、整个测试应用进程树采样 RSS 及关闭进程释放。内存采样不是操作系统绝对峰值；32 MiB 不是任意生成代码的性能保证。包移动与最小环境仍由既有 packaging.relocation / packaging.offline 用例覆盖，不用专项结果冒充完整 release。
+
+`DATA_AGENT_EVAL_REVIEW=1 pnpm test -- --case reports.live-interactive --live` 生成趋势叙事、分布比较和多图联动报告；使用合成 CSV、真实 DeepSeek 与既有预算，遇到审批写 pending-interactions.json，须逐条审核后通过真实 UI 作答，不自动批准未知命令。检查实际控件/数值变化、重置和离线重开；程序结果与分析准确性 Judge 分开。失败/超时不记通过，生成失败不由测试替写报告。
+
+promptVersion=2 与双 skill 改变了系统提示词，因此 read-tool.deepseek.json 已重新真实录制并审阅；REPORT_SKILL_ROOT 仅归一化第二个冻结资源根路径，完整 prompt/tools/history 匹配不变。录制包含历史 usage，不代表回放计费。Safari 尚无通过记录，不宣称已兼容。

@@ -1,3 +1,4 @@
+import { HtmlReport } from './HtmlReport';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
@@ -31,6 +32,7 @@ export function WorkspacePanel({
   close: () => void;
 }) {
   const size = usePanelSize();
+  const [reportRefresh, setReportRefresh] = useState(0);
   const [wide, setWide] = useState(false),
     [tab, setTab] = useState('files');
   const [showHidden, setShowHidden] = useState(false),
@@ -242,6 +244,7 @@ export function WorkspacePanel({
       </ul>
     );
   }
+  const html = !!selected && /\.html?$/i.test(selected.name);
   return (
     <aside
       ref={size.ref}
@@ -263,7 +266,7 @@ export function WorkspacePanel({
             variant="ghost"
             aria-label="刷新工作区"
             disabled={!sessionId || busy}
-            onClick={() => void refresh()}
+            onClick={() => void refresh().then(() => setReportRefresh((value) => value + 1))}
           >
             <RefreshCw />
           </Button>
@@ -278,7 +281,7 @@ export function WorkspacePanel({
           </Button>
           {tab === 'preview' && selected && (
             <>
-              {preview?.text !== undefined && (
+              {preview?.text !== undefined && (!html || source) && (
                 <Button
                   size="icon"
                   variant="ghost"
@@ -325,7 +328,7 @@ export function WorkspacePanel({
             <span className="workspace-filename" title={selected.relativePath}>
               {selected.relativePath}
             </span>
-            {preview?.entry.name.toLowerCase().endsWith('.md') && (
+            {(html || preview?.entry.name.toLowerCase().endsWith('.md')) && (
               <Button size="sm" variant="ghost" onClick={() => setSource(!source)}>
                 <Code2 size={14} />
                 {source ? '阅读视图' : '查看源码'}
@@ -352,7 +355,12 @@ export function WorkspacePanel({
             <p className="artifact-notice">正在读取工作区…</p>
           ) : null}
         </Tabs.Content>
-        <Tabs.Content value="preview" className="artifact-scroll" tabIndex={0}>
+        <Tabs.Content
+          value="preview"
+          className="artifact-scroll"
+          tabIndex={0}
+          style={html && !source ? { display: 'none' } : undefined}
+        >
           {!selected ? (
             <p className="artifact-notice">从文件列表选择文件进行预览</p>
           ) : preview ? (
@@ -373,6 +381,13 @@ export function WorkspacePanel({
             <p className="artifact-notice">正在读取文件…</p>
           ) : null}
         </Tabs.Content>
+        {html && selected && (
+          <HtmlReport
+            entry={selected}
+            hidden={hidden || tab !== 'preview' || source}
+            refresh={reportRefresh}
+          />
+        )}
       </Tabs.Root>
     </aside>
   );

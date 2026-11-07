@@ -1,18 +1,15 @@
+import { loadBundledSkills } from '../../node/bundled-skills';
 import type Database from 'better-sqlite3';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppPaths } from '../../node/app-paths';
 import { inspectSessionFile } from '../../node/session-integrity';
-import {
-  configDigest,
-  frozenSkillPath,
-  materializeSkills,
-  verifyBinding,
-} from '../../node/agent-config-resources';
+import { configDigest, materializeSkills, verifyBinding } from '../../node/agent-config-resources';
 import { AppError } from '../../shared/errors';
 import {
   composeAgentPrompt,
   defaultAgentConfig,
+  currentDefaultAgentConfig,
   normalizeAgentConfig,
   toolIds,
   type AgentConfig,
@@ -25,34 +22,24 @@ import {
 export class AgentConfigService {
   readonly resourcesRoot: string;
   private bundled: AgentBinding['skills'];
+  private binarySources: Map<string, string>;
   constructor(
     private db: Database.Database,
     paths: AppPaths,
     skillsDirectory: string,
+    reportRuntime = join(skillsDirectory, '../../runtime/report-runtime'),
   ) {
     this.resourcesRoot = join(paths.home, 'agent-resources');
-    const content = readFileSync(join(skillsDirectory, 'data-analysis/SKILL.md'), 'utf8');
-    const description = content.match(/^description: (.+)$/m)?.[1];
-    if (!description || !content.startsWith('---\nname: data-analysis\n'))
-      throw new Error('内置 skill 元数据无效');
-    const sha256 = configDigest(content);
-    this.bundled = [
-      {
-        id: 'data-analysis',
-        name: 'data-analysis',
-        description,
-        content,
-        sha256,
-        filePath: frozenSkillPath(this.resourcesRoot, sha256, 'data-analysis'),
-      },
-    ];
+    const bundle = loadBundledSkills(this.resourcesRoot, skillsDirectory, reportRuntime);
+    this.bundled = bundle.skills;
+    this.binarySources = bundle.binarySources;
     if (!this.db.prepare('SELECT revision FROM agent_config_revisions LIMIT 1').get())
-      this.db.transaction(() => this.insert(defaultAgentConfig))();
+      this.db.transaction(() => this.insert(currentDefaultAgentConfig))();
   }
   settings(): AgentConfigSettings {
     return {
       current: this.current(),
-      defaults: structuredClone(defaultAgentConfig),
+      defaults: structuredClone(currentDefaultAgentConfig),
       availableSkills: this.editableSkills().map(({ id, name, description, content }) => ({
         id,
         name,
@@ -76,6 +63,7 @@ export class AgentConfigService {
       const current = this.current();
       if (current.revision !== expectedRevision)
         throw new AppError('CONFIG_CONFLICT', '配置已在其他操作中更新，请重新加载后再保存');
+      if (JSON.stringify(normalizeAgentConfig(config)) === JSON.stringify(current.config)) return;
       const skills = this.editableSkills().filter((s) => config.enabledSkills.includes(s.id));
       const next = this.build(normalizeAgentConfig(config), skills);
       if (next.fingerprint !== current.fingerprint) this.insert(config, skills);
@@ -83,8 +71,11 @@ export class AgentConfigService {
     return this.settings();
   }
   preview(config: AgentConfig, expectedRevision: number): AgentBinding {
-    if (this.current().revision !== expectedRevision)
+    const current = this.current();
+    if (current.revision !== expectedRevision)
       throw new AppError('CONFIG_CONFLICT', '配置已更新，请重新加载后查看预览');
+    if (JSON.stringify(normalizeAgentConfig(config)) === JSON.stringify(current.config))
+      return current;
     return this.build(
       normalizeAgentConfig(config),
       this.editableSkills().filter((s) => config.enabledSkills.includes(s.id)),
@@ -102,7 +93,7 @@ export class AgentConfigService {
     const contents = {
       config: normalizeAgentConfig(config),
       skills,
-      promptVersion: 1 as const,
+      promptVersion: legacyPreamble ? (1 as const) : (2 as const),
       ...(legacyPreamble === undefined ? {} : { legacyPreamble }),
     };
     return {
@@ -114,7 +105,7 @@ export class AgentConfigService {
   }
   private insert(config: AgentConfig, skills?: AgentBinding['skills']) {
     const binding = this.build(normalizeAgentConfig(config), skills);
-    materializeSkills(this.resourcesRoot, binding);
+    materializeSkills(this.resourcesRoot, binding, this.binarySources);
     const result = this.db
       .prepare('INSERT INTO agent_config_revisions(snapshot) VALUES (?)')
       .run(JSON.stringify(binding));
@@ -150,7 +141,7 @@ export class AgentConfigService {
   require(sessionId: string): AgentBinding {
     try {
       const binding = this.resolve(sessionId);
-      materializeSkills(this.resourcesRoot, binding);
+      materializeSkills(this.resourcesRoot, binding, this.binarySources);
       return binding;
     } catch (error) {
       throw new AppError(
@@ -212,7 +203,7 @@ export class AgentConfigService {
       return this.current();
     }
     const binding = this.recoverLegacy(session.file);
-    materializeSkills(this.resourcesRoot, binding);
+    materializeSkills(this.resourcesRoot, binding, this.binarySources);
     this.db
       .prepare('UPDATE sessions SET agent_config_override=? WHERE id=?')
       .run(JSON.stringify(binding), id);

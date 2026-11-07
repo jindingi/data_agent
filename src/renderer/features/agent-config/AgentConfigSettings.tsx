@@ -2,6 +2,7 @@ import {
   agentConfigSchema,
   normalizeAgentConfig,
   toolIds,
+  skillIds,
   toolLabels,
 } from '../../../shared/agent-config';
 import { Button } from '../../components/ui/button';
@@ -103,9 +104,14 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
             <label className="config-toggle-row">
               <span>
                 <strong>
-                  数据分析 <code>{skill.id}</code>
+                  {skill.id === 'interactive-report' ? '交互报告' : '数据分析'}{' '}
+                  <code>{skill.id}</code>
                 </strong>
-                <small>使用 Python 分析本地数据，生成图表与 Markdown 报告。</small>
+                <small>
+                  {skill.id === 'interactive-report'
+                    ? '自由编写离线 HTML，使用内置 ECharts 生成交互图表。'
+                    : '使用 Python 分析本地数据，生成图表与 Markdown 报告。'}
+                </small>
               </span>
               <input
                 type="checkbox"
@@ -114,12 +120,17 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
                 checked={draft.enabledSkills.includes(skill.id)}
                 disabled={busy}
                 onChange={(event) =>
-                  setDraft({ ...draft, enabledSkills: event.target.checked ? [skill.id] : [] })
+                  setDraft({
+                    ...draft,
+                    enabledSkills: skillIds.filter((id) =>
+                      id === skill.id ? event.target.checked : draft.enabledSkills.includes(id),
+                    ),
+                  })
                 }
               />
             </label>
             <details className="agent-config-details">
-              <summary>查看 data-analysis 说明</summary>
+              <summary>查看 {skill.id} 说明</summary>
               <pre>{skill.content}</pre>
             </details>
           </div>

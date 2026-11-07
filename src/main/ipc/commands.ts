@@ -14,6 +14,7 @@ function success<K extends keyof CommandResponses>(
 export async function dispatchCommand(
   command: Command,
   {
+    reports,
     agentConfigs,
     info,
     host,
@@ -32,6 +33,17 @@ export async function dispatchCommand(
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'report.open':
+      return success(
+        command.type,
+        await reports.open(command.id, command.sessionId, command.entryId),
+      );
+    case 'report.layout':
+      reports.layout(command.id, command.bounds, command.visible);
+      return success(command.type, null);
+    case 'report.close':
+      reports.close(command.id);
+      return success(command.type, null);
     case 'workspace.list':
       return success(
         command.type,
@@ -197,6 +209,7 @@ export async function dispatchCommand(
     case 'sessions.deletePreview':
       return success(command.type, deletion.preview(command.sessionId));
     case 'sessions.delete':
+      reports.closeSession(command.sessionId);
       return success(command.type, await deletion.remove(command.sessionId));
     case 'logs.list':
       return success(

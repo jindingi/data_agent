@@ -1,6 +1,7 @@
+import { HtmlReportService } from './services/html-reports';
 import { WorkspaceFileService } from './services/workspace';
 import { AgentConfigService } from './services/agent-config';
-import { app, BrowserWindow, Menu, safeStorage, nativeImage } from 'electron';
+import { app, BrowserWindow, Menu, safeStorage, nativeImage, protocol } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { writeFileSync } from 'node:fs';
@@ -26,6 +27,9 @@ declare const __DATA_AGENT_DEV_ROOT__: string;
 const resourceAppPath =
   !app.isPackaged && process.env.ELECTRON_RENDERER_URL ? __DATA_AGENT_DEV_ROOT__ : app.getAppPath();
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'data-report', privileges: { standard: true, secure: true } },
+]);
 app.setName('Data Agent');
 const automation = process.argv.includes('--data-agent-automation');
 // Presentation only: this flag never enables automation IPC or test credentials.
@@ -60,6 +64,7 @@ let db: ReturnType<typeof openDatabase> | undefined;
 let runtime: RuntimeService | undefined;
 let deletion: DeletionService | undefined;
 let quitting = false;
+let reports: HtmlReportService | undefined;
 
 function createWindow() {
   window = new BrowserWindow({
@@ -85,6 +90,7 @@ function createWindow() {
     if (url !== rendererURL) event.preventDefault();
   });
   window.on('closed', () => {
+    reports?.close();
     window = null;
   });
   void window.loadURL(rendererURL);
@@ -97,7 +103,14 @@ if (primaryInstance)
       const skillsDirectory = app.isPackaged
         ? join(process.resourcesPath, 'skills')
         : join(resourceAppPath, 'resources/skills');
-      const agentConfigs = new AgentConfigService(db, paths, skillsDirectory);
+      const agentConfigs = new AgentConfigService(
+        db,
+        paths,
+        skillsDirectory,
+        app.isPackaged
+          ? join(process.resourcesPath, 'report-runtime')
+          : join(resourceAppPath, 'runtime/report-runtime'),
+      );
       const sessions = new SessionService(db, paths, undefined, agentConfigs);
       sessions.recoverIntents();
       sessions.reconcile();
@@ -179,7 +192,17 @@ if (primaryInstance)
         ],
         (bytes) => !nativeImage.createFromBuffer(bytes).isEmpty(),
       );
+      reports = new HtmlReportService(
+        () => window,
+        workspaceFiles,
+        (state) => {
+          if (window && !window.isDestroyed())
+            window.webContents.send(IPC_EVENT, { type: 'report.state', state });
+        },
+        background,
+      );
       registerHandlers({
+        reports,
         workspaceFiles,
         trusted: (event) =>
           Boolean(

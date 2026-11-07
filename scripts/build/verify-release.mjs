@@ -53,6 +53,12 @@ export function verifyRelease(
       assert.equal(hash(bytes), hash(readFileSync(file)), `Stale bundled resource ${path}`);
       checked.push({ path, sha256: hash(bytes) });
     }
+  const reportLock = JSON.parse(readFileSync('resources/echarts-lock.json', 'utf8'));
+  for (const [name, item] of Object.entries(reportLock.files)) {
+    const bytes = readFileSync(join(resources, 'report-runtime', name));
+    assert.equal(hash(bytes), item.sha256, `Stale bundled report runtime ${name}`);
+    checked.push({ path: `report-runtime/${name}`, sha256: item.sha256 });
+  }
   const manifest = JSON.parse(readFileSync(join(resources, 'runtime/manifest.json'), 'utf8'));
   const licenses = Object.keys(manifest.files).filter((p) =>
     /LICENSE|COPYING|licenses\/.*OFL/.test(p),

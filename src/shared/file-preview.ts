@@ -22,6 +22,7 @@ export function previewLanguage(name: string): string | undefined {
       bash: 'bash',
       css: 'css',
       html: 'xml',
+      htm: 'xml',
       xml: 'xml',
       md: 'markdown',
       markdown: 'markdown',

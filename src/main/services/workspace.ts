@@ -1,3 +1,4 @@
+import { HTML_REPORT_MAX_BYTES } from '../../shared/html-report';
 import { constants, type Stats } from 'node:fs';
 import { lstat, open, opendir, realpath, rename, unlink } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
@@ -161,6 +162,29 @@ export class WorkspaceFileService {
     } finally {
       await handle.close();
     }
+  }
+  async html(sessionId: string, id: string): Promise<string> {
+    return this.read(sessionId, id, async (handle, ref) => {
+      if (!/\.html?$/i.test(ref.path)) throw new AppError('INVALID_REPORT', '请选择 HTML 文件');
+      if (!ref.stat.size || ref.stat.size > HTML_REPORT_MAX_BYTES)
+        throw new AppError(
+          'REPORT_SIZE',
+          '交互预览仅支持非空且不超过 32 MiB 的 HTML；可查看源码或另存。',
+        );
+      const bytes = Buffer.alloc(ref.stat.size);
+      let offset = 0;
+      while (offset < bytes.length) {
+        const result = await handle.read(bytes, offset, bytes.length - offset, offset);
+        if (!result.bytesRead) throw new AppError('FILE_CHANGED', '文件正在变化，请刷新');
+        offset += result.bytesRead;
+      }
+      try {
+        if (bytes.includes(0)) throw new Error('binary');
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch {
+        throw new AppError('INVALID_REPORT', 'HTML 必须是有效的 UTF-8 文本');
+      }
+    });
   }
   async preview(sessionId: string, id: string): Promise<WorkspacePreview> {
     return this.read(sessionId, id, async (handle, ref) => {

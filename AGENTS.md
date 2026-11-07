@@ -14,7 +14,7 @@
 
 - 产品是支持数据分析的通用 AI 工作台，保证外围流程与交互，不保证 Agent 的代码、方法或分析结论正确。
 - CSV 由选择器取得原文件路径；只校验路径、存在性、每文件和单次选用总量均不超过 100,000,000 bytes。不做 CSV 解析、编码转换、表格预览、内容复制或文件版本管理；允许对 workspace 内文件按临时条目 ID 有界读取 UTF-8 原始文本供只读预览。
-- 使用通用工具与内置 skills，不新增 inspect_csv 等产品专用解析工具。首版仅内置 Python 库，不允许安装额外依赖。
+- 使用通用工具与内置 skills，不新增 inspect_csv 等产品专用解析工具。内置 Python 分析库与固定版本 ECharts 浏览器资源，不允许安装额外依赖。
 - pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。只开放 DeepSeek / OpenRouter 的 BYOK 与 Base URL 覆盖；先保存地址/凭证，再通过 `/models` 获取与锁定 SDK 聊天模型目录的交集。修改地址必须重新输入凭证，修改连接清除缓存列表。自定义提供方/未知模型与用户 skills 后置。
 - Agent 默认配置支持行为提示词、工具和内置 skill 开关，保存为不可变修订；首次创建会话时绑定，已有/排队会话不随默认值变化。版本详情、历史恢复和快照策略见技术设计。
 - 两个会话可同时运行，其余 FIFO；同会话 steer/follow-up 由 pi 队列处理。关闭窗口继续任务，Cmd+Q 停止全部并保存。
@@ -54,14 +54,14 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - Agent 工具执行采用规则与路径检测的尽力策略，不宣称沙箱或可拦截任意代码。Electron Renderer 的 sandbox/contextIsolation 仍必须开启。
 - 工作区外读取默认允许，敏感路径拒绝；检测到外部写入/删除或联网请求批准。危险命令、敏感路径、安装依赖等拒绝项不因一般联网批准而放行。
 - 不把密钥发给 Renderer 或工具子进程，不输出凭证到日志/命令参数/截图；不自动批准未知 live 模型命令。
-- Markdown/产物访问遵守受控路径及外链策略；不能为展示便利开放任意本地读取、HTML 执行或危险 URL scheme。
+- Markdown/产物访问遵守受控路径及外链策略；不能为展示便利开放任意本地读取或危险 URL scheme。HTML 仅通过独立无 preload/IPC 的受限报告 view 执行，禁止在主 Renderer 或 Markdown 中执行。
 
 ## UI 实施要求
 
 详细规则以 [设计原则](docs/design-principles.md) 为准：内容优先、状态稳定、控件可发现；删除无任务用途的装饰信息，不靠标签和口号营造专业感。
 
 - 检查 components.json、现有 Radix/shadcn 组件及 globals.css；保留语义 tokens、data-theme 和现有图标体系，不引入第二套主题状态。
-- 文件预览通过 Main 内存签发的 workspace 条目 ID 的 Main 接口读取，不传任意路径。SourcePreview 使用固定版本 highlight.js 的显式语言包，仅展示转义后的源码；大文件截断/高亮限制见技术设计，不引入 CSV 解析或代码执行。
+- 文件预览通过 Main 内存签发的 workspace 条目 ID 的 Main 接口读取，不传任意路径。SourcePreview 使用固定版本 highlight.js 的显式语言包，仅展示转义后的源码；大文件截断/高亮限制见技术设计，不引入 CSV 解析。HTML 完整执行使用独立 viewer，32 MiB 上限，不复用截断源码；禁止引入固定报告布局、DSL 或组件生成器。
 - 明确空态、加载、失败、审批、禁用、hover/focus 的行为；纯图标按钮同时提供可访问名称和 Tooltip。
 - 可搜索模型列表复用 `features/models/ModelPicker`（Radix Popover + cmdk），搜索置于弹层内；保留键盘、输入法和关闭后焦点恢复，不另设常驻搜索框。
 - 校验独立滚动、长 Markdown、局部横滚、焦点恢复和三种窗口尺寸；流式消息不得抢阅读位置。

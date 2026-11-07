@@ -1,3 +1,4 @@
+import type { HtmlReportService } from '../services/html-reports';
 import type { WorkspaceFileService } from '../services/workspace';
 import type { AgentConfigService } from '../services/agent-config';
 import type { IpcMainInvokeEvent } from 'electron';
@@ -11,6 +12,7 @@ import type { DeletionService } from '../services/deletion';
 import type { LogService } from '../services/logs';
 import type { InteractionBroker } from '../services/interactions';
 export interface HandlerDependencies {
+  reports: HtmlReportService;
   agentConfigs: AgentConfigService;
   trusted: (event: IpcMainInvokeEvent) => boolean;
   info: () => SystemInfo;

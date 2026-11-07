@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
@@ -13,6 +13,7 @@ import { configuredSkills, bindAgentConfiguration } from '../../../src/agent/age
 import { formatSkillsForPrompt } from '@earendil-works/pi-coding-agent';
 import { PolicyService } from '../../../src/main/services/policy';
 import { getRuntimePaths } from '../../../src/node/runtime-paths';
+import { configDigest } from '../../../src/node/agent-config-resources';
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -36,6 +37,40 @@ const tools = genericTools(
   { execute: async () => ({ output: 'ok', isError: false }), subscribe: () => () => {} },
   (value) => value,
 );
+it('agent-config.report-migration preserves installed protocol-1 defaults and rolls back failed resource revisions', () => {
+  const { db, paths, configs, sessions } = fixture();
+  const current = configs.current();
+  expect(current.config.enabledSkills).toEqual(['data-analysis', 'interactive-report']);
+  const contents = {
+    config: defaultAgentConfig,
+    skills: [current.skills[0]],
+    promptVersion: 1 as const,
+  };
+  const old = { ...current, ...contents, fingerprint: configDigest(contents) };
+  db.prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=1').run(
+    JSON.stringify(old),
+  );
+  const installed = new AgentConfigService(db, paths, resolve('resources/skills'));
+  const oldSession = sessions.create();
+  expect(installed.current()).toEqual(old);
+  expect(installed.settings().availableSkills.map((s) => s.id)).toEqual([
+    'data-analysis',
+    'interactive-report',
+  ]);
+  expect(installed.preview(old.config, 1)).toEqual(old);
+  expect(installed.save(old.config, 1).current).toEqual(old);
+  db.exec(
+    "CREATE TRIGGER reject_revision BEFORE INSERT ON agent_config_revisions BEGIN SELECT RAISE(ABORT,'fixture-failure'); END;",
+  );
+  expect(() => installed.save(current.config, 1)).toThrow('fixture-failure');
+  expect(installed.current()).toEqual(old);
+  db.exec('DROP TRIGGER reject_revision');
+  const next = installed.save(current.config, 1).current;
+  expect(next.promptVersion).toBe(2);
+  expect(next.revision).toBe(2);
+  expect(installed.require(oldSession.id)).toEqual(old);
+  expect(installed.require(sessions.create().id)).toEqual(next);
+});
 it('agent-config.storage pins immutable versions, rolls back creation and restores missing resources', async () => {
   const { paths, db, configs, sessions } = fixture();
   const first = sessions.create();
@@ -163,11 +198,15 @@ it('agent-config.legacy restores verified historical state and blocks missing or
   // A changed bundled resource becomes a new revision only when explicitly saved.
   const bundle = join(root, 'changed-skills');
   mkdirSync(join(bundle, 'data-analysis'), { recursive: true });
+  cpSync('resources/skills/interactive-report', join(bundle, 'interactive-report'), {
+    recursive: true,
+  });
   writeFileSync(join(bundle, 'data-analysis/SKILL.md'), legacySkill.content + '\nNew guidance.\n');
   const upgraded = new AgentConfigService(
     db,
     { home: join(root, 'data'), workspace: '', sessions: '', logs: '', database: '' },
     bundle,
+    resolve('runtime/report-runtime'),
   );
   expect(upgraded.current().revision).toBe(2);
 });

@@ -73,7 +73,8 @@ export const cases = {
       await page.getByRole('button', { name: '启用 read 并保留 Skills', exact: true }).click();
       assert(await page.getByRole('switch', { name: '启用 read', exact: true }).isChecked());
       await prompt.fill('Synthetic concise chat instructions.');
-      await page.getByRole('switch', { name: '启用 data-analysis', exact: true }).uncheck();
+      for (const id of v1.config.enabledSkills)
+        await page.getByRole('switch', { name: `启用 ${id}`, exact: true }).uncheck();
       for (const id of v1.config.enabledTools)
         await page.getByRole('switch', { name: `启用 ${id}`, exact: true }).uncheck();
       await page.getByText('查看完整系统提示词预览', { exact: true }).click();

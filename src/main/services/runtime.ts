@@ -492,7 +492,11 @@ export class RuntimeService {
           if (skill && this.agentConfigs)
             operation = {
               ...operation,
-              path: frozenSkillPath(this.agentConfigs.resourcesRoot, skill.sha256, skill.id),
+              path: frozenSkillPath(
+                this.agentConfigs.resourcesRoot,
+                skill.bundleHash ?? skill.sha256,
+                skill.id,
+              ),
             } as typeof operation;
           return this.tools.execute(
             {

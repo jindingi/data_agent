@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createRunContext, setRunContext, preparePackageDependencies } from './run-context.mjs';
 import { verifyRelease } from '../build/verify-release.mjs';
+import { prepareReportRuntime } from '../build/report-runtime.mjs';
 
 export function sourceFingerprint() {
   const hash = createHash('sha256');
@@ -26,6 +27,8 @@ function command(file, args, output, env = process.env) {
   return result;
 }
 export function prepare(plan, options, dir) {
+  // Unit/native tests also consume frozen skills on a clean checkout. No network or Python needed.
+  prepareReportRuntime();
   const context = createRunContext(options['run-root'] ?? dir);
   setRunContext(context);
   const fingerprint = sourceFingerprint(),

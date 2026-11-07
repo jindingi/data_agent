@@ -1,3 +1,4 @@
+import { loadBundledSkills } from '../../../src/node/bundled-skills';
 import { afterEach, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -36,7 +37,19 @@ function binding(config = defaultAgentConfig): AgentBinding {
         },
       ]
     : [];
-  const contents = { config: normalizeAgentConfig(config), skills, promptVersion: 1 as const };
+  const interactive = config.enabledSkills.includes('interactive-report');
+  const selected = interactive
+    ? loadBundledSkills(
+        resolve('test-results/request-resources'),
+        resolve('resources/skills'),
+        resolve('runtime/report-runtime'),
+      ).skills.filter((s) => config.enabledSkills.includes(s.id))
+    : skills;
+  const contents = {
+    config: normalizeAgentConfig(config),
+    skills: selected,
+    promptVersion: interactive ? (2 as const) : (1 as const),
+  };
   return {
     ...contents,
     revision: 1,
@@ -72,7 +85,7 @@ it('refuses to silently remove an unknown historical system section', () => {
   );
   expect(manager.getEntries()).toEqual(before);
 });
-it.each([true, false])(
+it.each([true, false, 'interactive', 'both'] as const)(
   'preserves provider prefixes across tools, steering, follow-up and restart (skills=%s)',
   async (withSkill) => {
     const root = mkdtempSync(join(tmpdir(), 'agent-config-wire-'));
@@ -83,7 +96,14 @@ it.each([true, false])(
       ...defaultAgentConfig,
       systemPrompt: 'Synthetic custom instructions.',
       enabledTools: ['read'],
-      enabledSkills: withSkill ? ['data-analysis'] : [],
+      enabledSkills:
+        withSkill === 'interactive'
+          ? ['interactive-report']
+          : withSkill === 'both'
+            ? ['data-analysis', 'interactive-report']
+            : withSkill
+              ? ['data-analysis']
+              : [],
     });
     const config: RuntimeConfig = {
       sessionId: randomUUID(),
@@ -158,9 +178,9 @@ it.each([true, false])(
     expect(preview.source).toBe('assembled');
     expect(preview.text).toBe((payloads[0].messages[0] as { content: string }).content);
     expect(preview.text).toContain('<cwd>');
-    expect(preview.text.includes('<skills>')).toBe(withSkill);
+    expect(preview.text.includes('<skills>')).toBe(Boolean(withSkill));
     expect(firstSystem).toContain('Synthetic custom instructions.');
-    expect(firstSystem.includes('<available_skills>')).toBe(withSkill);
+    expect(firstSystem.includes('<available_skills>')).toBe(Boolean(withSkill));
     if (!withSkill) expect(firstSystem).not.toContain('data-analysis');
     expect(payloads[0].tools?.map((tool) => tool.function.name)).toEqual(['read']);
     const records = readFileSync(config.file, 'utf8')

@@ -1,3 +1,4 @@
+import type { HtmlReportState } from '../html-report';
 import type { WorkspaceEntry, WorkspaceListing, WorkspacePreview } from '../workspace';
 import {
   agentConfigSchema,
@@ -19,6 +20,32 @@ import type { DeletionPreview, DeletionResult, ToolLogListing, LogPage } from '.
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...base,
+      type: z.literal('report.open'),
+      id: z.string().uuid(),
+      sessionId: z.string().uuid(),
+      entryId: z.string().uuid(),
+    })
+    .strict(),
+  z.object({ ...base, type: z.literal('report.close'), id: z.string().uuid() }).strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('report.layout'),
+      id: z.string().uuid(),
+      visible: z.boolean(),
+      bounds: z
+        .object({
+          x: z.number().finite().min(-20000).max(20000),
+          y: z.number().finite().min(-20000).max(20000),
+          width: z.number().finite().min(0).max(20000),
+          height: z.number().finite().min(0).max(20000),
+        })
+        .strict(),
+    })
+    .strict(),
   z
     .object({
       ...base,
@@ -254,10 +281,14 @@ export interface SystemInfo {
   sqliteVersion: string;
 }
 export type AppEvent =
+  | { type: 'report.state'; state: HtmlReportState }
   | { type: 'host.status'; status: HostStatus }
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'report.open': HtmlReportState;
+  'report.close': null;
+  'report.layout': null;
   'workspace.list': WorkspaceListing;
   'workspace.preview': WorkspacePreview;
   'workspace.resolve': WorkspaceEntry;
