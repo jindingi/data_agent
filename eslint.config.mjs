@@ -62,7 +62,7 @@ export default tseslint.config(
   },
   {
     // Playwright evaluate callbacks execute in the browser, the harness in Node.
-    files: ['tests/e2e/**/*.mjs', 'tests/support/**/*.mjs', 'scripts/test/*.mjs'],
+    files: ['tests/features/**/*.mjs', 'tests/support/**/*.mjs', 'scripts/test/*.mjs'],
     languageOptions: { globals: globals.browser },
   },
   prettier,

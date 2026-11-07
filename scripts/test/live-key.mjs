@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 /** Test runner only. Read one literal assignment; never source shell code or log the value. */
 export function liveKey() {
+  if (process.env.DATA_AGENT_TEST_MODEL_MODE && process.env.DATA_AGENT_TEST_MODEL_MODE !== 'live')
+    throw new Error('Real credentials are forbidden in non-live tests');
   if (process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
   return execFileSync(
     'python3',

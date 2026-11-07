@@ -29,7 +29,7 @@
 | `src/shared/`                               | 可序列化模型与 Zod contracts；不依赖各进程实现或 Node                                                         |
 | `src/node/`                                 | 仅 Node 侧路径、进程、运行时等公共能力                                                                        |
 | `resources/`                                | 内置 skills、可信 Python 辅助脚本、运行时锁定与许可配置                                                       |
-| `scripts/build/`、`scripts/test/`、`tests/` | 构建、正式测试 runner、unit/integration/e2e 与阶段必需清单                                                    |
+| `scripts/build/`、`scripts/test/`、`tests/` | 构建、正式测试 runner、按功能分组的 unit/integration/e2e 与测试目录                                           |
 | `evaluations/`、`validation/`               | 独立 Agent 效果评测、可复用技术探针；不是产品入口                                                             |
 
 Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信。IPC 必须验证参数、发送窗口、主 frame 与可信完整 URL；不能为了修复 dev 问题放宽成任意 localhost/任意 frame。优先查锁定依赖、本地源码和配置，不照抄最新框架模板。
@@ -68,16 +68,23 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 
 日常先运行 `pnpm quality`（格式检查、ESLint 零警告、类型/架构/链接检查）。`pnpm format` 自动格式化，`pnpm lint:fix` 修复可自动处理的 lint 问题；工具正反例验收使用 `pnpm test:tooling`。这些静态门禁不能替代相关功能测试。
 
-| 命令                                        | 用途 / 限制                                           |
-| ------------------------------------------- | ----------------------------------------------------- |
-| `pnpm check`                                | TypeScript、含 alias 的依赖边界及正式文档/AGENTS 链接 |
-| `pnpm test:unit`                            | 确定性单元测试；不能替代 UI/进程验收                  |
-| `pnpm test:integration`                     | 通过正式 runner 验证集成；原生 SQLite 需 Electron ABI |
-| `pnpm test:e2e -- --case <已注册 ID>`       | 定向 Electron/CDP；查 runner 是否自动构建或打包       |
-| `pnpm test:e2e -- --case P0-DEV --no-build` | 已有真实 pnpm dev 隔离启动/IPC 用例                   |
-| `pnpm dev:cdp`                              | 构建后 Electron 的测试入口；不是 Vite HMR 模式        |
-| `pnpm verify:phase -- Pn`                   | 对应阶段完整门禁；部分阶段会调用真实模型，P7 会打包   |
-| `pnpm verify:release`                       | 包资源/完整性校验，不能替代实际 .app UI 验收          |
+| 命令                                               | 用途 / 限制                                                       |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| `pnpm check`                                       | TypeScript、含 alias 的依赖边界及正式文档/AGENTS 链接             |
+| `pnpm test:unit`                                   | 确定性单元测试；不能替代 UI/进程验收                              |
+| `pnpm test:integration`                            | 通过正式 runner 验证集成；原生 SQLite 需 Electron ABI             |
+| `pnpm test -- --feature usage`                     | 按功能跑确定性单元、原生集成与 CDP                                |
+| `pnpm test -- --case application.dev`              | 定向真实 pnpm dev 隔离启动/IPC                                    |
+| `pnpm test -- --affected --base HEAD~1 --dry-run`  | 查看受影响用例和选择原因，无副作用                                |
+| `pnpm test` / `pnpm test:e2e`                      | 全部普通回归 / 普通 E2E，默认不调用真实模型、不打包               |
+| `pnpm test:live -- --case conversation.live-cache` | 显式真实模型，需凭证                                              |
+| `pnpm test -- --suite release --live`              | 完整静态/程序/性能/.app/live 与残留进程审计；涉及命令审批仍须审核 |
+| `pnpm verify:release`                              | 仅包资源检查，不替代 .app UI 验收                                 |
+| `pnpm dev:cdp`                                     | 构建后 Electron 测试入口，不是 Vite HMR                           |
+
+测试当前唯一指南是 [测试指南](docs/testing-guide.md)。用例放 `tests/features/<feature>/`，注册到 `tests/catalog.json`；不要再以 Pn 命名。旧阶段 JSON 只留档，阶段命令已退役；旧单项 ID 可解析为新 ID。修改功能时先查所属目录和 `--affected --dry-run`，不能仅跑未覆盖该修改的旧阶段。
+
+模型模式明确区分 none / scripted / replay / live。普通回归不读取真实密钥；重放在 HTTP 边界验证请求和原始响应，仍使用真实 SDK/工具/存储/UI。录制只用合成数据，候选放忽略目录，脱敏审阅后才提交；不保存请求头/凭证，不允许 replay mismatch 回退 live。重放 usage 是历史样本，不是本次实际花费，也不代表模型当前质量。更新 SDK/提示词/工具时检查录制兼容性，不能删严格匹配来获得绿灯。
 
 - **不要覆写用户正在使用的应用包或构建目录。** `pnpm build`、`package:dir` 和某些测试会写 out/release。先检查在用实例与输出路径，使用独立输出及匹配验证路径，或已停止的目标；不能自行杀掉用户任务来方便测试。正式 runner 已将 build/package 放入独立测试上下文；不要绕过它使用共享目录。
 - `--no-build`/`--no-package` 只用于匹配当前代码的已验证产物；不以旧包结果验证新代码。优先采用已有隔离 harness，不伪称未实现的参数可用。

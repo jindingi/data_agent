@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createRunContext } from '../../scripts/test/run-context.mjs';
-import { mergeCases, requirementsFor } from '../../scripts/test/case-registry.mjs';
+import { validateCatalog, requirementsFor } from '../../scripts/test/case-registry.mjs';
 
 test('test builds have distinct app/build/bundle paths and explicit requirements', () => {
   mkdirSync('test-results', { recursive: true });
@@ -23,8 +23,8 @@ test('test builds have distinct app/build/bundle paths and explicit requirements
     assert.equal(requirementsFor(['P1-SCHEMA']).build, false);
     assert.equal(requirementsFor(['P0-PACKAGE']).packaged, true);
     assert.equal(requirementsFor(['P7-USABILITY']).packaged, false);
-    assert.throws(() => mergeCases({ A() {} }, { A() {} }), /Duplicate/);
-    assert.throws(() => mergeCases({ A: null }), /invalid/);
+    assert.throws(() => validateCatalog([{ id: 'invalid' }]), /invalid/);
+    assert.throws(() => requirementsFor(['missing.test']), /Unknown/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

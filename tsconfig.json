@@ -15,7 +15,9 @@
     "noUnusedParameters": true,
     "types": ["node", "vite/client"],
     "baseUrl": ".",
-    "paths": { "@/*": ["src/renderer/*"] }
+    "paths": {
+      "@/*": ["src/renderer/*"]
+    }
   },
-  "include": ["src", "tests/unit", "tests/integration", "electron.vite.config.ts"]
+  "include": ["src", "tests/features", "electron.vite.config.ts"]
 }

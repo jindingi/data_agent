@@ -1,8 +1,8 @@
 # MVP 分阶段开发、程序验收与 Agent 效果评测计划
 
-更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列 pnpm 产品命令已在正式工程实现；它们与独立探针入口分开维护。
+更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列阶段及其 ID 保留历史设计语境；持续维护命令和目录已迁移到 [测试指南](testing-guide.md)。旧 Pn 执行入口已退役，不再作为当前开发命令。
 
-P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan.md)，尚未实施。新增用例须在实施时注册；旧门禁记录保留，不能据此宣称新 UX 问题已解决。UI 设计与视觉评审遵循 [设计原则](design-principles.md)。
+P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan.md)，已完成的范围见实施进度。新增用例须按功能注册；旧门禁记录保留，不能据此宣称新 UX 问题已解决。UI 设计与视觉评审遵循 [设计原则](design-principles.md)。
 
 ## 1. 两类验证与完成规则
 
@@ -15,7 +15,7 @@ P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan
 
 阶段顺序为 P0 → P1 → P2 → P3 → P4 → P5 → P6 → P7。每阶段必须同时交付实现、可运行测试与机器可读验收结果，并创建该阶段完成 commit，再进入依赖它的下一阶段。允许并行做不依赖未完成功能的工作，但不能跳过门禁。
 
-- 每个阶段运行 `pnpm verify:phase -- Pn`，读取 `tests/phases/Pn.json` 的必需检查清单，执行对应单元/集成/CDP/live 测试；失败返回非零。
+- 原阶段使用 `tests/phases/Pn.json`，现只作留档。后续工作按功能定向验收，完整发布用 `pnpm test -- --suite release --live`；任何完成阶段仍须测试、记录并 commit。
 - 清单对应测试不存在、必需用例未运行、零用例、skip/todo、缺 DeepSeek 测试凭证、网络不可用、构建不存在，均不能计为通过。基础设施阻塞记 blocked，并保留错误；不可切换 mock 或其他模型伪装通过。
 - 每阶段至少包含真实 Electron 的 CDP 验证。涉及 agent 的 P2–P7 另有指定的真实 DeepSeek 用例，确定性测试仍负责覆盖错误分支和竞态。
 - 阶段门禁包含受影响的前置回归；最终 P7 执行所有确定性测试及指定 live 回归。只改文案可运行相应 UI 用例，但不能因此宣称整个阶段或发布验证完成。
@@ -48,16 +48,15 @@ P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan
 
 显示名称不直接用作 API model ID。官方当前将 `deepseek-flash` 映射至 V4.1 Flash，别名后续可能更新；每次 live 测试记录请求模型、响应模型字段、时间、SDK 版本、request ID（若有）和用量。[官方调用说明](https://api-docs.deepseek.com/)
 
-P2 已提供以下入口，均会发起真实模型请求：
+真实只读对话入口（旧 `test:integration:live` 是该 E2E 场景的兼容别名）：
 
 ```sh
-pnpm test:integration:live
-pnpm verify:phase -- P2
+pnpm test:live -- --case models.live-conversation
 ```
 
-缓存专项：`pnpm test:e2e -- --case P2-LIVE-CACHE` 使用真实 DeepSeek 执行两个有界只读任务，核对原生 JSONL cacheRead 与轮次投影。提供方在该样本未命中则如实失败，不无限重试；实际消息/工具声明前缀稳定另由确定性单元及 P5 回归证明。
+缓存专项：`pnpm test:live -- --case conversation.live-cache` 使用真实 DeepSeek 执行两个有界只读任务，核对原生 JSONL cacheRead 与轮次投影。提供方在该样本未命中则如实失败，不无限重试；实际消息/工具声明前缀稳定另由确定性单元及 P5 回归证明。
 
-单项调试可用 `pnpm test:e2e -- --case P2-LIVE-READ`。`scripts/test/live-key.mjs` 优先读取继承环境；否则只解析 `~/.zshrc` 中 `DEEPSEEK_API_KEY` 的简单字面量赋值，拒绝命令替换/变量展开，不执行或 source 整个文件。缺 key 明确失败，不跳过 live、不寻找其他提供方的替代凭证。测试脚本通过真实设置页配置隔离实例；生产应用不读取 `.zshrc`，仍通过 BYOK 设置管理密钥。
+单项调试可用 `pnpm test:live -- --case models.live-conversation`。`scripts/test/live-key.mjs` 优先读取继承环境；否则只解析 `~/.zshrc` 中 `DEEPSEEK_API_KEY` 的简单字面量赋值，拒绝命令替换/变量展开，不执行或 source 整个文件。缺 key 明确失败，不跳过 live、不寻找其他提供方的替代凭证。测试脚本通过真实设置页配置隔离实例；生产应用不读取 `.zshrc`，仍通过 BYOK 设置管理密钥。
 
 本地 live 测试只发送合成 fixture、临时文件路径与必要工具结果。凭证仅进入 Main/Agent Host 的模型调用链，命令/Python 子进程显式移除；使用伪密钥哨兵验证日志脱敏，真实密钥只做内存内泄漏检查并输出布尔结果，不输出匹配内容。
 
@@ -73,28 +72,28 @@ pnpm verify:phase -- P2
 
 ## 3. 测试入口与证据约定
 
-| 命令（按对应阶段实现）            | 责任                                                                                                                   |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check`                      | TypeScript、lint、依赖方向、静态配置与文档链接检查                                                                     |
-| `pnpm test:unit`                  | Vitest 纯逻辑测试                                                                                                      |
-| `pnpm test:integration`           | 确定性 SDK、SQLite、JSONL、IPC、文件与进程测试；不得访问真实模型网络                                                   |
-| `pnpm test:integration:live`      | 固定 DeepSeek 的 SDK 真实多轮/工具集成测试                                                                             |
-| `pnpm dev:cdp`                    | 启动隔离的开发验证实例，输出 PID、endpoint、数据目录、ready 状态                                                       |
-| `pnpm test:e2e`                   | 真 Electron + CDP + 确定性模型响应源，执行实际工具和 Python                                                            |
-| `pnpm test:e2e:live`              | 真 Electron + CDP + DeepSeek 的完整分析与恢复                                                                          |
-| `pnpm runtime:prepare`            | 构建期准备固定版本 Python/库/rg/fd/字体，校验 hash 与许可证清单                                                        |
-| `pnpm build` / `pnpm package:dir` | 构建 JS 与本地 .app，供早期资源路径验证                                                                                |
-| `pnpm test:e2e:packaged`          | 对明确指定的 .app 执行关键 CDP 用例，默认确定性模型                                                                    |
-| `pnpm test:e2e:packaged:live`     | 对同一 .app 用固定 DeepSeek 完成分析与恢复                                                                             |
-| `pnpm verify:phase -- Pn`         | 执行阶段清单，汇总结果；不得因未实现或 skip 返回成功                                                                   |
-| `pnpm verify:release`             | 核对实际 .app 与当前构建/资源的 hash、架构、许可证和打包范围；必须与完整 P7 程序门禁一起通过，静态检查不能代替运行回归 |
-| `pnpm eval:prepare`               | 执行/收集固定 Agent 任务，打包 Judge 所需证据；仅表示证据准备结果，不自动给出质量分数                                  |
+| 命令（按对应阶段实现）                | 责任                                                                                                                   |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                          | TypeScript、依赖方向、静态配置与文档链接检查；格式/Lint 使用 pnpm quality                                              |
+| `pnpm test:unit`                      | Vitest 纯逻辑测试                                                                                                      |
+| `pnpm test:integration`               | 确定性 SDK、SQLite、JSONL、IPC、文件与进程测试；不得访问真实模型网络                                                   |
+| `pnpm test:integration:live`          | models.live-conversation 的兼容别名；实际是 Electron/CDP 测试                                                          |
+| `pnpm dev:cdp`                        | 启动隔离的开发验证实例，输出 PID、endpoint、数据目录、ready 状态                                                       |
+| `pnpm test:e2e`                       | 真 Electron + CDP + 确定性模型响应源，执行实际工具和 Python                                                            |
+| `pnpm test:e2e:live`                  | 真 Electron + CDP + DeepSeek 的完整分析与恢复                                                                          |
+| `pnpm runtime:prepare`                | 构建期准备固定版本 Python/库/rg/fd/字体，校验 hash 与许可证清单                                                        |
+| `pnpm build` / `pnpm package:dir`     | 构建 JS 与本地 .app，供早期资源路径验证                                                                                |
+| `pnpm test:e2e:packaged`              | 对明确指定的 .app 执行关键 CDP 用例，默认确定性模型                                                                    |
+| `pnpm test:e2e:packaged:live`         | 对同一 .app 用固定 DeepSeek 完成分析与恢复                                                                             |
+| `pnpm test -- --suite release --live` | 完整静态/确定性/打包/性能/live 回归，阶段入口已退役                                                                    |
+| `pnpm verify:release`                 | 核对实际 .app 与当前构建/资源的 hash、架构、许可证和打包范围；必须与完整 P7 程序门禁一起通过，静态检查不能代替运行回归 |
+| `pnpm eval:prepare`                   | 执行/收集固定 Agent 任务，打包 Judge 所需证据；仅表示证据准备结果，不自动给出质量分数                                  |
 
-程序测试命令提供统一 `--case <case-id>` 过滤能力，由项目 runner 解析并转给对应测试框架；阶段门禁使用显式 ID 清单，避免模糊 grep 漏测。下文 case ID 是需要落实的验收合同。
+程序测试命令提供统一 `--case <case-id>` 过滤能力，由项目 runner 解析并转给对应测试框架；持续测试由 tests/catalog.json 注册，旧单项 ID 由 legacy-aliases.json 映射。下文阶段 ID 保留验收合同语境，当前功能用例与执行方法见测试指南。
 
-每次执行生成 `test-results/<timestamp>-<run-id>/`：
+每次执行生成 `test-results/<timestamp>/`：
 
-- `summary.json`：phase、源码版本或源码树摘要、配置、平台/架构、依赖版本、用例总数/通过/失败/阻塞、起止时间、退出码、证据相对路径。
+- `summary.json`：选择计划、源码版本或源码树摘要、配置、平台/架构、依赖版本、用例总数/通过/失败、起止时间及日志/证据；进程失败返回非零。
 - `junit.xml`、脱敏 Main/Host/runner 日志，失败时的 screenshot/DOM 快照；CDP trace 能稳定取得时补充保存。
 - SQLite 只读摘要、JSONL 结构检查结果、fixture 与产物 hash、文件存在/非空检查、PNG 解码结果；不输出分析数值的准确性断言。
 - live 增加请求/响应模型名、request ID（若有）、用量、重试与耗时；不保存 Authorization header。
@@ -144,7 +143,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P0-ISOLATION | 两个测试实例使用不同 userData/业务根目录；生产启动无调试监听；无测试数据写入真实全局目录                                                        |
 | P0-PACKAGE   | package:dir 生成可启动 .app；其中 native SQLite 加载成功；Main/Host 两个编译入口存在                                                            |
 
-**门禁：** `pnpm verify:phase -- P0`。证据记录 Electron/Node/ABI、macOS/架构、本机 macOS 版本、首个 .app 启动和 CDP 截图。P0 构建最小 .app，只验收已实现入口与 native SQLite；完整 Python/rg/fd/字体资源在 P3 加入并验收。自动验收目标固定为 macOS 15.7.4 / Apple M4 / arm64 / 24 GiB；未测试架构不得标为支持。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)）。证据记录 Electron/Node/ABI、macOS/架构、本机 macOS 版本、首个 .app 启动和 CDP 截图。P0 构建最小 .app，只验收已实现入口与 native SQLite；完整 Python/rg/fd/字体资源在 P3 加入并验收。自动验收目标固定为 macOS 15.7.4 / Apple M4 / arm64 / 24 GiB；未测试架构不得标为支持。
 
 ## 7. P1 — SQLite、workspace 与原生会话文件
 
@@ -162,7 +161,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P1-INPUT-REF    | 添加原路径引用后数据库记录文件名/路径，无 CSV 副本；源文件删除后读失败有明确错误，不重建源文件、不建立版本库 |
 | P1-COORDINATION | 模拟建目录后 DB 更新失败、首次消息落盘后元数据更新失败；重启可对账，不覆盖已存在历史，无双 writer            |
 
-**门禁：** `pnpm verify:phase -- P1`，包含 P0 的启动/IPC 回归。此阶段不需要真实模型；可用真实 SDK + 确定性响应源生成历史。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)），包含 P0 的启动/IPC 回归。此阶段不需要真实模型；可用真实 SDK + 确定性响应源生成历史。
 
 ## 8. P2 — pi 直接集成、流式 UI 与真实 DeepSeek
 
@@ -183,7 +182,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 
 补充回归 `P2-PREFLIGHT` 验证主进程错误释放、双会话准入和排队凭证绑定；`P2-READ-BOUNDS` 验证读取上限/敏感符号链接；`P2-REQUEST-LIMIT` 验证第 21 次请求未进入提供方。四个 live Case ID 复用同一次有独立结果的真实窗口多轮场景，分别检查工具续传、上下文、thinking 与 CDP；不会为每个 ID 重复采样模型答案。
 
-**门禁：** `pnpm verify:phase -- P2`，必须执行 P2-LIVE-READ/CONTEXT/CDP-LIVE，不可仅用 HTTP ping 或 curl 成功代替 SDK/Electron 集成。
+**门禁：** `pnpm test:live -- --case models.live-conversation`，必须执行 P2-LIVE-READ/CONTEXT/CDP-LIVE，不可仅用 HTTP ping 或 curl 成功代替 SDK/Electron 集成。
 
 ## 9. P3 — 通用工具、内置运行时与审批
 
@@ -203,7 +202,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P3-QUESTION    | CDP 展示澄清表单并返回结构化回答；拒绝/取消路径正常收束，不当作权限批准                                                                                           |
 | P3-LIVE-TOOLS  | DeepSeek 实际 write 脚本、bash 使用内置 Python 执行、read 返回实际文件内容；指定结果文件存在且非空，工具子进程无 API key；不判断计算结果准确性                    |
 
-**门禁：** `pnpm verify:phase -- P3`，当前清单包含 19 项检查（含 P2 核心 live 回归与实际 .app 运行时验证）。确定性模型使用仅测试模式启用的 loopback HTTP/SSE 响应源，真实 SDK、工具服务、文件、Python、SQLite 和 UI 均不替换。危险命令只测试分类器或临时目录中的无害替身，不实际执行破坏系统的样例。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)），当前清单包含 19 项检查（含 P2 核心 live 回归与实际 .app 运行时验证）。确定性模型使用仅测试模式启用的 loopback HTTP/SSE 响应源，真实 SDK、工具服务、文件、Python、SQLite 和 UI 均不替换。危险命令只测试分类器或临时目录中的无害替身，不实际执行破坏系统的样例。
 
 ## 10. P4 — CSV → 图表 → 报告的完整闭环
 
@@ -222,7 +221,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P4-RESULT-STATE  | SDK 正常结束显示“执行完成”；文件缺失/空文件/损坏 PNG 分别显示未生成、空文件或无法展示。非空但内容错误的报告仍可展示，不能标成分析正确或因数值错误被工作台拦截                       |
 | P4-VERSIONS      | 重复生成报告复用会话目录和同路径 artifact ID；更新 hash/预览，删除文件移出登记；旧版本目录兼容可读                                                                                  |
 
-**门禁：** `pnpm verify:phase -- P4`，必须包含 `test:e2e:live --case P4-LIVE-ANALYSIS`。Agent 可在总执行预算内自行修复；程序门禁仅检查既定交付条件，不增加数值断言。另执行 J1/J2 效果评测并记录评价，质量分数不作为工作台回归门禁。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)），必须包含 `pnpm test:live -- --case artifacts.live-analysis`。Agent 可在总执行预算内自行修复；程序门禁仅检查既定交付条件，不增加数值断言。另执行 J1/J2 效果评测并记录评价，质量分数不作为工作台回归门禁。
 
 ## 11. P5 — 多轮、插话、停止与崩溃恢复
 
@@ -242,7 +241,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P5-RETRY-COMPACT | 确定性触发重试与压缩；UI 状态正确，不能在尚有 retry 时宣布完成，重试期间主动停止必须标 cancelled；压缩后仍可浏览完整历史并继续                                                                                |
 | P5-LIVE-RESUME   | DeepSeek 第一轮生成非空报告 → 关闭重启应用 → 追问并要求新报告；实际请求保留原生会话上下文，新文件非空，消息与产物不重复，仍使用指定模型；不评价追问答案准确性                                                 |
 
-**门禁：** `pnpm verify:phase -- P5`。恢复以 SDK 原生树为上下文来源，不靠重新发送整段聊天。不能把“页面能显示缓存”当作模型已恢复。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)）。恢复以 SDK 原生树为上下文来源，不靠重新发送整段聊天。不能把“页面能显示缓存”当作模型已恢复。
 
 ## 12. P6 — 文件边界、模型设置与交互质量
 
@@ -261,7 +260,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 
 除表中主用例外，P6 清单包含 `P6-DELETE-STORAGE`、`P6-LOG-STORAGE`、`P6-READ-ENCODING`、`P6-OUTPUT-LIMIT`、`P6-LOG-LIMIT` 、`P6-LOG-UI` 和 `P6-DRAFTS`，验证恢复清单/路径隔离、UTF-8 分页、二进制反馈、500 MiB 产物终止及每 run 10 MiB 日志上限及切换会话时未提交的输入框文字隔离。基准固定两份各 50 MB 文件，通过实际 UI 发送计时；并发采样与所有 30 次交互耗时保存在本地结果，不以独立脚本代替工作台流程。
 
-**门禁：** `pnpm verify:phase -- P6`。180 秒/2 GiB/CDP p95 为产品门禁；独立 Python 的实际基准已见验证记录，不能当作含 UI/LLM 的实测。本机配置满足基准要求。若初次测量表明目标需调整，必须记录数据与理由并显式修订门禁，不能在报告中悄悄放宽。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)）。180 秒/2 GiB/CDP p95 为产品门禁；独立 Python 的实际基准已见验证记录，不能当作含 UI/LLM 的实测。本机配置满足基准要求。若初次测量表明目标需调整，必须记录数据与理由并显式修订门禁，不能在报告中悄悄放宽。
 
 ## 13. P7 — 本机 macOS 应用最终验收
 
@@ -284,7 +283,7 @@ P7 清单汇总 P0–P6 全部确定性检查，加上本阶段打包用例；�
 
 离线检查由测试启动器用 macOS Seatbelt 阻断应用进程树的外网，仅允许本地响应源和 IPC；固定 Python 探针及其子进程对保留测试 IP 的连接均须返回 EPERM。macOS 不支持在该外层测试策略内再次初始化 Chromium Seatbelt，因此仅 P7-OFFLINE 启动参数包含 `--no-sandbox`。该用例证明离线依赖完整性，不证明 Renderer 隔离；P7-CDP 与正常生产启动仍使用 `sandbox: true`、contextIsolation 和 CSP。产品的 Agent 工具执行不使用沙箱，维持已确认的规则/审批策略。
 
-**门禁：** `pnpm verify:phase -- P7` + `pnpm verify:release`；此处 release 指本机可用 `.app` 的交付检查。签名、公证和安装弹窗不纳入本期必需通过项，不用缺证书阻塞 MVP。视觉观感可补充人工检查，不代替自动门禁。
+**门禁：** 历史阶段门禁（当前命令见 [测试指南](testing-guide.md)） + `pnpm verify:release`；此处 release 指本机可用 `.app` 的交付检查。签名、公证和安装弹窗不纳入本期必需通过项，不用缺证书阻塞 MVP。视觉观感可补充人工检查，不代替自动门禁。
 
 ## 14. 阶段与需求覆盖
 

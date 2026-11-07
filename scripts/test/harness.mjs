@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
 import { mkdirSync, openSync, closeSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -46,6 +47,16 @@ export async function startApp(
     ? join(resolve(packagedPath ?? testBundle()), 'Contents/MacOS/Data Agent')
     : require('electron');
   if (!existsSync(executable)) throw new Error(`Missing executable: ${executable}`);
+  // A missing fixture must never accidentally use the real provider in ordinary regression.
+  let deniedModel;
+  if (automation && !testModelBaseUrl && process.env.DATA_AGENT_TEST_MODEL_MODE !== 'live') {
+    deniedModel = createHttpServer((_request, response) => {
+      response.writeHead(400);
+      response.end('Unexpected model request: configure a scripted or replay fixture.');
+    });
+    await new Promise((resolve) => deniedModel.listen(0, '127.0.0.1', resolve));
+    testModelBaseUrl = `http://127.0.0.1:${deniedModel.address().port}/v1`;
+  }
   const args = [
     ...(packaged ? [] : [testAppDir()]),
     ...(automation ? ['--data-agent-automation'] : []),
@@ -109,6 +120,11 @@ export async function startApp(
   let browser;
   let page;
   async function stop() {
+    if (deniedModel) {
+      deniedModel.closeAllConnections();
+      await new Promise((resolve) => deniedModel.close(resolve));
+      deniedModel = undefined;
+    }
     if (page && !page.isClosed()) {
       try {
         await page.screenshot({ path: join(root, 'final-screen.png') });

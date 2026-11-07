@@ -1,0 +1,902 @@
+[
+  {
+    "id": "conversation.live-cache",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/live-cache.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "transcript.execution-process",
+    "feature": "transcript",
+    "level": "e2e",
+    "file": "tests/features/transcript/execution-process.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "preview.files",
+    "feature": "preview",
+    "level": "e2e",
+    "file": "tests/features/preview/files.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["artifacts"]
+  },
+  {
+    "id": "application.dev",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/dev.e2e.mjs",
+    "model": "none",
+    "environment": "dev",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "application.cdp",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/cdp.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": []
+  },
+  {
+    "id": "application.ipc",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/ipc.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": []
+  },
+  {
+    "id": "application.isolation",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/isolation.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "packaging.resources",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/resources.e2e.mjs",
+    "model": "none",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "sessions.empty",
+    "feature": "sessions",
+    "level": "e2e",
+    "file": "tests/features/sessions/empty.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": ["composer"]
+  },
+  {
+    "id": "sessions.metadata",
+    "feature": "sessions",
+    "level": "e2e",
+    "file": "tests/features/sessions/metadata.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "composer.input-references",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/input-references.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "models.live-conversation",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/live-conversation.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "tools.live-execution",
+    "feature": "tools",
+    "level": "e2e",
+    "file": "tests/features/tools/live-execution.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "packaging.python-runtime",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/python-runtime.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "approvals.permissions",
+    "feature": "approvals",
+    "level": "e2e",
+    "file": "tests/features/approvals/permissions.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["tools"]
+  },
+  {
+    "id": "approvals.clarification",
+    "feature": "approvals",
+    "level": "e2e",
+    "file": "tests/features/approvals/clarification.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["tools"]
+  },
+  {
+    "id": "composer.import",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/import.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "artifacts.result-state",
+    "feature": "artifacts",
+    "level": "e2e",
+    "file": "tests/features/artifacts/result-state.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "artifacts.live-analysis",
+    "feature": "artifacts",
+    "level": "e2e",
+    "file": "tests/features/artifacts/live-analysis.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "artifacts.delivery",
+    "feature": "artifacts",
+    "level": "e2e",
+    "file": "tests/features/artifacts/delivery.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "conversation.live-resume",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/live-resume.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "lifecycle.concurrent-windows",
+    "feature": "lifecycle",
+    "level": "e2e",
+    "file": "tests/features/lifecycle/concurrent-windows.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "conversation.retry-compaction",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/retry-compaction.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "lifecycle.stop",
+    "feature": "lifecycle",
+    "level": "e2e",
+    "file": "tests/features/lifecycle/stop.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "lifecycle.crash",
+    "feature": "lifecycle",
+    "level": "e2e",
+    "file": "tests/features/lifecycle/crash.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": ["slow"],
+    "related": []
+  },
+  {
+    "id": "conversation.multiturn",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/multiturn.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "conversation.steering",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/steering.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "conversation.followup",
+    "feature": "conversation",
+    "level": "e2e",
+    "file": "tests/features/conversation/followup.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "composer.session-drafts",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/session-drafts.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "performance.large-input",
+    "feature": "performance",
+    "level": "e2e",
+    "file": "tests/features/performance/large-input.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": ["performance"],
+    "related": []
+  },
+  {
+    "id": "models.settings",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/settings.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "composer.file-boundaries",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/file-boundaries.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "transcript.rendering",
+    "feature": "transcript",
+    "level": "e2e",
+    "file": "tests/features/transcript/rendering.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "sessions.deletion",
+    "feature": "sessions",
+    "level": "e2e",
+    "file": "tests/features/sessions/deletion.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "tools.log-viewer",
+    "feature": "tools",
+    "level": "e2e",
+    "file": "tests/features/tools/log-viewer.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "composer.packaged-input",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/packaged-input.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "packaging.workflow",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/workflow.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "packaging.offline",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/offline.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "packaging.live-analysis",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/live-analysis.e2e.mjs",
+    "model": "live",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "packaging.relocation",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/relocation.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "packaging.defaults",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/defaults.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "application.workflow",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/workflow.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "usage.concurrent-crash-recovery",
+    "feature": "usage",
+    "level": "e2e",
+    "file": "tests/features/usage/concurrent-crash-recovery.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "usage.details",
+    "feature": "usage",
+    "level": "e2e",
+    "file": "tests/features/usage/details.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": ["conversation"]
+  },
+  {
+    "id": "usage.queue-boundaries",
+    "feature": "usage",
+    "level": "e2e",
+    "file": "tests/features/usage/queue-boundaries.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "sessions.delete-confirmation",
+    "feature": "sessions",
+    "level": "e2e",
+    "file": "tests/features/sessions/delete-confirmation.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "composer.submission",
+    "feature": "composer",
+    "level": "e2e",
+    "file": "tests/features/composer/submission.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": ["sessions"]
+  },
+  {
+    "id": "transcript.reading",
+    "feature": "transcript",
+    "level": "e2e",
+    "file": "tests/features/transcript/reading.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "lifecycle.admission-unit",
+    "feature": "lifecycle",
+    "level": "unit",
+    "file": "tests/features/lifecycle/admission.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "application.contracts-unit",
+    "feature": "application",
+    "level": "unit",
+    "file": "tests/features/application/contracts.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "composer.drafts-unit",
+    "feature": "composer",
+    "level": "unit",
+    "file": "tests/features/composer/drafts.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["sessions"]
+  },
+  {
+    "id": "application.ipc-types-unit",
+    "feature": "application",
+    "level": "unit",
+    "file": "tests/features/application/ipc-types.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "conversation.request-budget-unit",
+    "feature": "conversation",
+    "level": "unit",
+    "file": "tests/features/conversation/request-budget.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "preview.text-preview-unit",
+    "feature": "preview",
+    "level": "unit",
+    "file": "tests/features/preview/text-preview.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["artifacts"]
+  },
+  {
+    "id": "transcript.transcript-turns-unit",
+    "feature": "transcript",
+    "level": "unit",
+    "file": "tests/features/transcript/transcript-turns.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "usage.turn-usage-unit",
+    "feature": "usage",
+    "level": "unit",
+    "file": "tests/features/usage/turn-usage.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "conversation.cache-prefix-unit",
+    "feature": "conversation",
+    "level": "unit",
+    "file": "tests/features/conversation/cache-prefix.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": ["smoke"],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "artifacts.inventory",
+    "feature": "artifacts",
+    "level": "integration",
+    "file": "tests/features/artifacts/artifacts.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "artifacts.shared-workspace",
+    "feature": "artifacts",
+    "level": "integration",
+    "file": "tests/features/artifacts/artifacts.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "artifacts.export",
+    "feature": "artifacts",
+    "level": "integration",
+    "file": "tests/features/artifacts/artifacts.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["preview"]
+  },
+  {
+    "id": "sessions.deletion-storage",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/maintenance.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "tools.log-storage",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/maintenance.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.read-encoding",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/maintenance.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "sessions.metadata-writes",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/run-ledger.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "models.preflight",
+    "feature": "models",
+    "level": "integration",
+    "file": "tests/features/models/runtime-service.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "conversation.streaming",
+    "feature": "conversation",
+    "level": "integration",
+    "file": "tests/features/conversation/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "conversation.snapshot",
+    "feature": "conversation",
+    "level": "integration",
+    "file": "tests/features/conversation/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": ["smoke"],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "conversation.input-identity",
+    "feature": "conversation",
+    "level": "integration",
+    "file": "tests/features/conversation/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "models.credentials",
+    "feature": "models",
+    "level": "integration",
+    "file": "tests/features/models/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "tools.read-bounds",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "conversation.request-limit",
+    "feature": "conversation",
+    "level": "integration",
+    "file": "tests/features/conversation/runtime.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["usage", "lifecycle"]
+  },
+  {
+    "id": "sessions.schema",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "sessions.native-history-roundtrip",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "sessions.history-recovery",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "sessions.coordination",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["composer"]
+  },
+  {
+    "id": "tools.execution",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "approvals.policy",
+    "feature": "approvals",
+    "level": "integration",
+    "file": "tests/features/approvals/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["tools"]
+  },
+  {
+    "id": "approvals.read-policy",
+    "feature": "approvals",
+    "level": "integration",
+    "file": "tests/features/approvals/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["tools"]
+  },
+  {
+    "id": "approvals.network",
+    "feature": "approvals",
+    "level": "integration",
+    "file": "tests/features/approvals/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["tools"]
+  },
+  {
+    "id": "tools.cancellation",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.output-limit",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.log-limit",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.resource-release",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tooling.dependency-boundaries",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/dependency-boundaries.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "tooling.pre-commit",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/pre-commit.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "tooling.run-context",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/run-context.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.recorded-conversation",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/recorded-conversation.e2e.mjs",
+    "model": "replay",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation", "usage"]
+  },
+  {
+    "id": "models.live-recording",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/recorded-conversation.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": ["recording"],
+    "related": ["conversation", "usage"]
+  },
+  {
+    "id": "tooling.selection",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/selection.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "tooling.model-cassette",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/model-cassette.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  }
+]

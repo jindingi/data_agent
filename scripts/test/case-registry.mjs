@@ -1,58 +1,48 @@
-export const nativeIds = [
-  'R-WRITES',
-  'R-EXPORT',
-  'R-RESOURCE-RELEASE',
-  'P6-OUTPUT-LIMIT',
-  'P6-LOG-LIMIT',
-  'P6-DELETE-STORAGE',
-  'P6-LOG-STORAGE',
-  'P6-READ-ENCODING',
-  'P4-ARTIFACT',
-  'P4-VERSIONS',
-  'P3-TOOLS',
-  'P3-POLICY',
-  'P3-READ-POLICY',
-  'P3-NETWORK',
-  'P3-CANCEL',
-  'P1-SCHEMA',
-  'P1-TREE',
-  'P1-RECOVERY',
-  'P1-COORDINATION',
-  'P2-STREAM',
-  'P2-SNAPSHOT',
-  'P2-IDENTITY',
-  'P2-CREDENTIAL',
-  'P2-READ-BOUNDS',
-  'P2-PREFLIGHT',
-  'P2-REQUEST-LIMIT',
-];
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-const packaged = new Set([
-  'P0-PACKAGE',
-  'P3-RUNTIME',
-  'P7-THEME-INPUT',
-  'P7-CDP',
-  'P7-OFFLINE',
-  'P7-LIVE',
-  'P7-PACKAGE',
-  'P7-DEFAULTS',
-  'P7-ALL',
-]);
-const live = new Set(['P2-LIVE-CACHE', 'P2-LIVE-READ', 'P3-LIVE-TOOLS', 'P4-LIVE', 'P7-LIVE']);
-export function mergeCases(...groups) {
-  const cases = {};
-  for (const group of groups)
-    for (const [id, run] of Object.entries(group)) {
-      if (id in cases || typeof run !== 'function')
-        throw new Error(`Duplicate or invalid case: ${id}`);
-      cases[id] = run;
-    }
-  return cases;
+export const catalog = JSON.parse(
+  readFileSync(new URL('../../tests/catalog.json', import.meta.url), 'utf8'),
+);
+export const aliases = JSON.parse(
+  readFileSync(new URL('../../tests/legacy-aliases.json', import.meta.url), 'utf8'),
+);
+export function validateCatalog(entries = catalog) {
+  const ids = new Set();
+  for (const item of entries) {
+    if (!/^[a-z][a-z0-9-]*\.[a-z0-9.-]+$/.test(item.id) || ids.has(item.id))
+      throw new Error(`Duplicate or invalid test ID: ${item.id}`);
+    ids.add(item.id);
+    if (
+      !['unit', 'integration', 'e2e', 'tooling'].includes(item.level) ||
+      !['none', 'scripted', 'replay', 'live'].includes(item.model) ||
+      !['node', 'electron-node', 'dev', 'built', 'packaged'].includes(item.environment)
+    )
+      throw new Error(`Incomplete test metadata: ${item.id}`);
+    if (
+      item.feature !== item.id.split('.')[0] ||
+      !Array.isArray(item.tags) ||
+      !Array.isArray(item.related) ||
+      !existsSync(resolve(item.file))
+    )
+      throw new Error(`Invalid test file/features: ${item.id}`);
+  }
+  return entries;
 }
-export function requirementsFor(ids) {
+validateCatalog();
+for (const [alias, id] of Object.entries(aliases))
+  if (!catalog.some((test) => test.id === id)) throw new Error(`Unknown alias target: ${alias}`);
+export function resolveCase(id) {
+  return aliases[id] ?? id;
+}
+export function requirementsFor(entries) {
+  const items = entries.map((entry) =>
+    typeof entry === 'string' ? catalog.find((item) => item.id === resolveCase(entry)) : entry,
+  );
+  if (items.some((entry) => !entry)) throw new Error('Unknown case requirement');
   return {
-    build: ids.some((id) => !nativeIds.includes(id) && !['P0-CHECK', 'P0-DEV'].includes(id)),
-    packaged: ids.some((id) => packaged.has(id)),
-    live: ids.some((id) => live.has(id)),
+    build: items.some((item) => ['built', 'packaged'].includes(item.environment)),
+    packaged: items.some((item) => item.environment === 'packaged'),
+    live: items.some((item) => item.model === 'live'),
   };
 }
