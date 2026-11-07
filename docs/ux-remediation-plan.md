@@ -2,7 +2,7 @@
 
 更新：2026-11-07。状态：**本轮修复与 UX5 正式验收已完成**。完整 P7 为 68/68 通过；实际覆盖及视觉复核见文末。
 
-依据用户截图、反馈和当前源码评审制定；采用 [设计原则](design-principles.md)。原 [P0–P7 开发计划](development-plan.md) 与 [实施进度](implementation-status.md) 保留历史事实，本计划补充交付后发现的体验缺口，不能用旧门禁通过来证明这些缺陷不存在。产品和进程边界仍以 [产品说明](mvp-plan.md)、[技术设计](technical-design.md) 为准。
+依据用户截图、反馈和当前源码评审制定；采用 [设计原则](design-principles.md)。原 [P0–P7 开发计划](development-plan.md) 与 Git 历史保留阶段依据，本计划补充交付后发现的体验缺口，不能用旧门禁通过来证明这些缺陷不存在。产品和进程边界仍以 [产品说明](mvp-plan.md)、[技术设计](technical-design.md) 为准。
 
 ## 1. 修复目标与范围
 

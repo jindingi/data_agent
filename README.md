@@ -4,13 +4,11 @@
 
 ## 当前状态
 
-本机 macOS arm64 MVP 已完成 P0–P7。初次交付的完整 P7 门禁为 **61/61 通过**：全部前置确定性回归、实际 `.app` 的移动目录/离线运行、真实 DeepSeek 多 CSV 分析与重启追问、审批/停止/恢复及零残留进程；发布资源校验通过。此后增量修复的定向测试与清单变更另行记录，阶段与证据见 [实施进度](docs/implementation-status.md)。
+本机 macOS arm64 工作台已实现多轮对话、steer/follow-up、双会话并发、DeepSeek/OpenRouter 连接与模型选择、Agent 配置修订、原生 JSONL 历史、工作区文件浏览与预览。Python 与常用库随应用打包；原 CSV 直接引用，删除会话保留工作区文件。
 
-打开 `release/mac-arm64/Data Agent.app`，在设置中填写 BYOK，即可引用 CSV 开始分析。支持多轮、插话、双会话并发、原生 JSONL 历史、Markdown/PNG 展示、复制及导出，Python 与常用库随包提供。详细操作见 [本机使用说明](docs/usage.md)。
+SQLite 当前为 schema 12、6 张应用表，执行身份统一为 runId。完整字段、关系与会话/执行/输入/交互状态机见 [SQLite 表设计与状态机](docs/sqlite-design.md)。操作说明见 [本机使用说明](docs/usage.md)。
 
-Agent 效果独立评测，结果不保证正确：首轮交付的 J1/J5 为 8/12、10/12，记录了主图裁切和解释不严谨等问题。前期 J4/J6 曾耗尽请求预算，失败保留。其他模型、Intel/其他系统和公开签名公证尚未验收；本次交付是本机可用 `.app`。
-
-交付后发现的预览滚动、空会话、附件状态、历史阅读与控件提示问题，见 [UX 修复计划](docs/ux-remediation-plan.md)。本轮 UX 修复与 R1–R6 重构已完成，最终 P7 为 **68/68 通过**，包括后台 CDP、实际 .app 和真实模型重启追问。测试默认隐藏窗口、不抢焦点。最终验收包保留在独立 test-results 目录，路径见实施进度；没有覆盖用户正在使用的 release 包。
+最近一次代码验收（`927bf9a`）普通回归 **87/87 通过**，包含隔离后台 Electron/CDP、原生集成和模型响应重放；这次未调用真实模型、未重新打包，不表示本机已有 release 包自动更新。测试入口与发布门禁见 [测试指南](docs/testing-guide.md)。历史过程记录从当前文档移除，必要时通过 Git 历史及本地 test-results 查询。
 
 ## 文档
 
@@ -23,8 +21,7 @@ Agent 效果独立评测，结果不保证正确：首轮交付的 J1/J5 为 8/1
 - [软件工程审查与重构计划](docs/refactoring-plan.md)
 - [设计原则与 AI 实施规范](docs/design-principles.md)
 - [UX 修复阶段与验收计划](docs/ux-remediation-plan.md)
-- [工作区文件浏览器改造方案（待实施）](docs/workspace-browser-plan.md)
-- [会话存储与工作区管理简化方案（待实施）](docs/storage-simplification-plan.md)
+- [SQLite 表设计与状态机](docs/sqlite-design.md)
 - [分阶段开发、程序验收与 Judge 效果评测](docs/development-plan.md)
 - [版本管理与阶段提交规则](docs/repository-workflow.md)
 - [可复用验证脚本](validation/README.md)

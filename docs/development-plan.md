@@ -2,7 +2,7 @@
 
 更新日期：2026-11-07。依据 [产品需求](mvp-plan.md) 与 [技术文档](technical-design.md)。本文描述正式产品的实施与验收。技术不确定性已先在 validation/ 中实际验证，证据见 [验证入口与证据说明](../validation/README.md)；这些独立探针不等于正式产品已完成。下列阶段及其 ID 保留历史设计语境；持续维护命令和目录已迁移到 [测试指南](testing-guide.md)。旧 Pn 执行入口已退役，不再作为当前开发命令。
 
-P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan.md)，已完成的范围见实施进度。新增用例须按功能注册；旧门禁记录保留，不能据此宣称新 UX 问题已解决。UI 设计与视觉评审遵循 [设计原则](design-principles.md)。
+P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan.md)，当前实现范围见 [产品说明](mvp-plan.md) 和 [技术设计](technical-design.md)。新增用例须按功能注册；旧门禁记录保留，不能据此宣称新 UX 问题已解决。UI 设计与视觉评审遵循 [设计原则](design-principles.md)。
 
 ## 1. 两类验证与完成规则
 
@@ -22,7 +22,7 @@ P0–P7 之外的交付后体验修复见 [UX0–UX5 计划](ux-remediation-plan
 - 修复失败后重跑相关用例；完整保留前次失败记录。不能无限重试模型直到碰巧通过文件交付断言；Judge 质量评价另行保留，不用重复采样隐藏差评。
 - 所有自动验收都运行于独立临时数据根目录，禁止使用或清理真实 `~/.data_agent`。
 
-当前逐阶段状态见 [实施进度](implementation-status.md)，P0–P7 已完成本机交付验收；技术前置验证单独记录为实际通过/失败及限制。不得把已验证能力写成“以后再研究”，也不得把探针通过写成产品 E2E 已通过。
+P0–P7 已完成本机交付验收；当前能力见 [产品说明](mvp-plan.md) 与 [技术设计](technical-design.md)，持续验收以 [测试指南](testing-guide.md) 为准。阶段过程与当时结果可查 Git 历史和本地 test-results；不得把探针通过写成产品 E2E 已通过，也不能用旧阶段结果代替当前回归。
 
 现有可执行入口（实际存在）：`python3 validation/policy/probe.py`、`validation/pi/` 的 SDK/live runner、`validation/runtime/` 的运行时准备与哈希/工具验证脚本、`validation/electron/` 的真实 CDP/打包 runner。精确环境、命令及证据见 [验证入口与证据说明](../validation/README.md)。产品开发应复用已验证机制，仅将工作台流程断言移入正式测试；旧探针的业务 oracle、metrics schema 和数值断言不迁移为产品门禁。只在集成发生变化时再验证相应边界。
 

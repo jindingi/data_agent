@@ -2,7 +2,7 @@
 
 更新日期：2026-11-07。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
 
-后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX1–UX4 与 R1–R5 已实施，完整回归证据见实施进度；下文描述实际结构与契约。
+后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX 修复与 R1–R6 重构已完成；历史验收见 Git 与本地 test-results，当前回归入口见 [测试指南](testing-guide.md)；下文描述实际结构与契约。
 
 ## 1. 技术栈与运行边界
 
@@ -149,7 +149,7 @@ input_submissions 按 sequence 保存全部执行的未确认输入；原生记�
 
 每次添加和提交只校验本次附件的路径、存在性、单文件及合计 ≤100,000,000 bytes，不解析 CSV、不冻结内容。实际读取失败由工具返回。路径不是权限令牌，仍走 PolicyService。
 
-迁移 11 在一致性备份后单事务合并旧元数据并删除冗余表，目标没有 tool_logs/output_versions/artifacts 及兼容视图。保留全部未确认输入、配置与原文件保护路径，废弃旧删除目标清单。迁移不打开或改写 JSONL，不搬移/删除 workspace 或旧日志。备份使用 VACUUM INTO，包含已提交 WAL，存于受保护 backups/；未知更高 schema 拒绝打开，失败回滚并报错。禁止用旧二进制打开新库；备份回退不等于后续 JSONL 一并回滚。细节与验收见 [存储简化方案](storage-simplification-plan.md)。
+迁移 11 在一致性备份后单事务合并旧元数据并删除冗余表，目标没有 tool_logs/output_versions/artifacts 及兼容视图。保留全部未确认输入、配置与原文件保护路径，废弃旧删除目标清单。迁移不打开或改写 JSONL，不搬移/删除 workspace 或旧日志。备份使用 VACUUM INTO，包含已提交 WAL，存于受保护 backups/；未知更高 schema 拒绝打开，失败回滚并报错。禁止用旧二进制打开新库；备份回退不等于后续 JSONL 一并回滚。当前完整字段、约束、关系与状态机见 [SQLite 表设计与状态机](sqlite-design.md)。
 
 迁移 12 将 execution_id/state/error 统一为 run_id/state/error，input_submissions 的关联列同步改名；删除重复的 execution_epoch，以及没有读取用途的 started_at/ended_at/provider/model 执行字段。旧库升级前一致性备份，迁移事务失败则回滚；不改写原生 JSONL、模型上下文或工作区文件。模型/用量历史仍由原生记录恢复，run 时间字段不承担本轮用量耗时计算。
 
@@ -160,6 +160,8 @@ JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。Session
 删除会话先标记 deleting，阻止新输入、停止该会话并等待 Host/工具写者退出。仅清理固定路径的原生 JSONL 与新布局内部日志，之后删除 sessions（投递/来源记录级联删除）；配置修订保留。workspace 及原 CSV 始终保留，不扫描、不清理空目录，用户自行删除。内部文件清理失败把错误存入 sessions 并允许重启重试；清理必须校验根、路径、链接及与所有 workspace 的重叠。迁移后不执行旧 deletion_files 里的产物删除指令。
 
 ## 5. 命令、事件与运行状态
+
+会话可用性、run 执行、输入投递以及内存交互分别建模，图示和持久化边界见 [SQLite 表设计与状态机](sqlite-design.md)。
 
 IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过 `runtime.event` 发送白名单 `snapshot` 对象，包含 schemaVersion/sessionId/runId/seq 与完整可序列化投影；控制命令另有按请求 ID 关联的响应。每个 run 独立 seq 水位；非当前 run 的推送不得直接替换前端投影，只能重新请求 Main 权威快照。Main 同时校验当前任务对象、sessionId/runId 与 seq，拒绝旧 run 的迟到事件。当前不支持保留 runId 重启执行进程；重新执行必须生成新 runId。
 

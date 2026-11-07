@@ -5,9 +5,9 @@
 ## 开始工作前
 
 1. 读相关文档及代码，检查 `git status --short`，保留用户已有修改。
-2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。
-3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中本轮 UX 修复已完成，验收范围及证据见计划与实施进度。
-4. 验收与交付见 [开发计划](docs/development-plan.md)、[实施进度](docs/implementation-status.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
+2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。SQLite 字段、关系及状态机见 [SQLite 设计](docs/sqlite-design.md)。
+3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX 修复已完成；历史验收可查 Git 和本地 test-results，当前行为以产品与技术文档为准。
+4. 验收与交付见 [开发计划](docs/development-plan.md)、[测试指南](docs/testing-guide.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
 5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R6 已完成，最终完整 P7 为 68/68 通过，不用格式化替代职责重构。
 
 ## 产品边界
@@ -102,7 +102,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 
 ## 文档、Git 与工具
 
-- 产品行为变更同步产品/技术/使用文档；新增计划注明目标与现状，不篡改旧验证记录。
+- 产品行为变更同步产品/技术/使用文档；新增计划注明目标与现状。任务完成后把长期约束归入正式文档，临时计划和流水式过程记录不作为长期文档堆积；历史证据由 Git 与忽略目录中的测试结果保留。
 - 每阶段完成验收后必须创建本地 commit，记录范围与检查；未完成只能如实标 WIP。检查 staged diff 与 `git diff --cached --check`，不混入他人改动、不自动 push。
 - 每次 commit 必须通过 Husky：lint-staged 对暂存代码执行 ESLint/Prettier，再跑全量 lint 和 check；安装依赖时 prepare 自动配置 hooks。禁止 `--no-verify`、`HUSKY=0`、更改 hooksPath 或关闭整套规则绕过。局部例外必须解释原因；全量质量工作流另见 .github/workflows/quality.yml。
 - 长期文档、正式源码、可复用脚本、测试与 lockfile 入 Git；密钥、SQLite/JSONL、下载运行时、out/release、截图、临时研究与测试结果仅留忽略目录。不用 `git add -f` 绕过规则。

@@ -1,6 +1,6 @@
 # 本机使用
 
-本期应用面向已验证的 macOS arm64 环境。打开 `release/mac-arm64/Data Agent.app`；可以把整个 `.app` 移到其他本机目录，必须保留包内资源。无需安装 Python、Node 或分析库。构建和验收方法见 [README](../README.md)，当前验收状态见 [实施进度](implementation-status.md)。
+本期应用面向已验证的 macOS arm64 环境。打开 `release/mac-arm64/Data Agent.app`；可以把整个 `.app` 移到其他本机目录，必须保留包内资源。无需安装 Python、Node 或分析库。构建与当前验收范围见 [README](../README.md)，持续测试入口见 [测试指南](testing-guide.md)。
 
 ## 第一次分析
 
