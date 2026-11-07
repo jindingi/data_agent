@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本机 macOS arm64 MVP 已完成 P0–P7。最终 P7 为 **61/61 通过**：全部前置确定性回归、实际 `.app` 的移动目录/离线运行、真实 DeepSeek 多 CSV 分析与重启追问、审批/停止/恢复及零残留进程；发布资源校验通过。阶段与证据见 [实施进度](docs/implementation-status.md)。
+本机 macOS arm64 MVP 已完成 P0–P7。初次交付的完整 P7 门禁为 **61/61 通过**：全部前置确定性回归、实际 `.app` 的移动目录/离线运行、真实 DeepSeek 多 CSV 分析与重启追问、审批/停止/恢复及零残留进程；发布资源校验通过。此后增量修复的定向测试与清单变更另行记录，阶段与证据见 [实施进度](docs/implementation-status.md)。
 
 打开 `release/mac-arm64/Data Agent.app`，在设置中填写 BYOK，即可引用 CSV 开始分析。支持多轮、插话、双会话并发、原生 JSONL 历史、Markdown/PNG 展示、复制及导出，Python 与常用库随包提供。详细操作见 [本机使用说明](docs/usage.md)。
 

@@ -4,7 +4,7 @@
 
 | 阶段 | 当前状态 | 实现与验证 |
 | --- | --- | --- |
-| P0 | 已通过 | 正式四入口构建、React/shadcn/Tailwind 界面、窄 IPC、utilityProcess ping/退出、SQLite、CDP 隔离和本机 .app。`pnpm verify:phase -- P0` 的 5 项必需用例通过，内含 2 项单元测试；实际开发态和打包态均运行 |
+| P0 | 已通过 | 正式四入口构建、React/shadcn/Tailwind 界面、窄 IPC、utilityProcess ping/退出、SQLite、CDP 隔离和本机 .app。`pnpm verify:phase -- P0` 的 5 项必需用例通过，内含 2 项单元测试；实际构建后的未打包态和打包态均运行；当时未覆盖 Vite 开发服务 |
 | P1 | 已通过 | SQLite 会话/原路径引用、新建/重命名/搜索/归档/恢复、自选新会话父目录、pi 原生 JSONL 只读预检与读取、可信 ResourceLoader、创建/历史落盘对账。`pnpm verify:phase -- P1` 的 10 项检查通过，包含 P0 前置回归和 7 项 P1 必需检查 |
 | P2 | 已通过 | 独立 Host 的真实 pi SessionRuntime、白名单快照/seq/epoch、原生输入身份与落盘恢复、模型选择/BYOK、受控 read、thinking/text/tool/Markdown 展示、基本并发准入与停止。`pnpm verify:phase -- P2` 的 15 项必需检查通过，含 4 个真实 DeepSeek/CDP 检查与前置回归 |
 | P3 | 已通过 | 7 个通用工具及澄清、内置 Python/rg/fd/中文字体、Main 策略审批与进程监督器。`pnpm verify:phase -- P3` 的 19 项检查通过，含真实 CDP、开发及 .app 运行时、DeepSeek 写入/执行/读取和 P2 核心 live 回归 |
@@ -83,3 +83,9 @@ P7 最终门禁 `DATA_AGENT_EVAL_REVIEW=1 pnpm verify:phase -- P7` 为 **61/61 �
 本次 `pnpm check`、打包应用 `P7-THEME-INPUT` 和既有 `P7-USABILITY` 定向 CDP 回归通过。证据分别为 `test-results/2026-11-07T00-18-17.209Z/summary.json` 和 `test-results/2026-11-07T00-18-42.089Z/summary.json`；深浅首页、聊天/工具/报告和浅色设置截图已查看。IME 防误发使用浏览器组合事件模拟，不等同于逐个实体输入法验收。首次新增测试因断言把模型 content 数组当成字符串而失败，修正为按内容块读取后通过；失败证据保留。
 
 `.app` 已更新，定向测试启动前的发布一致性检查通过。P7 清单新增 P7-THEME-INPUT 后共62项；上文61/61是此前完整门禁的历史结果，本次未重新运行完整门禁或真实模型/Judge。
+
+## 开发模式修复：IPC 来源地址规范化
+
+2026-11-07 用 `pnpm test:e2e -- --case P0-DEV --no-build` 在隔离目录启动真实 `pnpm dev`，复现主框架 `http://localhost:5173/` 被拒绝为 UNTRUSTED_SENDER。electron-vite 注入的地址没有末尾 `/`，原代码按字符串比较，错误拒绝 Chromium 规范化后的 URL。Main 现先规范化预期 URL，仍严格检查当前窗口、主框架和完整 URL。
+
+失败证据 `test-results/2026-11-07T00-24-29.765Z/summary.json`；修复后同一用例在 `test-results/2026-11-07T00-25-12.474Z/summary.json` 通过，包括系统 IPC、设置连接检查、新建会话、刷新恢复及同源不同查询参数页面的拒绝验证。`pnpm check` 与现有单元测试通过。构建输出与用户数据位于独立 test-results 目录，本次未覆盖 out/ 或 release/，无需重新生成 .app。P0/P7 清单新增 P0-DEV，当前 P7 共63项；本次未重跑完整门禁。

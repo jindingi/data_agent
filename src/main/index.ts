@@ -35,7 +35,9 @@ const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) { console.log('Data Agent already running'); app.exit(0); }
 const here = fileURLToPath(new URL('.', import.meta.url));
 const rendererFile = join(here, '../renderer/index.html');
-const rendererURL = !app.isPackaged && process.env.ELECTRON_RENDERER_URL ? process.env.ELECTRON_RENDERER_URL : pathToFileURL(rendererFile).href;
+// Chromium canonicalizes loaded URLs (notably adding '/' to a bare HTTP origin).
+// Compare against that same representation, while retaining exact-document trust.
+const rendererURL = new URL(!app.isPackaged && process.env.ELECTRON_RENDERER_URL ? process.env.ELECTRON_RENDERER_URL : pathToFileURL(rendererFile).href).href;
 let window: BrowserWindow | null = null;
 let host: AgentProcess | undefined;
 let db: ReturnType<typeof openDatabase> | undefined;

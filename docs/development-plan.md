@@ -135,6 +135,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | --- | --- |
 | P0-CHECK | pnpm check 通过；renderer 无 Node/pi/main 导入；shared 无进程依赖 |
 | P0-CDP | 启动后 30 秒内发现正确窗口；通过 CDP 输入文本、切换面板并读取状态；未捕获异常为 0 |
+| P0-DEV | 隔离目录启动真实 pnpm dev，通过 CDP 检查合法 IPC、设置连接、新建会话和刷新恢复；同源不同文档的 IPC 仍拒绝；不覆盖 out/、release/ 或真实用户数据 |
 | P0-IPC | 合法 ping 成功；未知 channel/非法参数返回明确错误且无副作用；Host 崩溃可检测 |
 | P0-ISOLATION | 两个测试实例使用不同 userData/业务根目录；生产启动无调试监听；无测试数据写入真实全局目录 |
 | P0-PACKAGE | package:dir 生成可启动 .app；其中 native SQLite 加载成功；Main/Host 两个编译入口存在 |
