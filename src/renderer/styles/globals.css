@@ -1808,3 +1808,46 @@ summary:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+.workspace-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.workspace-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+.workspace-entry:hover,
+.workspace-entry:focus-visible {
+  background: var(--muted);
+}
+.workspace-entry span,
+.workspace-filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-entry svg {
+  flex-shrink: 0;
+}
+.workspace-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.workspace-filename {
+  flex: 1;
+}

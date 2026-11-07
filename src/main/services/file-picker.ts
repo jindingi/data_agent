@@ -1,10 +1,23 @@
 import { dialog, type BrowserWindow } from 'electron';
+import { basename } from 'node:path';
 
 export class FilePicker {
   constructor(
     private window: () => BrowserWindow | null,
     private automation: boolean,
   ) {}
+  async chooseSaveFile(source: string): Promise<string | undefined> {
+    if (this.automation && process.env.DATA_AGENT_TEST_SAVE_FILE)
+      return process.env.DATA_AGENT_TEST_SAVE_FILE;
+    const win = this.window();
+    if (!win) return;
+    const result = await dialog.showSaveDialog(win, {
+      title: '另存文件',
+      defaultPath: basename(source),
+      properties: ['showOverwriteConfirmation', 'createDirectory'],
+    });
+    return result.canceled ? undefined : result.filePath;
+  }
   async chooseFiles(): Promise<string[]> {
     // Only the OS-picker result is substituted in automated tests; all business logic remains real.
     if (this.automation && process.env.DATA_AGENT_TEST_PICK_FILES) {

@@ -1,3 +1,4 @@
+import type { WorkspaceEntry, WorkspaceListing, WorkspacePreview } from '../workspace';
 import {
   agentConfigSchema,
   type AgentConfigSettings,
@@ -20,6 +21,43 @@ import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maint
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...base,
+      type: z.literal('workspace.list'),
+      sessionId: z.string().uuid(),
+      directoryId: z.string().uuid().optional(),
+      showHidden: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('workspace.resolve'),
+      sessionId: z.string().uuid(),
+      entryId: z.string().uuid(),
+      href: z.string().max(8192),
+    })
+    .strict(),
+  ...(['workspace.preview', 'workspace.copy', 'workspace.saveAs'] as const).map((type) =>
+    z
+      .object({
+        ...base,
+        type: z.literal(type),
+        sessionId: z.string().uuid(),
+        entryId: z.string().uuid(),
+      })
+      .strict(),
+  ),
+  z
+    .object({
+      ...base,
+      type: z.literal('workspace.reveal'),
+      sessionId: z.string().uuid(),
+      entryId: z.string().uuid().optional(),
+    })
+    .strict(),
+
   z
     .object({
       ...base,
@@ -292,6 +330,13 @@ export type AppEvent =
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'workspace.list': WorkspaceListing;
+  'workspace.preview': WorkspacePreview;
+  'workspace.resolve': WorkspaceEntry;
+  'workspace.copy': null;
+  'workspace.reveal': null;
+  'workspace.saveAs': string | null;
+
   'agentConfig.preview': AgentPromptView;
   'agentConfig.get': AgentConfigSettings;
   'agentConfig.save': AgentConfigSettings;

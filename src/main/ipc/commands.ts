@@ -27,11 +27,46 @@ export async function dispatchCommand(
     interactions,
     automationControl,
     artifacts,
+    workspaceFiles,
     logs,
     deletion,
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'workspace.list':
+      return success(
+        command.type,
+        await workspaceFiles.list(command.sessionId, command.directoryId, command.showHidden),
+      );
+    case 'workspace.resolve':
+      return success(
+        command.type,
+        await workspaceFiles.resolveLink(command.sessionId, command.entryId, command.href),
+      );
+    case 'workspace.preview':
+      return success(
+        command.type,
+        await workspaceFiles.preview(command.sessionId, command.entryId),
+      );
+    case 'workspace.copy': {
+      const preview = await workspaceFiles.preview(command.sessionId, command.entryId);
+      if (preview.text === undefined)
+        throw new AppError('TEXT_UNAVAILABLE', '当前文件没有可复制的文本');
+      clipboard.writeText(preview.text);
+      return success(command.type, null);
+    }
+    case 'workspace.reveal':
+      shell.showItemInFolder(await workspaceFiles.location(command.sessionId, command.entryId));
+      return success(command.type, null);
+    case 'workspace.saveAs': {
+      const source = await workspaceFiles.location(command.sessionId, command.entryId);
+      const target = await picker.chooseSaveFile(source);
+      return success(
+        command.type,
+        target ? await workspaceFiles.saveAs(command.sessionId, command.entryId, target) : null,
+      );
+    }
+
     case 'agentConfig.preview': {
       const result = await host.request({
         type: 'agentConfig.preview',

@@ -1,3 +1,4 @@
+import { WorkspaceFileService } from './services/workspace';
 import { AgentConfigService } from './services/agent-config';
 import { app, BrowserWindow, Menu, safeStorage, nativeImage } from 'electron';
 import { join } from 'node:path';
@@ -172,7 +173,20 @@ if (primaryInstance)
           db!.prepare('SELECT sqlite_version() AS version').get() as { version: string }
         ).version,
       });
+      const workspaceFiles = new WorkspaceFileService(
+        sessions,
+        [
+          paths.sessions,
+          paths.logs,
+          paths.database,
+          `${paths.database}-wal`,
+          `${paths.database}-shm`,
+          agentConfigs.resourcesRoot,
+        ],
+        (bytes) => !nativeImage.createFromBuffer(bytes).isEmpty(),
+      );
       registerHandlers({
+        workspaceFiles,
         trusted: (event) =>
           Boolean(
             window &&

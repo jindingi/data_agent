@@ -1,3 +1,4 @@
+import type { WorkspaceFileService } from '../services/workspace';
 import type { AgentConfigService } from '../services/agent-config';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { SystemInfo } from '../../shared/contracts/ipc';
@@ -28,6 +29,7 @@ export interface HandlerDependencies {
     sessionId?: string,
   ) => number | null;
   artifacts: ArtifactService;
+  workspaceFiles: WorkspaceFileService;
   logs: LogService;
   deletion: DeletionService;
 }

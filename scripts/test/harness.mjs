@@ -38,6 +38,7 @@ export async function startApp(
     pickFiles,
     pickDirectory,
     exportDirectory,
+    saveFile,
     testModelBaseUrl,
   } = {},
 ) {
@@ -78,6 +79,8 @@ export async function startApp(
     DATA_AGENT_HOME: join(root, 'data'),
     DATA_AGENT_USER_DATA: join(root, 'userData'),
   };
+  delete env.DATA_AGENT_TEST_SAVE_FILE;
+  if (automation && saveFile) env.DATA_AGENT_TEST_SAVE_FILE = saveFile;
   delete env.DATA_AGENT_TEST_EXPORT_DIRECTORY;
   if (automation && exportDirectory) env.DATA_AGENT_TEST_EXPORT_DIRECTORY = exportDirectory;
   delete env.DATA_AGENT_TEST_MODEL_BASE_URL;

@@ -998,5 +998,25 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["lifecycle", "tools"]
+  },
+  {
+    "id": "workspace.access",
+    "feature": "workspace",
+    "level": "unit",
+    "file": "tests/features/workspace/files.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["preview", "sessions"]
+  },
+  {
+    "id": "workspace.browser",
+    "feature": "workspace",
+    "level": "e2e",
+    "file": "tests/features/workspace/browser.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": [],
+    "related": ["preview"]
   }
 ]

@@ -16,7 +16,7 @@ import { useSessions } from '../features/sessions/use-sessions';
 import { isActive } from '../../shared/runtime';
 import { useRuntime } from '../features/runtime/use-runtime';
 import { Transcript } from '../features/runtime/Transcript';
-import { ArtifactPanel } from '../features/artifacts/ArtifactPanel';
+import { WorkspacePanel } from '../features/workspace/WorkspacePanel';
 import { readTheme, saveTheme } from '../lib/theme';
 
 const ideas = [
@@ -71,7 +71,6 @@ export function App() {
     !current?.error &&
     (!active ||
       ['running', 'waiting_approval', 'waiting_input'].includes(runtime.snapshot?.state ?? ''));
-  const files = sessions.detail?.files ?? [];
   const history = runtime.snapshot?.messages ?? sessions.detail?.messages ?? [];
   const act = (task: Promise<unknown>) => {
     void task.catch((error) => setError(error instanceof Error ? error.message : '操作失败'));
@@ -241,13 +240,10 @@ export function App() {
             )}
           </section>
         </main>
-        <ArtifactPanel
+        <WorkspacePanel
           key={sessions.selected ?? 'home'}
           hidden={!panel}
           sessionId={sessions.selected}
-          workspace={current?.workspace}
-          inputs={files}
-          removeInput={(id) => act(sessions.removeFile(id))}
           close={() => {
             setPanel(false);
             requestAnimationFrame(() =>
@@ -256,7 +252,6 @@ export function App() {
                 ?.focus(),
             );
           }}
-          onError={setError}
         />
       </div>
       {deleting && (
