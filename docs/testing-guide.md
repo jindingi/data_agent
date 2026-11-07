@@ -161,7 +161,7 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 `pnpm test -- --feature reports,preview,agent-config` 默认使用 none/scripted，不调用真实模型。正式 runner 的 prepare 从锁定 npm 字节准备 ECharts 资源，unit-only 与干净 CI 不依赖事先启动应用，不下载库。
 
-- `agent-config.report-resources-unit`、`agent-config.storage`：旧 JSON 指纹、缺失恢复/拒绝、链接/篡改、升级默认不变、数据库事务失败、旧会话绑定；`agent-config.admission` 检查 Main 实际读取完整资源包路径。
+- `agent-config.report-resources-unit`、`agent-config.report-migration`、`agent-config.storage`：旧 JSON 指纹、缺失恢复/拒绝、链接/篡改、升级默认不变、数据库事务失败、旧会话绑定；`agent-config.admission` 检查 Main 实际读取完整资源包路径。
 - `agent-config.requests`：旧 skill、新 skill 单独启用、两个 skill 同启用及关闭的最终提供方请求，工具循环/预算变化、steer/follow-up、附件和重启前缀；压缩边界仍由 conversation.retry-compaction 验证。
 - `reports.delivery`：用真实通用 read/write/bash 与内置 Python 读取新 skill/资料、装配自由 HTML、内联锁定库、转义数据、实际筛选；模型响应为 scripted，不代表生成质量。
 - `reports.engine`、`preview.html`：真实隐藏 Electron/CDP，ECharts 筛选/重置、源码/隐藏/弹窗/滚动状态、显式刷新、三尺寸/深浅宿主主题、另存和独立离线 file:// Chromium 打开。宿主截图不含独立原生 view，报告截图单独保留；必须实际检查两者，不能把空白宿主槽位当报告截图。
