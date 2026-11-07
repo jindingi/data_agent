@@ -41,6 +41,8 @@ AI 和日常开发禁止使用 `--no-verify`、`HUSKY=0` 或改 hooksPath 绕过
 
 `pnpm quality` 不运行构建、模型请求或 Electron，也不代替相关单元、集成、CDP 测试。CI 安装使用 `--ignore-scripts`，避免为静态检查下载 Electron 或重建 SQLite；钩子测试自行在临时仓库安装 Husky。
 
+统一文件预览新增直接依赖 highlight.js 11.11.1，按语言显式导入 core/grammar；职责与大小限制见 [技术设计](technical-design.md)。它不替代 ESLint/Prettier，也不执行预览代码；安全展示及文件访问边界由 `UX-FILE-PREVIEW` 与 `P4-ARTIFACT` 回归。
+
 ## 例外与评审规则
 
 - 只允许局部、附原因的规则抑制。本轮保留 async generation counter 在 effect cleanup 中递增的语义：它是失效票据，不是 React DOM ref，不能机械改成捕获旧值。

@@ -550,8 +550,8 @@ export const cases = {
       await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'Copyable report' }).waitFor();
       oldClipboard = execFileSync('/usr/bin/pbpaste');
-      await page.getByRole('button', { name: '复制 Markdown', exact: true }).click();
-      await page.getByRole('status').filter({ hasText: '已复制 Markdown' }).waitFor();
+      await page.getByRole('button', { name: '复制当前内容', exact: true }).click();
+      await page.getByRole('status').filter({ hasText: '已复制当前内容' }).waitFor();
       assert.equal(execFileSync('/usr/bin/pbpaste', { encoding: 'utf8' }), markdown);
       await page.setViewportSize({ width: 940, height: 650 });
       const before = await page.locator('.main-area').boundingBox();

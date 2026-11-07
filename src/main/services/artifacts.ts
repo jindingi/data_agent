@@ -1,4 +1,6 @@
 import { readVerified, writeAll } from './artifacts-io';
+import { textPreview, TEXT_PREVIEW_BYTES } from './text-preview';
+import { previewLanguage } from '../../shared/file-preview';
 import type Database from 'better-sqlite3';
 import { constants } from 'node:fs';
 import { mkdir, open, readdir, realpath, rm, rename, lstat } from 'node:fs/promises';
@@ -249,11 +251,32 @@ export class ArtifactService {
   async preview(sessionId: string, id: string): Promise<ArtifactPreview> {
     const file = this.file(sessionId, id);
     if (file.state !== 'ready') return { artifact: file };
-    if (file.kind === 'file') return { artifact: file };
+    if (file.kind === 'file') {
+      if (!previewLanguage(file.relativePath))
+        return { artifact: file, notice: '暂不支持此文件格式，可在 Finder 中定位后打开。' };
+      const prefix = Buffer.alloc(Math.min(file.size, TEXT_PREVIEW_BYTES));
+      let offset = 0;
+      // Verify the complete registered version in bounded chunks, retain only its preview prefix.
+      await this.verifyRead(file, async (chunk) => {
+        offset += chunk.copy(prefix, offset, 0, Math.max(0, prefix.length - offset));
+      });
+      return { artifact: file, ...textPreview(prefix, file.size, file.relativePath) };
+    }
     const bytes = await this.verifiedBytes(file);
     return file.kind === 'png'
       ? { artifact: file, image: `data:image/png;base64,${bytes.toString('base64')}` }
       : { artifact: file, text: bytes.toString('utf8') };
+  }
+  async location(sessionId: string, id: string) {
+    const file = this.file(sessionId, id);
+    const directory = this.version(file.versionId).directory;
+    if (
+      (await realpath(directory)) !== directory ||
+      (await realpath(file.path)) !== file.path ||
+      !inside(file.path, directory)
+    )
+      throw new AppError('FILE_CHANGED', '文件路径已变更');
+    return file.path;
   }
   async exportVersion(sessionId: string, versionId: string, parent: string) {
     const version = this.version(versionId);

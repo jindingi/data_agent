@@ -1,3 +1,4 @@
+import type { TextPreview } from './file-preview';
 export type ArtifactKind = 'markdown' | 'png' | 'file';
 export type ArtifactState =
   'ready' | 'empty' | 'unsupported' | 'too_large' | 'invalid' | 'changed' | 'missing';
@@ -28,8 +29,7 @@ export interface ArtifactListing {
   versions: OutputVersion[];
   files: ArtifactRecord[];
 }
-export interface ArtifactPreview {
+export interface ArtifactPreview extends TextPreview {
   artifact: ArtifactRecord;
-  text?: string;
   image?: string;
 }

@@ -129,11 +129,11 @@ export const cases = {
       }, 'empty and invalid artifacts');
       await openPreview(page, '预览');
       await page
-        .getByLabel('选择报告或图表')
+        .getByLabel('选择预览文件')
         .selectOption(listing.files.find((file) => file.kind === 'markdown').id);
       await page.getByText('文件为空', { exact: true }).waitFor();
       await page
-        .getByLabel('选择报告或图表')
+        .getByLabel('选择预览文件')
         .selectOption(listing.files.find((file) => file.kind === 'png').id);
       await page.getByText('无法展示：PNG 文件无效', { exact: true }).waitFor();
       fixture.set(

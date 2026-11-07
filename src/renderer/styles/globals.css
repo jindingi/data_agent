@@ -23,6 +23,9 @@
   --primary-foreground: #12231d;
   --destructive: #b83228;
   --destructive-foreground: #ffffff;
+  --code-keyword: #d9b8ff;
+  --code-string: #a2d0bb;
+  --code-number: #efc18e;
   --accent-text: #a2d0bb;
   --text-secondary: #bdc8c2;
   --text-muted: #909c98;
@@ -51,6 +54,9 @@
   --primary: #286747;
   --primary-foreground: #ffffff;
   --destructive: #b42318;
+  --code-keyword: #7435a3;
+  --code-string: #286747;
+  --code-number: #8c4814;
   --accent-text: #286747;
   --text-secondary: #40534a;
   --text-muted: #5d6d64;
@@ -517,7 +523,7 @@ summary:focus-visible {
 }
 .file-list > div {
   display: grid;
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: 7px;
   padding: 14px 0;
   border-bottom: 1px solid var(--border);
@@ -530,7 +536,7 @@ summary:focus-visible {
 }
 .file-list span,
 .file-list small {
-  grid-column: 2;
+  grid-column: 2 / -1;
   font-size: 11px;
   overflow-wrap: anywhere;
   line-height: 1.7;
@@ -765,6 +771,63 @@ summary:focus-visible {
   font-size: 12px;
   line-height: 1.7;
   overflow-wrap: anywhere;
+}
+.input-preview-link {
+  min-width: 0;
+  text-align: left;
+  color: var(--accent-text);
+}
+.input-preview-link:hover {
+  text-decoration: underline;
+}
+.source-preview {
+  display: flex;
+  overflow-x: auto;
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+}
+.source-preview pre {
+  margin: 0;
+  padding: 12px;
+  font:
+    13px/1.7 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  white-space: pre;
+  tab-size: 4;
+}
+.source-lines {
+  color: var(--text-muted);
+  border-right: 1px solid var(--border);
+  text-align: right;
+  user-select: none;
+}
+.source-code {
+  flex: 1;
+}
+.source-code code {
+  font: inherit;
+}
+.source-code .hljs-keyword,
+.source-code .hljs-selector-tag,
+.source-code .hljs-literal {
+  color: var(--code-keyword);
+}
+.source-code .hljs-string,
+.source-code .hljs-attr,
+.source-code .hljs-title {
+  color: var(--code-string);
+}
+.source-code .hljs-number,
+.source-code .hljs-built_in {
+  color: var(--code-number);
+}
+.source-code .hljs-comment,
+.source-code .hljs-meta {
+  color: var(--text-muted);
 }
 .generated-files {
   display: flex;
@@ -1095,9 +1158,13 @@ summary:focus-visible {
   border-bottom: 1px solid var(--border);
 }
 
-.artifact-toolbar select,
-.artifact-selector {
+.artifact-toolbar select {
+  min-width: 0;
+  flex: 1;
   margin: 0;
+}
+.artifact-toolbar > button {
+  flex-shrink: 0;
 }
 
 .artifact-scroll {

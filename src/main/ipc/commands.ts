@@ -48,16 +48,27 @@ export async function dispatchCommand(
     }
     case 'artifacts.list':
       return success(command.type, artifacts.list(command.sessionId));
+    case 'files.preview':
+      return success(command.type, await sessions.previewFile(command.sessionId, command.fileId));
+    case 'files.copy': {
+      const preview = await sessions.previewFile(command.sessionId, command.fileId);
+      if (preview.text === undefined)
+        throw new AppError('TEXT_UNAVAILABLE', '当前文件没有可复制的文本');
+      clipboard.writeText(preview.text);
+      return success(command.type, null);
+    }
+    case 'files.reveal':
+      shell.showItemInFolder(await sessions.inputLocation(command.sessionId, command.fileId));
+      return success(command.type, null);
+    case 'artifacts.reveal':
+      shell.showItemInFolder(await artifacts.location(command.sessionId, command.artifactId));
+      return success(command.type, null);
     case 'artifacts.preview':
       return success(command.type, await artifacts.preview(command.sessionId, command.artifactId));
     case 'artifacts.copy': {
       const preview = await artifacts.preview(command.sessionId, command.artifactId);
-      if (
-        preview.artifact.kind !== 'markdown' ||
-        preview.artifact.state !== 'ready' ||
-        preview.text === undefined
-      )
-        throw new AppError('REPORT_UNAVAILABLE', '当前文件不是可复制的 Markdown 报告');
+      if (preview.artifact.state !== 'ready' || preview.text === undefined)
+        throw new AppError('TEXT_UNAVAILABLE', '当前文件没有可复制的文本');
       clipboard.writeText(preview.text);
       return success(command.type, null);
     }

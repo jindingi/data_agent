@@ -9,6 +9,7 @@ import { interactionAnswerSchema } from '../tools';
 import type { SessionRecord, SessionDetail, FileReference, SelectedFile } from '../models';
 import type { ModelSettings } from '../runtime';
 import type { ArtifactListing, ArtifactPreview } from '../artifacts';
+import type { TextPreview } from '../file-preview';
 import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
@@ -40,6 +41,24 @@ export const commandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ ...base, type: z.literal('artifacts.list'), sessionId: z.string().uuid() }).strict(),
+  ...(['files.preview', 'files.copy', 'files.reveal'] as const).map((type) =>
+    z
+      .object({
+        ...base,
+        type: z.literal(type),
+        sessionId: z.string().uuid(),
+        fileId: z.string().uuid(),
+      })
+      .strict(),
+  ),
+  z
+    .object({
+      ...base,
+      type: z.literal('artifacts.reveal'),
+      sessionId: z.string().uuid(),
+      artifactId: z.string().uuid(),
+    })
+    .strict(),
   z
     .object({
       ...base,
@@ -257,6 +276,10 @@ export interface CommandResponses {
   'files.pick': FileReference[];
   'files.add': FileReference[];
   'files.remove': FileReference[];
+  'files.preview': TextPreview;
+  'files.copy': null;
+  'files.reveal': null;
+  'artifacts.reveal': null;
   'artifacts.list': ArtifactListing;
   'artifacts.preview': ArtifactPreview;
   'artifacts.copy': null;

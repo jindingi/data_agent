@@ -83,6 +83,17 @@ it('P4-ARTIFACT registers actual bounded files without trusting agent manifests 
   expect(artifacts.list(sessionId).files.find((file) => file.id === report.id)!.state).toBe(
     'changed',
   );
+  const textVersion = await version();
+  const source = 'x'.repeat(200_000);
+  await writeFile(join(textVersion.directory, 'large.py'), source);
+  await artifacts.publish(textVersion.id);
+  const code = artifacts.list(sessionId).files.find((file) => file.relativePath === 'large.py')!;
+  const preview = await artifacts.preview(sessionId, code.id);
+  expect(preview.text).toBe(source.slice(0, 128 * 1024));
+  expect(preview.truncated).toBe(true);
+  // Even a change beyond the displayed prefix must invalidate the registered version.
+  await writeFile(code.path, source.slice(0, -1) + 'y');
+  await expect(artifacts.preview(sessionId, code.id)).rejects.toThrow('文件已变更');
 });
 it('P4-VERSIONS preserves earlier bytes and IDs, guards their writes, and exports relative files', async () => {
   const first = await version();

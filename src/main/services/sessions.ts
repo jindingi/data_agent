@@ -1,4 +1,5 @@
 import { inspectFiles } from './file-selection';
+import { inputTextPreview, checkedInputPath } from './text-preview';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -138,6 +139,32 @@ export class SessionService {
       )
       .all(sessionId) as Omit<FileReference, 'missing'>[];
     return files.map((f) => ({ ...f, missing: !existsSync(f.path) }));
+  }
+  private inputReference(sessionId: string, fileId: string) {
+    const file = this.files(sessionId).find((file) => file.id === fileId);
+    if (!file) throw new AppError('FILE_NOT_FOUND', '文件未关联到当前会话');
+    return file;
+  }
+  private previewProtectedRoots() {
+    return [
+      this.paths.sessions,
+      this.paths.logs,
+      this.paths.database,
+      `${this.paths.database}-wal`,
+      `${this.paths.database}-shm`,
+    ];
+  }
+  previewFile(sessionId: string, fileId: string) {
+    return inputTextPreview(
+      this.inputReference(sessionId, fileId).path,
+      this.previewProtectedRoots(),
+    );
+  }
+  inputLocation(sessionId: string, fileId: string) {
+    return checkedInputPath(
+      this.inputReference(sessionId, fileId).path,
+      this.previewProtectedRoots(),
+    );
   }
   addFiles(sessionId: string, selected: string[]) {
     this.assertMutable(sessionId);

@@ -48,7 +48,7 @@ flowchart LR
 - storage/database.ts：SQLite 连接与 migration、外键、WAL、busy timeout；Main 服务单写，RunLedger 拥有输入账本的短事务。
 - InteractionBroker：按 sessionId/runId/toolCallId 绑定审批与澄清；关闭窗口不取消，Cmd+Q/停止/崩溃取消。
 - CredentialService：BYOK 加密持久化，只发送当前模型凭证到对应 Host；Renderer 不接收已保存的明文 key。
-- file-selection.ts / SessionService：获取所选文件路径，检查真实路径、存在性、大小和合计大小。不读取 CSV 内容、不解析、不生成数据预览；不复制源文件、不监测外部替换、不维护数据版本。
+- file-selection.ts / SessionService：获取所选文件路径，检查真实路径、存在性、大小和合计大小。导入时不读取 CSV 内容、不解析、不生成表格预览；不复制源文件、不监测外部替换、不维护数据版本。
 - ArtifactService：登记候选文件、分配/核对 artifact 身份，检查访问权限和展示条件，提供受控读取与导出；在任务收束时扫描登记本轮文件。不检查报告数值、关联键或分析结论。
 
 ### Agent Host
@@ -227,6 +227,10 @@ P4 的 `ArtifactService` 在 SDK 任务终态后扫描应用分配的输出目�
 
 Renderer 只请求 sessionId/artifactId，由 Main 再核对版本目录、真实路径、大小和 SHA256；预览不接受任意磁盘路径。Markdown 的相对图片只映射同版本已登记 PNG，外部图片不加载；外链只能经用户点击和 Main HTTP/HTTPS 校验后打开。整版导出保持相对目录结构，不拷贝原 CSV；已登记文件发生变化时拒绝冒充旧版本读取或导出。
 
+统一文件预览补充（2026-11-07）：`files.preview/copy/reveal` 只接受 sessionId/fileId；SessionService 验证引用归属，text-preview.ts 校验真实路径、敏感目录、普通文件与读取期间状态。输入 CSV 只读当前文件前 128 KiB，并限制 2,000 行，不解析表格、不复制或冻结原文件。生成代码/文本沿用 artifact ID；仍以 64 KiB 分块校验整文件 SHA256，只保留前 128 KiB 后再限行，不能因为截断预览绕过历史版本完整性。导出仍读取完整产物。未知扩展名、二进制、非 UTF-8 明确提示，不执行源码。新增接口不接受任意路径；Finder 定位同样校验归属和真实路径。
+
+Renderer 的 SourcePreview 共享只读文本/行号视图，使用 highlight.js 11.11.1 的 core 与显式语言包（[官方 API](https://highlightjs.readthedocs.io/en/latest/api.html)）生成转义后的 token 标记，不自动猜测语言，不引入编辑器。最多对 32,768 字符高亮，更长内容使用纯文本；UTF-8 在截断处保留完整字符。Markdown 默认继续使用 Report 的安全渲染，用户可切换源码。输入与产物保留各自身份，不将输入文件伪装成版本化产物。深浅主题使用统一代码颜色 token。
+
 不要求 Agent 生成 metrics.json、manifest.json、metric 标记或特定业务 schema，也不交叉核对报告、表格和图表的数值。应用自己的产物索引只保存文件元数据；即使 Agent 自行生成同名 JSON，它也只是普通产物，不成为权威状态来源。
 
 文件存在、非空、路径权限、类型/尺寸上限、图片解码、Markdown 安全渲染属于工作台检查。语义正确性（包括金额是否重复放大、图表是否与计算一致）归独立 LLM-as-a-judge 评测，不在产物登记或展示前运行。非空 report.md 可以满足测试的文件交付断言，即使 Judge 随后认为其结论错误。
@@ -285,8 +289,8 @@ pi JSONL 仍用原生 message/custom entry，`data_agent.input_submitted` 增加
 
 - `runtime/admission.ts` 持有最多两个运行许可及 FIFO；`run-ledger.ts` 只在状态/ACK 变化时写元数据，文本 delta 不重复写 SQLite；`lifecycle.ts` 等待 Host 写者、工具和产物发布，再清理计数并释放许可。RuntimeService 保留公开用例入口。终态 task/恢复 snapshot 缓存各最多 8 项，其他历史按需从 JSONL 读取。
 - SessionRuntime 是唯一 pi 会话所有者。上下文、请求/活跃时间预算、脱敏请求证据分开；ToolService 保留统一策略/审批/复查/取消外壳，ToolOperations 只执行已检查的通用操作。每轮结束显式释放工具与日志计数。
-- ArtifactService 导出通过同一已验证文件描述符以 64 KiB 分块读取并校验 SHA256；独占创建目标目录，隐藏 staging 中完成全部文件后提交，失败清理本次新文件，不覆盖已有导出。展示预览仍受 Markdown/PNG 大小限制。打开导出位置只接受 Main 本次运行记录的最近 64 个成功导出，校验会话和实际目录；Renderer 不能任意打开路径。
-- App 保留布局、导航与快捷键组合。SessionSidebar/Header、Rename/DeleteSessionDialog、Composer/useComposer、SettingsDialog/useModelSettings、RunControls/useActivity、Transcript、ArtifactPanel/Report/ZoomImage/usePanelSize 分别负责各自行为。ArtifactPanel 内拥有阅读状态及请求 ticket，没有额外增加无行为的布局/controller 文件。关闭预览不卸载当前会话面板，新版本不强制改变选择或重新打开面板。
+- ArtifactService 导出通过同一已验证文件描述符以 64 KiB 分块读取并校验 SHA256；独占创建目标目录，隐藏 staging 中完成全部文件后提交，失败清理本次新文件，不覆盖已有导出。Markdown/PNG 展示仍受原有大小限制；普通文本仅保留有界前缀。打开导出位置只接受 Main 本次运行记录的最近 64 个成功导出，校验会话和实际目录；Renderer 不能任意打开路径。
+- App 保留布局、导航与快捷键组合。SessionSidebar/Header、Rename/DeleteSessionDialog、Composer/useComposer、SettingsDialog/useModelSettings、RunControls/useActivity、Transcript、ArtifactPanel/Report/SourcePreview/ZoomImage/usePanelSize 分别负责各自行为。ArtifactPanel 内拥有阅读状态及请求 ticket，没有额外增加无行为的布局/controller 文件。关闭预览不卸载当前会话面板，新版本不强制改变选择或重新打开面板。
 - 单层 52px 顶栏；预览默认占可用区约 45%，聊天/预览分别至少 420px，不足时覆盖阅读。纯图标按钮统一 Radix Tooltip；Tabs/Menu/Dialog 保留键盘、焦点和名称语义。设置及重命名错误在对应弹窗内呈现。
 
 ### 后台验收
