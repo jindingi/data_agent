@@ -86,7 +86,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
     assert(final.requests.length > 0 && final.requests.every((r) => r.model === 'deepseek-flash'));
     assert(final.requests[0].userMessages >= 2);
     assert(final.requests[0].toolResultHashes.length > 0);
-    await page.getByRole('tab', { name: '报告', exact: true }).click();
+    await page.getByRole('tab', { name: '预览', exact: true }).click();
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     await page.screenshot({ path: join(root, 'followup-report.png'), fullPage: true });

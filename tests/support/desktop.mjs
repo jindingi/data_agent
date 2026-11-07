@@ -17,7 +17,7 @@ export async function configure(page, key = 'synthetic-p3-fixture-key') {
   await page.getByRole('textbox', { name: 'API key' }).fill(key);
   await page.getByRole('button', { name: '保存凭证', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
-  await page.getByRole('button', { name: '关闭设置' }).click();
+  await page.getByRole('button', { name: '关闭对话框' }).click();
 }
 export async function submit(page, text = 'Execute the requested fixture action.') {
   const known = new Set((await rpc(page, { type: 'sessions.list' })).map((session) => session.id));

@@ -70,7 +70,7 @@ async function liveScenario(dir) {
       } finally {
         await keyField.fill('').catch(() => {});
       }
-      await page.getByRole('button', { name: '关闭设置' }).click();
+      await page.getByRole('button', { name: '关闭对话框' }).click();
       await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
       const sessionId = await until(
         () => page.getByTestId('session-title').getAttribute('data-session-id'),

@@ -32,7 +32,7 @@ async function deliver(page, sessionId, previousRunId) {
   const files = (await listing(page, sessionId)).files.filter((f) => f.runId === final.runId);
   assert(files.some((f) => f.relativePath === 'report.md' && f.state === 'ready' && f.size > 0));
   assert(files.some((f) => f.kind === 'png' && f.state === 'ready' && f.size > 0));
-  await page.getByRole('tab', { name: '报告', exact: true }).click();
+  await page.getByRole('tab', { name: '预览', exact: true }).click();
   await until(
     () =>
       page
@@ -272,7 +272,7 @@ export const cases = {
       await configure(page);
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.screenshot({ path: join(root, 'light-settings.png') });
-      await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
 
       const input = page.getByRole('textbox', { name: '分析需求' });
       await input.fill('   ');
@@ -328,7 +328,7 @@ export const cases = {
         ),
       );
       await listing(page, id);
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page.locator('.artifact-markdown').getByRole('heading', { name: '主题预览' }).waitFor();
       await page.locator('.tool-card summary').first().click();
       await page.screenshot({ path: join(root, 'light-report.png') });
@@ -541,7 +541,7 @@ export const cases = {
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
       await settled(page, id);
       await listing(page, id);
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page.getByRole('heading', { name: 'Copyable report' }).waitFor();
       oldClipboard = execFileSync('/usr/bin/pbpaste');
       await page.getByRole('button', { name: '复制 Markdown', exact: true }).click();

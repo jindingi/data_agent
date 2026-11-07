@@ -6,9 +6,9 @@
 
 1. 读相关文档及代码，检查 `git status --short`，保留用户已有修改。
 2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。
-3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX0–UX5 尚未实施。不要将计划写成现状。
+3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX1 已定向验证，其他阶段实施/验收状态见计划。不要将计划写成现状。
 4. 验收与交付见 [开发计划](docs/development-plan.md)、[实施进度](docs/implementation-status.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
-5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R2 已完成，R3–R6 尚未实施，不用格式化替代职责重构。
+5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R2 已完成，R3 实施中，R4–R6 尚未实施，不用格式化替代职责重构。
 
 ## 产品边界
 

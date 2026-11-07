@@ -33,7 +33,8 @@ async function newSession(page) {
   return sessions[0];
 }
 async function rename(page, title) {
-  await page.getByRole('button', { name: '重命名会话', exact: true }).click();
+  await page.getByRole('button', { name: '会话操作', exact: true }).click();
+  await page.getByRole('menuitem', { name: '重命名会话', exact: true }).click();
   await page.getByRole('textbox', { name: '会话标题' }).fill(title);
   await page.getByRole('button', { name: '保存名称', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
@@ -89,7 +90,8 @@ export const cases = {
         .getByRole('button', { name: '打开会话 客户分析' })
         .waitFor({ state: 'hidden' });
       await app.page.getByRole('button', { name: '打开会话 销售趋势' }).click();
-      await app.page.getByRole('button', { name: '归档会话', exact: true }).click();
+      await app.page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await app.page.getByRole('menuitem', { name: '归档会话', exact: true }).click();
       await until(async () => (await list(app.page, true)).length === 1, 'archive persisted');
       await app.page.getByRole('button', { name: '查看归档会话' }).click();
       await app.page.getByRole('button', { name: '打开会话 销售趋势' }).click();

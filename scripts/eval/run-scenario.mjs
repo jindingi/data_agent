@@ -90,7 +90,7 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     assert(report, `nonempty ${reportName} required by fixture`);
     if (chartRequired) assert(chart, 'displayable PNG required by fixture');
     await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-    await page.getByRole('tab', { name: '报告', exact: true }).click();
+    await page.getByRole('tab', { name: '预览', exact: true }).click();
     await page.getByLabel('选择报告或图表').selectOption(report.id);
     await page.locator('.artifact-markdown').waitFor();
     assert((await page.locator('.artifact-markdown').innerText()).length > 0);

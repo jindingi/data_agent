@@ -1,23 +1,14 @@
+import { SessionSidebar } from '../features/sessions/SessionSidebar';
+import { SessionHeader } from '../features/sessions/SessionHeader';
 import { useEffect, useRef, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
 import {
   Activity,
-  Trash2,
-  Archive,
-  ArchiveRestore,
-  Pencil,
   ArrowUp,
   ChartNoAxesCombined,
   ChevronDown,
   FileChartColumn,
   FolderOpen,
-  Layers3,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRight,
   Plus,
-  Search,
-  Settings2,
   ShieldCheck,
   Sparkles,
   Table2,
@@ -183,14 +174,6 @@ export function App() {
       unsubscribe();
     };
   }, []);
-  useEffect(
-    () =>
-      window.dataAgent.subscribe((event) => {
-        if (event.type === 'artifacts.changed' && event.sessionId === sessions.selected)
-          setPanel(true);
-      }),
-    [sessions.selected],
-  );
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (!event.metaKey) return;
@@ -221,107 +204,18 @@ export function App() {
   }
   return (
     <div className="desktop-shell">
-      <div className="titlebar">
-        <span>Data Agent</span>
-      </div>
-      <div className="app-layout">
+      <div className={`app-layout${sidebar ? '' : ' sidebar-hidden'}`}>
         {sidebar && (
-          <aside className="sidebar" aria-label="会话侧栏">
-            <div className="brand">
-              <div className="brand-mark">
-                <ChartNoAxesCombined size={19} strokeWidth={2.2} />
-              </div>
-              <span>Data Agent</span>
-              <span className="beta">LOCAL</span>
-            </div>
-            <Button
-              variant="secondary"
-              className="new-chat"
-              aria-label="新会话"
-              onClick={() => act(newSession())}
-            >
-              <Plus size={17} />
-              新会话<span>⌘ N</span>
-            </Button>
-            <label className="search">
-              <Search size={15} />
-              <input
-                aria-label="搜索会话"
-                placeholder="搜索会话"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <kbd>⌘ K</kbd>
-            </label>
-            <div className="section-label">
-              <button
-                onClick={() => setArchived(!archived)}
-                aria-label={archived ? '查看活跃会话' : '查看归档会话'}
-              >
-                {archived ? '已归档' : '工作空间'} <ChevronDown size={11} />
-              </button>
-              <span>{sessions.list.length}</span>
-            </div>
-            {sessions.list.length > 0 ? (
-              <div className="session-list">
-                {sessions.list.map((session) => (
-                  <button
-                    key={session.id}
-                    aria-label={`打开会话 ${session.title}`}
-                    aria-current={sessions.selected === session.id ? 'true' : undefined}
-                    onClick={() => sessions.select(session.id)}
-                  >
-                    <FolderOpen size={15} />
-                    <span>{session.title}</span>
-                    <small data-session-activity={activity[session.id] ?? 'idle'}>
-                      {(
-                        {
-                          queued: '排队中',
-                          starting: '连接中',
-                          running: '执行中',
-                          waiting_approval: '待审批',
-                          waiting_input: '待回答',
-                        } as Record<string, string>
-                      )[activity[session.id]] ??
-                        new Date(session.updatedAt).toLocaleDateString('zh-CN', {
-                          month: 'numeric',
-                          day: 'numeric',
-                        })}
-                    </small>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="session-empty">
-                <Layers3 size={22} strokeWidth={1.3} />
-                <p>{search ? '没有匹配的会话' : '从一个问题开始'}</p>
-                <small>你的分析与发现，将留在这里</small>
-              </div>
-            )}
-            <div className="sidebar-bottom">
-              <div className="local-badge">
-                <span
-                  className={info?.hostStatus === 'ready' ? 'status-dot' : 'status-dot muted'}
-                />
-                <span data-testid="host-status">
-                  {info?.hostStatus === 'ready'
-                    ? '本地工作台已就绪'
-                    : info?.hostStatus === 'exited'
-                      ? 'Agent 连接已断开'
-                      : '正在启动工作台'}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                className="settings-button"
-                aria-label="设置"
-                onClick={() => setSettings(true)}
-              >
-                <Settings2 />
-                设置<span>⌘ ,</span>
-              </Button>
-            </div>
-          </aside>
+          <SessionSidebar
+            sessions={sessions}
+            search={search}
+            setSearch={setSearch}
+            archived={archived}
+            setArchived={setArchived}
+            activity={activity}
+            onNew={() => act(newSession())}
+            onSettings={() => setSettings(true)}
+          />
         )}
         <main
           className={`main-area${dragging ? ' drag-over' : ''}`}
@@ -344,79 +238,24 @@ export function App() {
           }}
         >
           {dragging && <div className="drop-hint">松开以添加 CSV 原文件路径</div>}
-          <header className="workspace-header">
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={sidebar ? '收起侧栏' : '展开侧栏'}
-              onClick={() => setSidebar(!sidebar)}
-            >
-              {sidebar ? <PanelLeftClose /> : <PanelLeftOpen />}
-            </Button>
-            <span className="breadcrumb" data-testid="session-title" data-session-id={current?.id}>
-              工作台<span>/</span>
-              <strong>{current?.title ?? '新会话'}</strong>
-            </span>
-            <div className="header-actions">
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                onClick={() => {
-                  const next = theme === 'dark' ? 'light' : 'dark';
-                  saveTheme(next);
-                  setTheme(next);
-                }}
-              >
-                {theme === 'dark' ? <Sun /> : <Moon />}
-              </Button>
-              {current && (
-                <>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="重命名会话"
-                    onClick={() => {
-                      setTitle(current.title);
-                      setRenaming(true);
-                    }}
-                  >
-                    <Pencil />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={current.archived ? '恢复会话' : '归档会话'}
-                    onClick={() => act(sessions.archiveCurrent())}
-                  >
-                    {current.archived ? <ArchiveRestore /> : <Archive />}
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="删除会话"
-                    onClick={() => setDeleting(current.id)}
-                  >
-                    <Trash2 />
-                  </Button>
-                </>
-              )}
-              <span className="privacy-label">
-                <ShieldCheck size={14} />
-                文件保留在本地
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="切换结果面板"
-                aria-pressed={panel}
-                onClick={() => setPanel(!panel)}
-              >
-                <PanelRight />
-              </Button>
-            </div>
-          </header>
+          <SessionHeader
+            current={current}
+            sidebar={sidebar}
+            setSidebar={setSidebar}
+            panel={panel}
+            setPanel={setPanel}
+            theme={theme}
+            onTheme={(value) => {
+              saveTheme(value);
+              setTheme(value);
+            }}
+            onRename={() => {
+              setTitle(current!.title);
+              setRenaming(true);
+            }}
+            onArchive={() => act(sessions.archiveCurrent())}
+            onDelete={() => setDeleting(current!.id)}
+          />
           {error && (
             <div role="alert" className="error-banner">
               {error}
@@ -443,7 +282,6 @@ export function App() {
                 <div className="welcome-icon">
                   <ChartNoAxesCombined size={28} strokeWidth={1.5} />
                 </div>
-                <div className="eyebrow">FROM DATA TO UNDERSTANDING</div>
                 <h1>让数据，回答你的问题。</h1>
                 <p className="welcome-copy">
                   带上你的数据，说说你想了解什么。
@@ -675,7 +513,6 @@ export function App() {
                 </div>
               </div>
               <div className="composer-caption">
-                你的文件在本机处理，必要的内容会发送给所选模型。
                 <span className="keyboard-hint">Enter 发送 · Shift+Enter 换行</span>
               </div>
             </div>
@@ -693,22 +530,22 @@ export function App() {
               </div>
             )}
           </section>
-          <footer className="workspace-footer">
-            <span>
-              <span className="status-dot muted" />
-              自然语言 · 本地文件 · 可追溯过程
-            </span>
-            <span>AI 生成的内容请结合业务判断</span>
-          </footer>
         </main>
-        {panel && (
-          <ArtifactPanel
-            sessionId={sessions.selected}
-            inputs={files}
-            close={() => setPanel(false)}
-            onError={setError}
-          />
-        )}
+        <ArtifactPanel
+          key={sessions.selected ?? 'home'}
+          hidden={!panel}
+          sessionId={sessions.selected}
+          inputs={files}
+          close={() => {
+            setPanel(false);
+            requestAnimationFrame(() =>
+              document
+                .querySelector<HTMLButtonElement>('button[aria-label="切换结果面板"]')
+                ?.focus(),
+            );
+          }}
+          onError={setError}
+        />
       </div>
       {deleting && (
         <DeleteSessionDialog

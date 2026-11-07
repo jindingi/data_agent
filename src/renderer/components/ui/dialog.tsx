@@ -1,4 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Button } from './button';
 import { X } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { cn } from '../../lib/utils';
@@ -21,11 +22,15 @@ export function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-md p-2 text-muted-foreground hover:bg-accent"
-          aria-label="关闭设置"
-        >
-          <X size={18} />
+        <DialogPrimitive.Close asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute right-4 top-4"
+            aria-label="关闭对话框"
+          >
+            <X size={18} />
+          </Button>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

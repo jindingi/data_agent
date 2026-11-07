@@ -1,3 +1,4 @@
+import { Tooltip } from './tooltip';
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
@@ -23,8 +24,12 @@ export function Button({
   variant,
   size,
   asChild = false,
+  tooltip,
   ...props
-}: React.ComponentProps<'button'> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+}: React.ComponentProps<'button'> &
+  VariantProps<typeof buttonVariants> & { asChild?: boolean; tooltip?: string }) {
   const Comp = asChild ? Slot : 'button';
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  const label = tooltip ?? (size === 'icon' ? props['aria-label'] : undefined);
+  const button = <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return label && !props.disabled ? <Tooltip label={label}>{button}</Tooltip> : button;
 }

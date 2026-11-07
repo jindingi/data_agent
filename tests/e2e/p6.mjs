@@ -111,7 +111,7 @@ export const cases = {
         window.dataAgent.request({ type: 'models.thinking', level: 'minimal' }),
       );
       assert.equal(unsupported.ok, false);
-      await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       fixture.set({ text: 'First model run.' });
       const sessionId = await submit(page, 'First model request.');
       const first = await settled(page, sessionId);
@@ -135,7 +135,7 @@ export const cases = {
       await page.getByRole('button', { name: '保存凭证', exact: true }).click();
       await page.getByRole('status').filter({ hasText: 'API key 已保存' }).waitFor();
       await page.getByLabel('思考级别', { exact: true }).selectOption('high');
-      await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       await app.stop();
       app = await startApp(root, { testModelBaseUrl: fixture.baseUrl });
       page = app.page;
@@ -337,7 +337,7 @@ export const cases = {
       const first = await settled(page, sessionId);
       assert.equal(first.state, 'completed');
       await published(page, sessionId);
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page
         .locator('.artifact-markdown')
         .getByRole('heading', { name: 'Safe report heading' })
@@ -473,7 +473,8 @@ export const cases = {
       await rpc(page, { type: 'sessions.rename', sessionId: b, title: 'Keep B' });
       const bRun = await running(b);
       await page.getByRole('button', { name: '打开会话 Delete A', exact: true }).click();
-      await page.getByRole('button', { name: '删除会话', exact: true }).click();
+      await page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
       await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
       await deleted(page, a);
@@ -511,7 +512,8 @@ export const cases = {
       const manualAfter = join(listing.versions[0].directory, 'manual-after.txt');
       writeFileSync(manualAfter, 'never registered');
       writeFileSync(report.path, '# manually modified');
-      await page.getByRole('button', { name: '删除会话', exact: true }).click();
+      await page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
       await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
       await page.getByRole('button', { name: '继续清理', exact: true }).waitFor();
@@ -529,7 +531,8 @@ export const cases = {
             .then((id) => id === c),
         'deleting session restored',
       );
-      await page.getByRole('button', { name: '删除会话', exact: true }).click();
+      await page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
       await page.getByRole('button', { name: '继续清理', exact: true }).waitFor();
       assert.equal(await page.getByRole('checkbox').isChecked(), true);
       assert.equal(await page.getByRole('checkbox').isDisabled(), true);
@@ -545,7 +548,8 @@ export const cases = {
       const d = await submit(page, 'Keep the files when removing this conversation.');
       await settled(page, d);
       const keep = (await published(page, d)).files.find((f) => f.relativePath === 'report.md');
-      await page.getByRole('button', { name: '删除会话', exact: true }).click();
+      await page.getByRole('button', { name: '会话操作', exact: true }).click();
+      await page.getByRole('menuitem', { name: '删除会话', exact: true }).click();
       assert.equal(await page.getByRole('checkbox').isChecked(), false);
       await page.getByRole('button', { name: '确认删除会话', exact: true }).click();
       await deleted(page, d);

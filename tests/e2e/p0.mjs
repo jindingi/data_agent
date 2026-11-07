@@ -22,7 +22,7 @@ export const cases = {
       await page.getByText('应用诊断', { exact: true }).click();
       await page.getByRole('button', { name: '检查连接' }).click();
       await page.getByRole('status').filter({ hasText: '连接正常' }).waitFor();
-      await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+      await page.getByRole('button', { name: '关闭对话框', exact: true }).click();
       await page.getByRole('button', { name: '新会话', exact: true }).click();
       const id = await until(
         () => page.getByTestId('session-title').getAttribute('data-session-id'),
@@ -79,8 +79,8 @@ export const cases = {
         '分析地区销售变化',
       );
       await page.getByRole('button', { name: '切换结果面板' }).click();
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
-      await page.getByRole('heading', { name: '还没有报告' }).waitFor();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await page.getByRole('heading', { name: '还没有预览' }).waitFor();
       await page.getByRole('button', { name: '关闭结果面板' }).click();
       await page.getByRole('button', { name: '收起侧栏' }).click();
       assert.equal(await page.getByLabel('会话侧栏').count(), 0);

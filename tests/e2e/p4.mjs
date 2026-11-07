@@ -126,7 +126,7 @@ export const cases = {
       let id = await submit(page);
       assert.equal((await settled(page, id)).state, 'completed');
       await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page.getByRole('heading', { name: '还没有报告' }).waitFor();
       fixture.set(
         { tool: { name: 'write', args: { path: 'report.md', content: '' } } },
@@ -139,7 +139,7 @@ export const cases = {
         const value = await rpc(page, { type: 'artifacts.list', sessionId: id });
         return value.files.length === 2 ? value : null;
       }, 'empty and invalid artifacts');
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page
         .getByLabel('选择报告或图表')
         .selectOption(listing.files.find((file) => file.kind === 'markdown').id);
@@ -244,7 +244,7 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
         !fixture.requests[0].messages.some((message) => String(message.content).includes('N,10')),
       );
       await page.getByRole('complementary', { name: '结果面板' }).waitFor();
-      await page.getByRole('tab', { name: '报告', exact: true }).click();
+      await page.getByRole('tab', { name: '预览', exact: true }).click();
       await page.getByRole('heading', { name: 'Delivery report', exact: true }).waitFor();
       const image = page.getByRole('img', { name: '地区销售', exact: true });
       await until(
