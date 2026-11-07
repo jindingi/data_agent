@@ -288,3 +288,15 @@ Main 列表发现、Host 连接探测与会话请求接入 Electron 网络栈以
 2026-11-07，删除会话不再清理工作区，确认弹窗取消产物开关、显示保留说明与 Finder 入口。删除仅按固定会话路径清理内部 JSONL 和新日志，失败保留 deleting 状态，重启可继续。日志改为会话/tool hash/执行 ID 的磁盘布局，不再注册或查询 tool_logs；旧表实体随阶段 C 迁移统一删除。
 
 `tools.log-storage`、`sessions.deletion-storage`、`sessions.deletion`、`sessions.delete-confirmation` 共 4 项通过，含真实双会话进程停止隔离、全部工作区文件保留、内部链接拒绝、清理中断恢复、日志 UTF-8 分页和确认按钮深浅主题检查。证据：`test-results/2026-11-07T10-44-01.422Z`；已检查实际删除弹窗截图。`pnpm quality` 通过。本轮未调用真实模型。
+
+## 存储简化：六表迁移（阶段 C）
+
+2026-11-07，迁移 11 已实现。运行时仅使用 schema_migrations、app_metadata、sessions、agent_config_revisions、input_submissions、session_sources。旧运行/输入/配置/删除拆表已合并，tool_logs、output_versions、artifacts 及其查询、发布、版本导出和关联 API 已删除；旧迁移定义仅用于升级，不是兼容运行分支。
+
+升级前 VACUUM INTO 一致性备份包含已提交 WAL；事务迁移保留全部投递顺序和未确认输入、配置引用/特殊覆盖、来源保护。最新执行投影进入 sessions，状态更新校验 execution/epoch；原生 JSONL 仍为历史和用量事实源。迁移不触碰 workspace、JSONL 或旧日志，旧删除清单被废弃。日志列表分页 100 条、正文 32 KiB，不另建持久化索引。产品/技术/使用/设计原则和 AGENTS 同步更新。
+
+- 原生集成 **31/31** 通过：`test-results/2026-11-07T10-59-01.300Z/summary.json`，含新增 `sessions.storage-migration` 的真实旧库/WAL、备份、六表断言、输入与配置、事务回滚及未知高版本拒绝。
+- 收尾的配置/输入/上下文前缀等 **8/8** 通过：`test-results/2026-11-07T11-01-21.728Z/summary.json`。
+- 工作区刷新、源码/图片/报告、空态和阅读修正 **5/5** 后台 CDP 通过：`test-results/2026-11-07T11-02-47.163Z/summary.json`。已查看实际窄屏报告尾部和跨轮更新图表截图；深浅主题、三种尺寸、滚动和焦点均由用例覆盖。
+- 初次全量失败中的旧日志路径、旧空态文案和非活动 tab 选择器已定位并修正；原失败报告保留，不将其改写为通过。完整最终普通与 .app 验收在阶段 D 记录。
+- `pnpm quality` 通过。未调用真实模型、未修改用户业务库或正在使用的 out/release。

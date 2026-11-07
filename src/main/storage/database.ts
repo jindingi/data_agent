@@ -1,3 +1,7 @@
+import { simplifyStorage } from './simplify';
+import { mkdirSync, chmodSync, lstatSync, realpathSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { submissionDigest } from '../../node/submission-digest';
 import { inputSchema } from '../../shared/runtime';
 import Database from 'better-sqlite3';
@@ -144,6 +148,7 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  { version: 11, sql: '', after: simplifyStorage },
 ];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec(
@@ -170,6 +175,30 @@ export function openDatabase(file: string) {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
+    const hasMigrations = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
+      .get();
+    const version = hasMigrations
+      ? ((
+          db.prepare('SELECT MAX(version) version FROM schema_migrations').get() as {
+            version: number;
+          }
+        ).version ?? 0)
+      : 0;
+    if (version > migrations.at(-1)!.version)
+      throw new Error('数据库版本高于此应用支持范围，请升级应用');
+    if (version > 0 && version < 11 && file !== ':memory:') {
+      const directory = join(dirname(file), 'backups');
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      if (
+        lstatSync(directory).isSymbolicLink() ||
+        realpathSync(directory) !== join(realpathSync(dirname(file)), 'backups')
+      )
+        throw new Error('数据库备份目录已重定向，升级已停止');
+      const backup = join(directory, `state-v${version}-${randomUUID()}.sqlite`);
+      db.prepare('VACUUM INTO ?').run(backup);
+      chmodSync(backup, 0o600);
+    }
     migrate(db);
     db.prepare(
       'INSERT INTO app_metadata VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',

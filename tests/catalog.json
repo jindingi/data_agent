@@ -1018,5 +1018,15 @@
     "environment": "built",
     "tags": [],
     "related": ["preview"]
+  },
+  {
+    "id": "sessions.storage-migration",
+    "feature": "sessions",
+    "level": "integration",
+    "file": "tests/features/sessions/migration.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["agent-config", "workspace"]
   }
 ]

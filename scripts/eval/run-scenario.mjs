@@ -1,4 +1,4 @@
-import { openPreview } from '../../tests/support/desktop.mjs';
+import { openWorkspaceFile, workspaceFiles } from '../../tests/support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -73,32 +73,23 @@ export async function runScenario(id, root, { packaged = false } = {}) {
     evidence.sessionId = sessionId;
     evidence.sessionFile = join(root, 'application/data/sessions', `${sessionId}.jsonl`);
     assert.equal(final.state, 'completed', final.error ?? 'Agent did not finish');
-    const listing = await until(async () => {
-      const value = await rpc(page, { type: 'artifacts.list', sessionId });
-      return value.versions.some(
-        (version) => version.runId === final.runId && version.state === 'published',
-      )
-        ? value
-        : null;
-    }, 'analysis artifacts published');
     const reportName = scenario.delivery?.report ?? 'report.md',
       chartRequired = scenario.delivery?.chart ?? true;
-    const files = listing.files.filter((file) => file.runId === final.runId),
-      report = files.find(
-        (file) => file.relativePath === reportName && file.size > 0 && file.state === 'ready',
-      ),
-      chart = files.find((file) => file.kind === 'png' && file.size > 0 && file.state === 'ready');
+    const files = (await workspaceFiles(page, sessionId)).map((file) => ({
+        ...file,
+        path: join(final.outputDirectory, file.relativePath),
+      })),
+      report = files.find((file) => file.relativePath === reportName && file.size > 0),
+      chart = files.find((file) => file.name.endsWith('.png') && file.size > 0);
     evidence.artifacts = files;
     assert(report, `nonempty ${reportName} required by fixture`);
     if (chartRequired) assert(chart, 'displayable PNG required by fixture');
-    await openPreview(page, '预览');
-    await page.getByLabel('选择产物版本').selectOption(report.versionId);
-    await page.getByLabel('选择报告或图表').selectOption(report.id);
+    await openWorkspaceFile(page, report.relativePath);
     await page.locator('.artifact-markdown').waitFor();
     assert((await page.locator('.artifact-markdown').innerText()).length > 0);
     await page.screenshot({ path: join(root, 'report.png'), fullPage: true });
     if (chart) {
-      await page.getByLabel('选择报告或图表').selectOption(chart.id);
+      await openWorkspaceFile(page, chart.relativePath);
       await until(
         () =>
           page

@@ -18,3 +18,8 @@ export interface DeletionResult {
   complete: boolean;
   remaining: { path: string; error: string | null }[];
 }
+
+export interface ToolLogListing {
+  logs: ToolLog[];
+  nextOffset: number | null;
+}

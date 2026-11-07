@@ -1,4 +1,4 @@
-import { openPreview } from '../../support/desktop.mjs';
+import { openPreview, workspaceFiles } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -8,11 +8,9 @@ import { rpc, configure, submit, settled } from '../../support/desktop.mjs';
 
 async function published(page, sessionId) {
   return until(async () => {
-    const value = await rpc(page, { type: 'artifacts.list', sessionId });
-    return value.versions.length && value.versions.every((v) => v.state === 'published')
-      ? value
-      : null;
-  }, 'outputs published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files');
 }
 export const cases = {
   async 'transcript.rendering'({ dir }) {
@@ -83,7 +81,8 @@ export const cases = {
       );
       await page.getByRole('button', { name: '展开结果面板', exact: true }).click();
       assert(
-        (await page.getByRole('complementary', { name: '结果面板' }).boundingBox()).width > 500,
+        (await page.getByRole('complementary', { name: '工作区', exact: true }).boundingBox())
+          .width > 500,
       );
       await page.getByRole('button', { name: '缩小结果面板', exact: true }).click();
       const message = page

@@ -7,7 +7,6 @@ import { openDatabase } from '../../../src/main/storage/database';
 import { SessionService } from '../../../src/main/services/sessions';
 import { CredentialService } from '../../../src/main/services/credentials';
 import { ToolService } from '../../../src/main/services/tools';
-import { ArtifactService } from '../../../src/main/services/artifacts';
 import { InteractionBroker } from '../../../src/main/services/interactions';
 import { getRuntimePaths } from '../../../src/node/runtime-paths';
 import { RuntimeService } from '../../../src/main/services/runtime';
@@ -110,13 +109,7 @@ it('models.preflight credentials and model errors leave no run or permit; later 
     tools: new ToolService(
       getRuntimePaths(process.cwd(), '', false),
       paths.logs,
-      new InteractionBroker(db),
-    ),
-    artifacts: new ArtifactService(
-      db,
-      sessions,
-      () => false,
-      () => {},
+      new InteractionBroker(),
     ),
   });
   cleanups.push(() => service.stop());
@@ -130,7 +123,9 @@ it('models.preflight credentials and model errors leave no run or permit; later 
   expect(service.snapshot(session.id)).toBeNull();
   expect(starts).toBe(0);
   expect(() => credentials.select({ provider: 'deepseek', model: 'wrong-name' })).toThrow('模型');
-  expect(db.prepare('SELECT count(*) n FROM runs').get()).toEqual({ n: 0 });
+  expect(
+    db.prepare('SELECT count(*) n FROM sessions WHERE execution_id IS NOT NULL').get(),
+  ).toEqual({ n: 0 });
   const sentinel = 'sk-synthetic-credential-do-not-persist';
   credentials.saveConnection('deepseek', 'https://first.example/v1/', sentinel);
   expect(credentials.endpoint('deepseek')).toBe('https://first.example/v1');

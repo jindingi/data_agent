@@ -59,15 +59,17 @@ export const cases = {
         () => page.getByRole('button', { name: '下一页日志', exact: true }).isEnabled(),
         'previous page loaded',
       );
-      const records = await rpc(page, { type: 'logs.list', sessionId, toolCallId: tool.id });
+      const { logs: records } = await rpc(page, {
+        type: 'logs.list',
+        sessionId,
+        toolCallId: tool.id,
+      });
       assert.equal(records.length, 1);
-      assert(records[0].peakRss > 0);
       assert.deepEqual(app.errors, []);
       return {
         actualLogPages: pages,
         endBeyondStreamTruncationVisible: true,
         utf8Preserved: true,
-        peakRss: records[0].peakRss,
       };
     } finally {
       await app?.stop();

@@ -13,11 +13,9 @@ import {
   type RuntimeSnapshot,
 } from '../runtime';
 import { interactionAnswerSchema } from '../tools';
-import type { SessionRecord, SessionDetail, FileReference, SelectedFile } from '../models';
+import type { SessionRecord, SessionDetail, SelectedFile } from '../models';
 import type { ModelSettings } from '../runtime';
-import type { ArtifactListing, ArtifactPreview } from '../artifacts';
-import type { TextPreview } from '../file-preview';
-import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maintenance';
+import type { DeletionPreview, DeletionResult, ToolLogListing, LogPage } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
@@ -102,57 +100,6 @@ export const commandSchema = z.discriminatedUnion('type', [
       type: z.literal('automation.control'),
       action: z.enum(['close_reopen', 'quit', 'host_pid']),
       sessionId: z.string().uuid().optional(),
-    })
-    .strict(),
-  z.object({ ...base, type: z.literal('artifacts.list'), sessionId: z.string().uuid() }).strict(),
-  ...(['files.preview', 'files.copy', 'files.reveal'] as const).map((type) =>
-    z
-      .object({
-        ...base,
-        type: z.literal(type),
-        sessionId: z.string().uuid(),
-        fileId: z.string().uuid(),
-      })
-      .strict(),
-  ),
-  z
-    .object({
-      ...base,
-      type: z.literal('artifacts.reveal'),
-      sessionId: z.string().uuid(),
-      artifactId: z.string().uuid(),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('artifacts.preview'),
-      sessionId: z.string().uuid(),
-      artifactId: z.string().uuid(),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('artifacts.copy'),
-      sessionId: z.string().uuid(),
-      artifactId: z.string().uuid(),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('artifacts.export'),
-      sessionId: z.string().uuid(),
-      versionId: z.string().uuid(),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('artifacts.revealExport'),
-      sessionId: z.string().uuid(),
-      path: z.string().min(1).max(4096),
     })
     .strict(),
   z.object({ ...base, type: z.literal('workspace.open'), sessionId: z.string().uuid() }).strict(),
@@ -246,6 +193,7 @@ export const commandSchema = z.discriminatedUnion('type', [
     .object({
       ...base,
       type: z.literal('logs.list'),
+      offset: z.number().int().min(0).max(100000).optional(),
       sessionId: z.string().uuid(),
       toolCallId: z.string().min(1).max(4096),
     })
@@ -280,23 +228,6 @@ export const commandSchema = z.discriminatedUnion('type', [
       archived: z.boolean(),
     })
     .strict(),
-  z.object({ ...base, type: z.literal('files.pick'), sessionId: z.string().uuid() }).strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('files.add'),
-      sessionId: z.string().uuid(),
-      paths: z.array(z.string().min(1).max(8192).startsWith('/')).min(1).max(100),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('files.remove'),
-      sessionId: z.string().uuid(),
-      fileId: z.string().uuid(),
-    })
-    .strict(),
   z.object({ ...base, type: z.literal('system.ping'), text: z.string().max(256) }).strict(),
 ]);
 export type Command = z.infer<typeof commandSchema>;
@@ -324,7 +255,6 @@ export interface SystemInfo {
   sqliteVersion: string;
 }
 export type AppEvent =
-  | { type: 'artifacts.changed'; sessionId: string }
   | { type: 'host.status'; status: HostStatus }
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
@@ -367,27 +297,14 @@ export interface CommandResponses {
   'sessions.archive': SessionRecord;
   'sessions.deletePreview': DeletionPreview;
   'sessions.delete': DeletionResult;
-  'files.pick': FileReference[];
-  'files.add': FileReference[];
-  'files.remove': FileReference[];
-  'files.preview': TextPreview;
-  'files.copy': null;
-  'files.reveal': null;
-  'artifacts.reveal': null;
-  'artifacts.list': ArtifactListing;
-  'artifacts.preview': ArtifactPreview;
-  'artifacts.copy': null;
-  'artifacts.export': string | null;
-  'artifacts.revealExport': null;
   'workspace.open': null;
   'link.open': null;
-  'logs.list': ToolLog[];
+  'logs.list': ToolLogListing;
   'logs.page': LogPage;
 }
 export type CommandResponse<C extends CommandInput> = CommandResponses[C['type']];
 export interface DesktopAPI {
   inspectDroppedFiles: (files: File[]) => Promise<Result<SelectedFile[]>>;
-  addFiles: (sessionId: string, files: File[]) => Promise<Result<FileReference[]>>;
   request: <C extends CommandInput>(command: C) => Promise<Result<CommandResponse<C>>>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;
 }

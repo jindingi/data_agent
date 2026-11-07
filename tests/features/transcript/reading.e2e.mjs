@@ -1,8 +1,9 @@
+import { workspaceFiles, openPreview } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { startApp, until } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
-import { configure, submit, settled, rpc } from '../../support/desktop.mjs';
+import { configure, submit, settled } from '../../support/desktop.mjs';
 
 export const cases = {
   async 'transcript.reading'({ dir }) {
@@ -25,12 +26,8 @@ export const cases = {
       );
       const id = await submit(page, '生成 report.md');
       assert.equal((await settled(page, id)).state, 'completed');
-      await until(
-        async () => (await rpc(page, { type: 'artifacts.list', sessionId: id })).files.length > 0,
-        'artifact ready',
-      );
-      await page.getByRole('button', { name: '切换结果面板' }).click();
-      await page.getByRole('tab', { name: '预览', exact: true }).click();
+      await until(async () => (await workspaceFiles(page, id)).length > 0, 'artifact ready');
+      await openPreview(page);
       await page.locator('.artifact-markdown').waitFor();
       for (const [width, height] of [
         [1440, 900],
@@ -47,7 +44,7 @@ export const cases = {
             await toggle.click();
             await page.getByRole('button', { name: '切换结果面板' }).click();
           }
-          const pane = page.locator('.artifact-scroll');
+          const pane = page.getByRole('tabpanel', { name: '预览', exact: true });
           await pane.focus();
           await page.keyboard.press('Control+End');
           // Native wheel scrolling must move the actual preview, independently of chat.
@@ -83,10 +80,10 @@ export const cases = {
       await page.mouse.move(b.x - 70, b.y + 150);
       await page.mouse.up();
       assert((await page.locator('.result-panel').evaluate((n) => n.clientWidth)) > initial + 32);
-      const version = await page.getByLabel('选择预览文件').inputValue();
+      const version = await page.locator('.workspace-filename').innerText();
       await page.getByRole('button', { name: '展开结果面板' }).click();
       await page.getByRole('button', { name: '缩小结果面板' }).click();
-      assert.equal(await page.getByLabel('选择预览文件').inputValue(), version);
+      assert.equal(await page.locator('.workspace-filename').innerText(), version);
       await page.getByRole('button', { name: '关闭结果面板' }).hover();
       await page.getByRole('tooltip', { name: '关闭结果面板' }).waitFor();
       await page.keyboard.press('Escape');

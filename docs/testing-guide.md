@@ -18,7 +18,8 @@ tests/
     agent-config/               # 配置修订/迁移、会话绑定、工具禁用、上下文前缀与设置 UI
     tools/                      # 执行、取消、资源限制、完整日志
     approvals/                  # 路径策略、联网、审批、澄清
-    artifacts/                  # 共享工作区、文件登记、交付与导出
+    artifacts/                  # 文件交付/另存及跨轮工作区（保留原用例 ID）
+    workspace/                  # 按层目录、受控文件操作与浏览 UI
     preview/                    # 有界文本/代码/CSV/Markdown/PNG 预览
     transcript/                 # 消息阅读、执行过程、渲染安全
     usage/                      # 本轮用量、队列归属、并发与恢复
@@ -150,3 +151,5 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 重放场景把 APP_ROOT 路径绑定到当前 skill 快照根，并在请求前核对快照正文与内置正文相同；只是可移植路径发生变化，完整请求匹配、原响应与 usage 样本保持不变。没有删除提示词或工具字段的匹配，也没有 live 回退。
 
 `agent-config.requests` 同时比较预览与最终 HTTP 请求中的 system 文本，覆盖启用/关闭 skill 和全工具关闭；历史预览必须等于原生记录且 JSONL 字节不变。`agent-config.settings` 验证展开加载、草稿更新、真实 XML 标签与顺序、工具/skill 关闭后的预览、会话详情与实际请求逐字一致，并检查预览不增加模型调用或会话数量。
+
+存储简化回归：sessions.storage-migration 使用旧 schema 10 的 WAL fixture，覆盖六表迁移、完整输入顺序、配置引用/覆盖、事务失败回滚、旧删除清单废弃、备份与未知高版本拒绝。普通测试不读取真实用户库。工作区用例验证实际目录，不再等待产物登记或 output_versions 发布。

@@ -3,7 +3,7 @@ import { createStoredSession } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { startApp, until } from '../../../scripts/test/harness.mjs';
+import { startApp } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
 import { rpc, configure, settled } from '../../support/desktop.mjs';
 import { cases as imports } from './import.e2e.mjs';
@@ -36,13 +36,10 @@ export const cases = {
       const page = app.page;
       await configure(page);
       const { id: sessionId } = await createStoredSession(page);
-      await rpc(page, { type: 'files.pick', sessionId });
-      const detail = await until(async () => {
-        const d = await rpc(page, { type: 'sessions.open', sessionId });
-        return d.files.length === paths.length ? d : null;
-      }, 'all boundary files registered');
-      assert.deepEqual(new Set(detail.files.map((f) => f.path)), new Set(paths));
-      for (const file of detail.files) assert.equal(file.size, fixtures[file.name].length);
+      const selected = await rpc(page, { type: 'files.choose' });
+      assert.deepEqual(new Set(selected.map((f) => f.path)), new Set(paths));
+      for (const file of selected) assert.equal(file.size, fixtures[file.name].length);
+      await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
       const script = `import pandas as pd\npd.read_csv(${JSON.stringify(join(root, 'invalid.csv'))})\n`;
       fixture.set(
         { tool: { name: 'read', args: { path: join(root, 'gb18030.csv') } } },
@@ -75,11 +72,6 @@ export const cases = {
       await page
         .getByText('数据读取遇到编码、CSV 格式和缺失文件错误；请检查来源后继续。', { exact: true })
         .waitFor();
-      assert(
-        (await rpc(page, { type: 'sessions.open', sessionId })).files.find(
-          (f) => f.name === 'missing.csv',
-        ).missing,
-      );
       for (const [name, bytes] of Object.entries(fixtures))
         if (name !== 'missing.csv') assert.deepEqual(readFileSync(join(root, name)), bytes);
       assert.deepEqual(app.errors, []);

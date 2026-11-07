@@ -6,17 +6,12 @@ import { randomUUID } from 'node:crypto';
 import { getAppPaths, ensureAppPaths, type AppPaths } from '../../../src/node/app-paths';
 import { openDatabase } from '../../../src/main/storage/database';
 import { SessionService } from '../../../src/main/services/sessions';
-import { ArtifactService } from '../../../src/main/services/artifacts';
 import { LogService } from '../../../src/main/services/logs';
 import { toolLogPath } from '../../../src/node/tool-log-path';
 import { dirname } from 'node:path';
 import { readText } from '../../../src/node/read-text';
 
-let root: string,
-  paths: AppPaths,
-  db: ReturnType<typeof openDatabase>,
-  sessions: SessionService,
-  artifacts: ArtifactService;
+let root: string, paths: AppPaths, db: ReturnType<typeof openDatabase>, sessions: SessionService;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'data-agent-maintenance-'));
@@ -29,44 +24,23 @@ beforeEach(async () => {
   ensureAppPaths(paths);
   db = openDatabase(paths.database);
   sessions = new SessionService(db, paths);
-  artifacts = new ArtifactService(
-    db,
-    sessions,
-    () => false,
-    () => {},
-  );
 });
 
 afterEach(async () => {
-  await artifacts.settled();
   db.close();
   await rm(root, { recursive: true, force: true });
 });
 
-function run(id: string) {
-  const runId = randomUUID();
-  db.prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)').run(
-    runId,
-    id,
-    randomUUID(),
-    'completed',
-    'fixture',
-    'fixture',
-    new Date().toISOString(),
-  );
-  return runId;
-}
-
 it('tools.log-storage paginates UTF-8 without loss, enforces session scope, and rejects redirected paths', async () => {
   const session = sessions.create(),
     other = sessions.create(),
-    runId = run(session.id),
+    runId = randomUUID(),
     logs = new LogService(paths.logs, async (id) => id === session.id);
   const path = toolLogPath(paths.logs, session.id, runId, 'tool');
   await mkdir(dirname(path), { recursive: true });
   const content = 'a'.repeat(32767) + '中文\n'.repeat(18000) + 'END_MARKER';
   await writeFile(path, content);
-  const rows = await logs.list(session.id, 'tool');
+  const { logs: rows } = await logs.list(session.id, 'tool');
   expect(rows).toHaveLength(1);
   await expect(logs.list(other.id, 'tool')).rejects.toThrow();
   await expect(logs.page(other.id, rows[0].id, 0)).rejects.toThrow('不属于当前会话');
@@ -83,6 +57,16 @@ it('tools.log-storage paginates UTF-8 without loss, enforces session scope, and 
   }
   expect(pages).toBeGreaterThan(3);
   expect(output).toBe(content);
+
+  for (let i = 0; i < 101; i++)
+    await writeFile(toolLogPath(paths.logs, session.id, randomUUID(), 'tool'), 'another');
+  const first = await logs.list(session.id, 'tool');
+  expect(first.logs).toHaveLength(100);
+  expect(first.nextOffset).toBe(100);
+  const second = await logs.list(session.id, 'tool', first.nextOffset!);
+  expect(second.logs).toHaveLength(2);
+  expect(second.nextOffset).toBeNull();
+  expect(new Set([...first.logs, ...second.logs].map((log) => log.runId)).size).toBe(102);
   await unlink(path);
   const secret = join(root, 'secret');
   await writeFile(secret, 'must not expose');

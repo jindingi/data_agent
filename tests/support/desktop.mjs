@@ -77,9 +77,34 @@ export async function selectSession(page, id) {
   );
 }
 export async function openPreview(page, tab = '预览') {
-  if (!(await page.getByRole('complementary', { name: '结果面板' }).isVisible()))
+  if (!(await page.getByRole('complementary', { name: '工作区', exact: true }).isVisible()))
     await page.getByRole('button', { name: '切换结果面板' }).click();
-  await page.getByRole('tab', { name: tab, exact: true }).click();
+  await page.getByRole('tab', { name: '文件', exact: true }).click();
+  if (tab === '预览') {
+    const report = page.getByRole('button', { name: 'report.md', exact: true });
+    if (await report.count()) await report.click();
+    else await page.getByRole('tab', { name: '预览', exact: true }).click();
+  }
+}
+export async function openWorkspaceFile(page, name) {
+  await openPreview(page, '文件');
+  const parts = name.split('/');
+  for (const directory of parts.slice(0, -1)) {
+    const button = page.getByRole('button', { name: directory, exact: true });
+    if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+  }
+  await page.getByRole('button', { name: parts.at(-1), exact: true }).click();
+}
+export async function workspaceFiles(page, sessionId, directoryId) {
+  const result = await rpc(page, { type: 'workspace.list', sessionId, directoryId });
+  assert.equal(result.truncated, false, 'fixture directory must fit listing bound');
+  const files = [];
+  for (const entry of result.entries) {
+    if (entry.kind === 'directory')
+      files.push(...(await workspaceFiles(page, sessionId, entry.id)));
+    else files.push(entry);
+  }
+  return files;
 }
 export async function openExecutionProcesses(page) {
   for (const toggle of await page.locator('.process-toggle[aria-expanded="false"]').all())

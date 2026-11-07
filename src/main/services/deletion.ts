@@ -42,7 +42,7 @@ export class DeletionService {
     if (running) return running;
     const task = this.perform(sessionId);
     this.active.set(sessionId, task);
-    void task.finally(() => this.active.delete(sessionId));
+    void task.finally(() => this.active.delete(sessionId)).catch(() => {});
     return task;
   }
   private async clean(path: string, root: string, directories: boolean, workspaces: string[]) {
@@ -94,14 +94,6 @@ export class DeletionService {
       );
       this.faults?.afterInternalCleanup?.();
       this.db.transaction(() => {
-        for (const table of ['tool_logs', 'run_files', 'run_inputs'])
-          this.db
-            .prepare(
-              `DELETE FROM ${table} WHERE run_id IN (SELECT id FROM runs WHERE session_id=?)`,
-            )
-            .run(sessionId);
-        for (const table of ['artifacts', 'output_versions', 'interactions', 'runs'])
-          this.db.prepare(`DELETE FROM ${table} WHERE session_id=?`).run(sessionId);
         this.db.prepare('DELETE FROM sessions WHERE id=?').run(sessionId);
       })();
       this.runtime.forget(sessionId);

@@ -1,9 +1,9 @@
-import { openPreview } from '../../support/desktop.mjs';
+import { openPreview, openWorkspaceFile } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { startApp, until } from '../../../scripts/test/harness.mjs';
+import { startApp } from '../../../scripts/test/harness.mjs';
 import { modelFixture } from '../../../scripts/test/model-fixture.mjs';
-import { configure, rpc, settled, submit } from '../../support/desktop.mjs';
+import { configure, settled, submit } from '../../support/desktop.mjs';
 
 export const cases = {
   async 'artifacts.result-state'({ dir }) {
@@ -16,7 +16,7 @@ export const cases = {
       let id = await submit(page);
       assert.equal((await settled(page, id)).state, 'completed');
       await openPreview(page, '预览');
-      await page.getByRole('heading', { name: '还没有预览' }).waitFor();
+      await page.getByText('从文件列表选择文件进行预览').waitFor();
       fixture.set(
         { tool: { name: 'write', args: { path: 'report.md', content: '' } } },
         { tool: { name: 'write', args: { path: 'chart.png', content: 'broken png' } } },
@@ -24,19 +24,10 @@ export const cases = {
       );
       id = await submit(page);
       await settled(page, id);
-      const listing = await until(async () => {
-        const value = await rpc(page, { type: 'artifacts.list', sessionId: id });
-        return value.files.length === 2 ? value : null;
-      }, 'empty and invalid artifacts');
-      await openPreview(page, '预览');
-      await page
-        .getByLabel('选择预览文件')
-        .selectOption(listing.files.find((file) => file.kind === 'markdown').id);
+      await openWorkspaceFile(page, 'report.md');
       await page.getByText('文件为空', { exact: true }).waitFor();
-      await page
-        .getByLabel('选择预览文件')
-        .selectOption(listing.files.find((file) => file.kind === 'png').id);
-      await page.getByText('无法展示：PNG 文件无效', { exact: true }).waitFor();
+      await openWorkspaceFile(page, 'chart.png');
+      await page.getByText('图片无效或超过 4,000 万像素，无法预览', { exact: true }).waitFor();
       fixture.set(
         {
           tool: {

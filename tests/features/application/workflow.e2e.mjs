@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import { openPreview } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -11,9 +12,9 @@ const taskTool = (name, args) => ({ tool: { name, args } });
 
 async function listing(page, sessionId) {
   return until(async () => {
-    const v = await rpc(page, { type: 'artifacts.list', sessionId });
-    return v.versions.length && v.versions.every((v) => v.state === 'published') ? v : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 export const cases = {
   async 'application.workflow'({ dir }) {
@@ -79,12 +80,14 @@ export const cases = {
       await page.getByRole('heading', { name: 'Copyable report' }).waitFor();
       oldClipboard = execFileSync('/usr/bin/pbpaste');
       await page.getByRole('button', { name: '复制当前内容', exact: true }).click();
-      await page.getByRole('status').filter({ hasText: '已复制当前内容' }).waitFor();
+      await page.getByRole('status').filter({ hasText: '已复制当前展示内容' }).waitFor();
       assert.equal(execFileSync('/usr/bin/pbpaste', { encoding: 'utf8' }), markdown);
       await page.setViewportSize({ width: 940, height: 650 });
       const before = await page.locator('.main-area').boundingBox();
       await page.getByRole('button', { name: '展开结果面板', exact: true }).click();
-      const report = await page.getByRole('complementary', { name: '结果面板' }).boundingBox(),
+      const report = await page
+          .getByRole('complementary', { name: '工作区', exact: true })
+          .boundingBox(),
         after = await page.locator('.main-area').boundingBox();
       assert.equal(before.width, after.width);
       assert(report.width > 700);

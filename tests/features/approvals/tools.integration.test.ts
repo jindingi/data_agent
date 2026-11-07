@@ -56,16 +56,7 @@ beforeEach(() => {
   const session = new SessionService(db, paths).create();
   const runId = randomUUID(),
     hostEpoch = randomUUID();
-  db.prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)').run(
-    runId,
-    session.id,
-    hostEpoch,
-    'running',
-    'test',
-    'test',
-    new Date().toISOString(),
-  );
-  tools = new ToolService(resources, paths.logs, new InteractionBroker(db));
+  tools = new ToolService(resources, paths.logs, new InteractionBroker());
   context = {
     sessionId: session.id,
     runId,
@@ -74,7 +65,6 @@ beforeEach(() => {
     workspace: session.workspace,
     protectedRoots: [paths.sessions, paths.database, paths.logs],
     inputs: [],
-    published: [],
   };
 });
 
@@ -198,10 +188,6 @@ it('approvals.policy classifies commands, scripts, protected paths and rechecks 
   writeFileSync(input, 'a\n1\n');
   context.inputs.push(input);
   expect((await inspect({ name: 'write', path: input, content: 'x' })).decision).toBe('ask');
-  const published = join(context.workspace, 'published.md');
-  writeFileSync(published, 'keep');
-  context.published.push(published);
-  expect((await inspect({ name: 'write', path: published, content: 'x' })).decision).toBe('deny');
   expect(
     (await inspect({ name: 'bash', command: `rm -rf ${JSON.stringify(join(root, 'data'))}` }))
       .decision,

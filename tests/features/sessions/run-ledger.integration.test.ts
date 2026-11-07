@@ -11,15 +11,9 @@ it('sessions.metadata-writes text snapshots do not write metadata; ACK and termi
     db.prepare(
       'INSERT INTO sessions (id,title,workspace,session_file,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
     ).run('s', 'test', '/tmp/s', '/tmp/s.jsonl', 'draft', 'now', 'now');
-    db.prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)').run(
-      'r',
-      's',
-      'h',
-      'running',
-      'fixture',
-      'model',
-      'now',
-    );
+    db.prepare(
+      "UPDATE sessions SET execution_id='r',execution_epoch='h',execution_state='running' WHERE id='s'",
+    ).run();
     const ledger = new RunLedger(db);
     ledger.accept('r', 's', {
       inputId: 'i',
@@ -56,13 +50,34 @@ it('sessions.metadata-writes text snapshots do not write metadata; ACK and termi
       inputs: [{ inputId: 'i', kind: 'prompt', state: 'committed', entryId: 'entry' }],
     };
     ledger.transition(initial, committed);
-    expect(count()).toBe(before + 2);
-    expect(db.prepare('SELECT * FROM input_drafts').all()).toEqual([]);
+    expect(count()).toBe(before + 1);
+    expect(
+      db.prepare('SELECT * FROM input_submissions WHERE pending_text IS NOT NULL').all(),
+    ).toEqual([]);
     ledger.transition(committed, { ...committed, state: 'completed', seq: 101 });
-    expect(db.prepare('SELECT state,ended_at FROM runs').get()).toMatchObject({
+    expect(
+      db
+        .prepare('SELECT execution_state AS state,execution_ended_at AS ended_at FROM sessions')
+        .get(),
+    ).toMatchObject({
       state: 'completed',
       ended_at: expect.any(String),
     });
+    ledger.transition(committed, { ...committed, hostEpoch: 'stale', state: 'failed' });
+    expect(db.prepare('SELECT execution_state FROM sessions').get()).toEqual({
+      execution_state: 'completed',
+    });
+    for (const kind of ['steer', 'followUp'] as const)
+      ledger.accept('r', 's', {
+        inputId: kind,
+        kind,
+        text: kind,
+        paths: ['/tmp/' + kind + '.csv'],
+      });
+    expect(db.prepare('SELECT count(*) n FROM session_sources').get()).toEqual({ n: 3 });
+    expect(
+      ledger.withDrafts({ ...committed, state: 'completed' }).unsentInputs?.map((i) => i.kind),
+    ).toEqual(['steer', 'followUp']);
   } finally {
     db.close();
   }

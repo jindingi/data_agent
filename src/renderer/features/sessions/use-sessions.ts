@@ -82,11 +82,6 @@ export function useSessions(search: string, archived: boolean, onError: (message
     select(null);
     await refresh();
   }
-  async function removeFile(fileId: string) {
-    if (!selected) return;
-    await request({ type: 'files.remove', sessionId: selected, fileId });
-    await load();
-  }
   return {
     list,
     selected,
@@ -94,7 +89,6 @@ export function useSessions(search: string, archived: boolean, onError: (message
     select,
     rename,
     archiveCurrent,
-    removeFile,
     refresh,
     load,
   };

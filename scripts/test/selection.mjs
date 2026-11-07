@@ -72,9 +72,12 @@ const relatedPaths = [
     ],
   ],
   [/^src\/main\/services\/runtime/, ['conversation', 'usage', 'lifecycle', 'sessions']],
-  [/^src\/main\/services\/(artifacts|files)/, ['artifacts', 'preview', 'composer', 'conversation']],
+  [
+    /^src\/main\/services\/(workspace|files)/,
+    ['workspace', 'artifacts', 'preview', 'composer', 'conversation'],
+  ],
   [/^src\/renderer\/features\/runtime\//, ['conversation', 'usage', 'transcript']],
-  [/^src\/renderer\/features\/artifacts\//, ['preview', 'artifacts']],
+  [/^src\/renderer\/features\/(workspace|artifacts)\//, ['workspace', 'preview', 'artifacts']],
   [/^src\/main\/services\/(policy|tools)/, ['approvals', 'tools', 'artifacts']],
 ];
 /** Conservative transitive local-import graph plus cross-process feature ownership. */

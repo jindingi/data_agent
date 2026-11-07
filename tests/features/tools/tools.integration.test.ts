@@ -57,16 +57,7 @@ beforeEach(() => {
   const session = new SessionService(db, paths).create();
   const runId = randomUUID(),
     hostEpoch = randomUUID();
-  db.prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)').run(
-    runId,
-    session.id,
-    hostEpoch,
-    'running',
-    'test',
-    'test',
-    new Date().toISOString(),
-  );
-  tools = new ToolService(resources, paths.logs, new InteractionBroker(db));
+  tools = new ToolService(resources, paths.logs, new InteractionBroker());
   context = {
     sessionId: session.id,
     runId,
@@ -75,7 +66,6 @@ beforeEach(() => {
     workspace: session.workspace,
     protectedRoots: [paths.sessions, paths.database, paths.logs],
     inputs: [],
-    published: [],
   };
 });
 
@@ -201,9 +191,17 @@ it('tools.log-limit retains at most 10 MiB across actual tools in one run with b
     (await execute({ name: 'bash', command: 'python3 -c \'print("y" * 100000)\'' })).isError,
   ).toBe(false);
   const { readdirSync } = await import('node:fs');
-  const logDir = join(root, 'data/logs', context.runId);
+  const logDir = join(root, 'data/logs', context.sessionId);
   expect(
-    readdirSync(logDir).reduce((sum, file) => sum + statSync(join(logDir, file)).size, 0),
+    readdirSync(logDir).reduce(
+      (sum, folder) =>
+        sum +
+        readdirSync(join(logDir, folder)).reduce(
+          (total, file) => total + statSync(join(logDir, folder, file)).size,
+          0,
+        ),
+      0,
+    ),
   ).toBe(10 * 1024 * 1024);
 }, 15_000);
 

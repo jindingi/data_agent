@@ -109,7 +109,9 @@ describe('native storage acceptance', () => {
         .run(input.inputId, legacySession.id, JSON.stringify(input));
       migrate(legacy);
       migrate(legacy);
-      const receipt = legacy.prepare('SELECT * FROM submission_receipts').get();
+      const receipt = legacy
+        .prepare('SELECT input_id,session_id,digest FROM input_submissions')
+        .get();
       expect(receipt).toEqual({
         input_id: input.inputId,
         session_id: legacySession.id,

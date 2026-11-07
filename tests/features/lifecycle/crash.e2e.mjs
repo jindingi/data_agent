@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import { selectSession } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, statSync } from 'node:fs';
@@ -21,13 +22,11 @@ async function send(page, text, kind) {
   );
 }
 
-async function listing(page, sessionId, count) {
+async function listing(page, sessionId) {
   return until(async () => {
-    const value = await rpc(page, { type: 'artifacts.list', sessionId });
-    return value.versions.length === count && value.versions.every((v) => v.state === 'published')
-      ? value
-      : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 export const cases = {
   async 'lifecycle.crash'({ dir }) {
@@ -105,7 +104,7 @@ export const cases = {
         assert(recovered.messages.some((m) => m.role === 'user'));
         assert.deepEqual(recovered.interactions, []);
         const outputs = await listing(app.page, sessionId, 1);
-        assert(outputs.files.some((f) => f.relativePath === 'report.md' && f.size > 0));
+        assert(outputs.some((f) => f.relativePath === 'report.md' && f.size > 0));
         const answer = await app.page.evaluate((command) => window.dataAgent.request(command), {
           type: 'interaction.answer',
           interactionId: pending.id,

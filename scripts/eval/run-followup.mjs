@@ -1,5 +1,5 @@
 import { selectSession } from '../../tests/support/desktop.mjs';
-import { openPreview } from '../../tests/support/desktop.mjs';
+import { openWorkspaceFile, workspaceFiles } from '../../tests/support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -15,7 +15,7 @@ export async function runFollowup(root, { packaged = false } = {}) {
   const key = liveKey();
   let app;
   const task =
-    '继续刚才的分析，但本次只比较 2026-07 到 2026-08，按销售额下降比例优先排名，说明与上一轮首末月比较的区别。给出各地区金额和比例变化，不推断业务原因。生成本轮新的 report.md 和一张中文 PNG，报告使用相对图片链接，保留之前的报告，不修改原 CSV。';
+    '继续刚才的分析，但本次只比较 2026-07 到 2026-08，按销售额下降比例优先排名，说明与上一轮首末月比较的区别。给出各地区金额和比例变化，不推断业务原因。生成 report_followup.md 和 chart_followup.png（中文图表），报告使用相对图片链接，保留之前的报告，不修改原 CSV。';
   const evidence = {
     id: 'J5-FOLLOWUP',
     task,
@@ -61,16 +61,13 @@ export async function runFollowup(root, { packaged = false } = {}) {
     evidence.final = final;
     assert.equal(final.state, 'completed', final.error ?? 'Followup failed');
     assert.notEqual(final.runId, first.final.runId);
-    assert.notEqual(final.outputDirectory, first.final.outputDirectory);
-    const listing = await until(async () => {
-      const x = await rpc(page, { type: 'artifacts.list', sessionId: first.sessionId });
-      return x.versions.some((v) => v.runId === final.runId && v.state === 'published') ? x : null;
-    }, 'new report registered');
-    const files = listing.files.filter((f) => f.runId === final.runId),
-      report = files.find(
-        (f) => f.relativePath === 'report.md' && f.size > 0 && f.state === 'ready',
-      ),
-      chart = files.find((f) => f.kind === 'png' && f.state === 'ready' && f.size > 0);
+    assert.equal(final.outputDirectory, first.final.outputDirectory);
+    const files = (await workspaceFiles(page, first.sessionId)).map((file) => ({
+        ...file,
+        path: join(final.outputDirectory, file.relativePath),
+      })),
+      report = files.find((f) => f.relativePath === 'report_followup.md' && f.size > 0),
+      chart = files.find((f) => f.relativePath === 'chart_followup.png' && f.size > 0);
     evidence.artifacts = files;
     assert(report);
     assert(chart);
@@ -88,13 +85,10 @@ export async function runFollowup(root, { packaged = false } = {}) {
     assert(final.requests.length > 0 && final.requests.every((r) => r.model === 'deepseek-flash'));
     assert(final.requests[0].userMessages >= 2);
     assert(final.requests[0].toolResultHashes.length > 0);
-    await openPreview(page, '预览');
-    if (await page.getByLabel('选择产物版本').count())
-      await page.getByLabel('选择产物版本').selectOption(report.versionId);
-    await page.getByLabel('选择报告或图表').selectOption(report.id);
+    await openWorkspaceFile(page, report.relativePath);
     await page.locator('.artifact-markdown').waitFor();
     await page.screenshot({ path: join(root, 'followup-report.png'), fullPage: true });
-    await page.getByLabel('选择报告或图表').selectOption(chart.id);
+    await openWorkspaceFile(page, chart.relativePath);
     await until(
       () =>
         page

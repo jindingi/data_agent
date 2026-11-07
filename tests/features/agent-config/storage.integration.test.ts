@@ -54,7 +54,7 @@ it('agent-config.storage pins immutable versions, rolls back creation and restor
   expect(() => configs.save({ ...defaultAgentConfig, enabledTools: [] }, 2)).toThrow('read');
   const previous = db.prepare('SELECT count(*) n FROM sessions').get();
   db.exec(
-    "CREATE TRIGGER fail_binding BEFORE INSERT ON session_agent_configs BEGIN SELECT RAISE(ABORT,'fixture'); END;",
+    "CREATE TRIGGER fail_binding BEFORE UPDATE OF agent_config_revision ON sessions BEGIN SELECT RAISE(ABORT,'fixture'); END;",
   );
   expect(() => sessions.create()).toThrow('fixture');
   expect(db.prepare('SELECT count(*) n FROM sessions').get()).toEqual(previous);
@@ -69,7 +69,6 @@ it('agent-config.storage pins immutable versions, rolls back creation and restor
     workspace: first.workspace,
     protectedRoots: [],
     inputs: [],
-    published: [],
     readonlyRoots: [configs.resourcesRoot],
   };
   expect(
@@ -115,7 +114,9 @@ it('agent-config.legacy restores verified historical state and blocks missing or
     timestamp: Date.now(),
   });
   manager.appendMessage({ role: 'user', content: 'History', timestamp: Date.now() });
-  db.prepare('DELETE FROM session_agent_configs WHERE session_id=?').run(session.id);
+  db.prepare(
+    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
+  ).run(session.id);
   configs.save(
     { ...defaultAgentConfig, systemPrompt: 'New default', enabledTools: [], enabledSkills: [] },
     1,
@@ -131,22 +132,24 @@ it('agent-config.legacy restores verified historical state and blocks missing or
   );
   const stored = JSON.stringify(legacy);
   const altered = { ...legacy, revision: 99 };
-  db.prepare('UPDATE session_agent_configs SET snapshot=? WHERE session_id=?').run(
-    JSON.stringify(altered),
-    session.id,
-  );
+  db.prepare(
+    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=? WHERE id=?',
+  ).run(JSON.stringify(altered), session.id);
   expect(configs.details(session.id).error).toContain('不一致');
-  db.prepare('UPDATE session_agent_configs SET snapshot=? WHERE session_id=?').run(
-    stored,
-    session.id,
-  );
+  db.prepare(
+    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=? WHERE id=?',
+  ).run(stored, session.id);
   // Missing DB binding with an existing JSONL identity must not silently migrate or adopt defaults.
-  db.prepare('DELETE FROM session_agent_configs WHERE session_id=?').run(session.id);
+  db.prepare(
+    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
+  ).run(session.id);
   expect(configs.details(session.id).error).toContain('绑定缺失');
   expect(() => configs.require(session.id)).toThrow('配置待确认');
   expect(readFileSync(session.sessionFile, 'utf8').startsWith(before)).toBe(true);
   const unknown = sessions.create();
-  db.prepare('DELETE FROM session_agent_configs WHERE session_id=?').run(unknown.id);
+  db.prepare(
+    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
+  ).run(unknown.id);
   const damaged = SessionManager.open(unknown.sessionFile, root, unknown.workspace);
   damaged.appendMessage({
     role: 'system',

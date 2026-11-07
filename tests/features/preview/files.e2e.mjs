@@ -8,6 +8,8 @@ import {
   rpc,
   settled,
   openPreview,
+  openWorkspaceFile,
+  workspaceFiles,
   createStoredSession,
   selectSession,
 } from '../../support/desktop.mjs';
@@ -56,37 +58,33 @@ export const cases = {
         'submitted',
       );
       assert.equal((await settled(page, id)).state, 'completed');
-      const listing = await until(async () => {
-        const value = await rpc(page, { type: 'artifacts.list', sessionId: id });
-        return value.files.length === Object.keys(outputs).length ? value : null;
-      }, 'all files registered');
-      const refs = (await rpc(page, { type: 'sessions.open', sessionId: id })).files;
+      const { session } = await rpc(page, { type: 'sessions.open', sessionId: id });
+      assert(
+        !(await workspaceFiles(page, id)).some((f) => f.name === 'input.csv'),
+        'external attachments are not directory entries',
+      );
+      const listing = await workspaceFiles(page, id);
       const choose = async (name) => {
-        await page
-          .getByLabel('选择预览文件')
-          .selectOption(listing.files.find((file) => file.relativePath === name).id);
+        await openWorkspaceFile(page, name);
         await until(
-          () =>
-            page
-              .locator('.source-code')
-              .textContent()
-              .then((s) => s === outputs[name]),
-          `preview ${name}`,
+          async () => (await page.locator('.source-code').textContent()) === outputs[name],
+          'source preview',
         );
       };
+      // User-created files are equally previewable; no registration required.
+      writeFileSync(join(session.workspace, 'input.csv'), input);
+      writeFileSync(join(session.workspace, 'large.csv'), 'x'.repeat(140000));
+      writeFileSync(join(session.workspace, 'invalid.csv'), Buffer.from([0xff, 0xfe, 0x61]));
       await openPreview(page, '文件');
-      await page.getByRole('button', { name: '预览 input.csv', exact: true }).click();
+      await page.getByRole('button', { name: '刷新工作区', exact: true }).click();
+      await page.getByRole('button', { name: 'input.csv', exact: true }).click();
       await until(
-        () =>
-          page
-            .locator('.source-code')
-            .textContent()
-            .then((s) => s === input),
-        'raw input CSV',
+        async () => (await page.locator('.source-code').textContent()) === input,
+        'raw csv',
       );
       assert.equal(await page.locator('.source-code img').count(), 0);
       await page.getByRole('button', { name: '复制当前内容', exact: true }).click();
-      await page.getByRole('status').filter({ hasText: '已复制当前内容' }).waitFor();
+      await page.getByRole('status').filter({ hasText: '已复制当前展示内容' }).waitFor();
       for (const name of [
         'analysis.py',
         'query.sql',
@@ -103,12 +101,12 @@ export const cases = {
           );
         assert.equal(await page.locator('.source-code img, .source-code script').count(), 0);
       }
-      const report = listing.files.find((file) => file.relativePath === 'report.md');
-      await page.getByLabel('选择预览文件').selectOption(report.id);
+      const report = listing.find((file) => file.relativePath === 'report.md');
+      await openWorkspaceFile(page, 'report.md');
       await page.locator('.artifact-markdown').getByRole('heading', { name: '示例报告' }).waitFor();
       await page.getByRole('button', { name: '查看源码', exact: true }).click();
       assert.equal(await page.locator('.source-code').textContent(), outputs['report.md']);
-      await page.getByRole('button', { name: '查看渲染', exact: true }).click();
+      await page.getByRole('button', { name: '阅读视图', exact: true }).click();
       await page
         .locator('.artifact-markdown')
         .getByRole('button', { name: '查看代码', exact: true })
@@ -130,8 +128,7 @@ export const cases = {
         await openPreview(page);
         await page.screenshot({ path: join(dir, `source-${theme}.png`) });
       }
-      const largeRef = refs.find((file) => file.name === 'large.csv');
-      await page.getByLabel('选择预览文件').selectOption(`input:${largeRef.id}`);
+      await openWorkspaceFile(page, 'large.csv');
       await page.getByRole('status').filter({ hasText: '仅展示文件开头' }).waitFor();
       assert.equal((await page.locator('.source-code').textContent()).length, 128 * 1024);
       await page.setViewportSize({ width: 940, height: 650 });
@@ -144,14 +141,11 @@ export const cases = {
       );
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await page.screenshot({ path: join(dir, 'source-narrow.png') });
-      const invalidRef = refs.find((file) => file.name === 'invalid.csv');
-      await page.getByLabel('选择预览文件').selectOption(`input:${invalidRef.id}`);
+      await openWorkspaceFile(page, 'invalid.csv');
       await page
         .getByText('该文件不是有效的 UTF-8 文本，暂不支持此编码预览。', { exact: true })
         .waitFor();
-      await page
-        .getByLabel('选择预览文件')
-        .selectOption(listing.files.find((file) => file.relativePath === 'blob.bin').id);
+      await openWorkspaceFile(page, 'blob.bin');
       await page
         .getByText('暂不支持此文件格式，可在 Finder 中定位后打开。', { exact: true })
         .waitFor();
@@ -159,71 +153,53 @@ export const cases = {
       // Validate session ownership, revoked references, symlinks and missing files through real IPC.
       await page.getByRole('button', { name: '关闭结果面板' }).click();
       const other = await createStoredSession(page);
-      const inputRef = refs.find((file) => file.name === 'input.csv');
-      for (const type of ['files.preview', 'files.copy', 'files.reveal']) {
+      for (const type of ['workspace.preview', 'workspace.copy', 'workspace.reveal']) {
         assert.equal(
           (
             await page.evaluate((command) => window.dataAgent.request(command), {
               type,
               sessionId: other.id,
-              fileId: inputRef.id,
+              entryId: report.id,
             })
           ).ok,
           false,
         );
       }
-      assert.equal(
-        (
-          await page.evaluate((command) => window.dataAgent.request(command), {
-            type: 'artifacts.preview',
-            sessionId: other.id,
-            artifactId: report.id,
-          })
-        ).ok,
-        false,
-      );
       await selectSession(page, id);
-      unlinkSync(csv);
-      symlinkSync(large, csv);
+      const entries = await workspaceFiles(page, id),
+        inputRef = entries.find((f) => f.name === 'input.csv');
+      const local = join(session.workspace, 'input.csv');
+      unlinkSync(local);
+      symlinkSync(large, local);
       assert.equal(
         (
           await page.evaluate((command) => window.dataAgent.request(command), {
-            type: 'files.preview',
+            type: 'workspace.preview',
             sessionId: id,
-            fileId: inputRef.id,
+            entryId: inputRef.id,
           })
         ).ok,
         false,
       );
-      unlinkSync(csv);
-      await openPreview(page, '文件');
-      await page.getByRole('button', { name: '预览 input.csv', exact: true }).click();
-      await page
-        .getByRole('alert')
-        .filter({ hasText: /ENOENT|不存在/ })
-        .waitFor();
-      await rpc(page, { type: 'files.remove', sessionId: id, fileId: inputRef.id });
+      unlinkSync(local);
       assert.equal(
         (
           await page.evaluate((command) => window.dataAgent.request(command), {
-            type: 'files.preview',
+            type: 'workspace.preview',
             sessionId: id,
-            fileId: inputRef.id,
+            entryId: inputRef.id,
           })
         ).ok,
         false,
       );
-      const py = listing.files.find((file) => file.relativePath === 'analysis.py');
-      writeFileSync(py.path, 'changed');
+      const py = entries.find((f) => f.name === 'analysis.py');
+      writeFileSync(join(session.workspace, 'analysis.py'), 'changed');
+      // Refresh resolves current file identity; there is no permanent hash registration.
+      const updated = (await workspaceFiles(page, id)).find((f) => f.name === 'analysis.py');
+      assert.equal(updated.id, py.id);
       assert.equal(
-        (
-          await page.evaluate((command) => window.dataAgent.request(command), {
-            type: 'artifacts.preview',
-            sessionId: id,
-            artifactId: py.id,
-          })
-        ).ok,
-        false,
+        (await rpc(page, { type: 'workspace.preview', sessionId: id, entryId: updated.id })).text,
+        'changed',
       );
       assert.deepEqual(app.errors, []);
       return {

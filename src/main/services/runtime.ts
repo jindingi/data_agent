@@ -13,7 +13,6 @@ import type Database from 'better-sqlite3';
 import type { HostInput } from '../../shared/contracts/host';
 import type { HostStatus } from '../../shared/contracts/ipc';
 import type { ToolHandler } from './agent-process';
-import type { ArtifactService } from './artifacts';
 import type { ToolService } from './tools';
 import type { CredentialService } from './credentials';
 import type { SessionService } from './sessions';
@@ -56,7 +55,6 @@ interface Task {
   host?: RuntimeHost;
   starting: boolean;
   outputDirectory?: string;
-  versionId?: string;
 }
 interface RuntimeDependencies {
   agentConfigs?: AgentConfigService;
@@ -70,7 +68,6 @@ interface RuntimeDependencies {
   changed: () => void;
   tools: ToolService;
   testBaseUrl?: string | undefined;
-  artifacts: ArtifactService;
   skillsDirectory?: string | undefined;
 }
 /** Global admission only; pi owns each conversation's steer/follow-up queue. */
@@ -95,7 +92,6 @@ export class RuntimeService {
   private changed: () => void;
   private tools: ToolService;
   private testBaseUrl: string | undefined;
-  private artifacts: ArtifactService;
   private skillsDirectory: string | undefined;
   constructor(dependencies: RuntimeDependencies) {
     this.agentConfigs = dependencies.agentConfigs;
@@ -109,15 +105,14 @@ export class RuntimeService {
     this.changed = dependencies.changed;
     this.tools = dependencies.tools;
     this.testBaseUrl = dependencies.testBaseUrl;
-    this.artifacts = dependencies.artifacts;
     this.skillsDirectory = dependencies.skillsDirectory;
-    const { db, tools, artifacts } = dependencies;
+    const { db, tools } = dependencies;
     this.ledger = new RunLedger(db);
-    this.lifecycle = new RunLifecycle({ tools, artifacts });
+    this.lifecycle = new RunLifecycle({ tools });
     db.prepare(
-      "UPDATE runs SET state='interrupted',ended_at=? WHERE state IN ('queued','starting','running','waiting_approval','waiting_input')",
+      "UPDATE sessions SET execution_state='interrupted',execution_ended_at=? WHERE execution_state IN ('queued','starting','running','waiting_approval','waiting_input')",
     ).run(new Date().toISOString());
-    db.prepare("UPDATE run_inputs SET state='unknown' WHERE state='pending'").run();
+    db.prepare("UPDATE input_submissions SET state='unknown' WHERE state='pending'").run();
   }
   activeStates(): Record<string, RuntimeSnapshot['state']> {
     return Object.fromEntries(
@@ -135,7 +130,9 @@ export class RuntimeService {
     const snapshot = this.snapshot(sessionId);
     if (!snapshot?.unsentInputs?.some((input) => input.inputId === inputId))
       throw new AppError('DRAFT_UNAVAILABLE', '只能移除该会话的未发送输入');
-    this.db.prepare('DELETE FROM input_drafts WHERE input_id=?').run(inputId);
+    this.db
+      .prepare('UPDATE input_submissions SET pending_text=NULL,pending_paths=NULL WHERE input_id=?')
+      .run(inputId);
   }
   private update(task: Task, snapshot: RuntimeSnapshot) {
     if (
@@ -178,7 +175,6 @@ export class RuntimeService {
       this.admission.remove(snapshot.runId);
       task.finalizePromise = this.lifecycle.finish(
         snapshot.runId,
-        task.versionId,
         [task.stopPromise, task.startPromise],
         () => {
           this.admission.release(snapshot.runId);
@@ -197,7 +193,7 @@ export class RuntimeService {
     if (pending)
       return pending.then(async (accepted) => {
         const receipt = this.db
-          .prepare('SELECT digest FROM submission_receipts WHERE input_id=?')
+          .prepare('SELECT digest FROM input_submissions WHERE input_id=?')
           .get(input.inputId) as { digest: string } | undefined;
         if (
           (sessionId && sessionId !== accepted.sessionId) ||
@@ -213,7 +209,7 @@ export class RuntimeService {
   }
   private async acceptConversation(input: RunInput, sessionId?: string, parent?: string) {
     const receipt = this.db
-      .prepare('SELECT session_id,digest FROM submission_receipts WHERE input_id=?')
+      .prepare('SELECT session_id,digest FROM input_submissions WHERE input_id=?')
       .get(input.inputId) as { session_id: string; digest: string } | undefined;
     if (receipt) {
       if (
@@ -229,21 +225,18 @@ export class RuntimeService {
     const model = this.credentials.selected();
     this.credentials.validate(model);
     this.credentials.key(model.provider);
-    inspectFiles([
-      ...(sessionId ? this.sessions.files(sessionId).map((f) => f.path) : []),
-      ...(input.paths ?? []),
-    ]);
+    inspectFiles(input.paths ?? []);
     let id = sessionId;
     try {
       id ??= this.sessions.create(parent, input.inputId, true).id;
       const snapshot = await this.submit(id, input);
-      this.db.prepare('DELETE FROM conversation_intents WHERE session_id=?').run(id);
+      this.db.prepare('UPDATE sessions SET creation_pending=0 WHERE id=?').run(id);
       if (!sessionId) this.sessions.rename(id, input.text.trim().slice(0, 48));
       this.changed();
       return { sessionId: id, snapshot };
     } catch (error) {
       const accepted = this.db
-        .prepare('SELECT session_id FROM submission_receipts WHERE input_id=?')
+        .prepare('SELECT session_id FROM input_submissions WHERE input_id=?')
         .get(input.inputId) as { session_id: string } | undefined;
       if (accepted) {
         const snapshot = await this.restoreSnapshot(accepted.session_id);
@@ -252,7 +245,7 @@ export class RuntimeService {
       if (!sessionId) {
         // create() may have failed after recording its intent.
         const intent = this.db
-          .prepare('SELECT session_id FROM conversation_intents WHERE session_id=?')
+          .prepare('SELECT id FROM sessions WHERE id=? AND creation_pending=1')
           .get(input.inputId);
         if (intent) this.sessions.rollbackEmpty(input.inputId);
       }
@@ -272,17 +265,19 @@ export class RuntimeService {
         !['running', 'waiting_approval', 'waiting_input'].includes(current.snapshot.state)
       )
         throw new AppError('NOT_RUNNING', '任务尚在等待启动，请稍后插话');
-      inspectFiles([
-        ...this.sessions.files(sessionId).map((file) => file.path),
-        ...(input.paths ?? []),
-      ]);
-      this.insertInput(current, input);
-      this.sessions.addFiles(sessionId, input.paths ?? []);
-      current.filePaths = this.sessions.files(sessionId).map((file) => file.path);
+      const files = inspectFiles(input.paths ?? []);
+      this.insertInput(
+        current,
+        input,
+        files.map((file) => file.path),
+      );
+      current.filePaths = this.sessions.sources(sessionId);
       try {
         await current.host.request({ type: 'runtime.input', input });
       } catch (error) {
-        this.db.prepare("UPDATE run_inputs SET state='unknown' WHERE id=?").run(input.inputId);
+        this.db
+          .prepare("UPDATE input_submissions SET state='unknown' WHERE input_id=?")
+          .run(input.inputId);
         throw error;
       }
       return current.snapshot;
@@ -300,8 +295,7 @@ export class RuntimeService {
     if (session.archived || !['draft', 'persisted'].includes(session.state))
       throw new AppError('SESSION_UNAVAILABLE', session.error || '请先恢复会话后再提问');
     const agentConfig = this.agentConfigs?.require(sessionId);
-    const existingFiles = this.sessions.files(sessionId);
-    const files = inspectFiles([...existingFiles.map((file) => file.path), ...(input.paths ?? [])]);
+    const files = inspectFiles(input.paths ?? []);
 
     let messages: MessageView[] = [];
     let turnUsage: RuntimeSnapshot['turnUsage'] = [];
@@ -325,7 +319,9 @@ export class RuntimeService {
     const task: Task = {
       agentConfig,
       thinkingLevel,
-      filePaths: files.map((file) => file.path),
+      filePaths: [
+        ...new Set([...this.sessions.sources(sessionId), ...files.map((file) => file.path)]),
+      ],
       input,
       model,
       apiKey,
@@ -348,22 +344,22 @@ export class RuntimeService {
     };
     this.db.transaction(() => {
       this.db
-        .prepare('INSERT INTO runs VALUES (?,?,?,?,?,?,?,NULL)')
+        .prepare(
+          `UPDATE sessions SET execution_id=?,execution_epoch=?,execution_state='queued',execution_provider=?,execution_model=?,execution_started_at=?,execution_ended_at=NULL,execution_error=NULL WHERE id=?`,
+        )
         .run(
           task.snapshot.runId,
-          sessionId,
           task.snapshot.hostEpoch,
-          'queued',
           model.provider,
           model.model,
           new Date().toISOString(),
+          sessionId,
         );
-      for (const file of files)
-        this.db
-          .prepare('INSERT INTO run_files(run_id,path,size) VALUES (?,?,?)')
-          .run(task.snapshot.runId, file.path, file.size);
-      this.insertInput(task, input);
-      this.sessions.addFiles(sessionId, input.paths ?? []);
+      this.insertInput(
+        task,
+        input,
+        files.map((file) => file.path),
+      );
       this.db
         .prepare('UPDATE sessions SET updated_at=? WHERE id=?')
         .run(new Date().toISOString(), sessionId);
@@ -383,10 +379,11 @@ export class RuntimeService {
     const session = this.sessions.get(sessionId);
     const run = this.db
       .prepare(
-        'SELECT id,host_epoch,state FROM runs WHERE session_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',
+        'SELECT execution_id AS id,execution_epoch AS host_epoch,execution_state AS state,execution_error AS error FROM sessions WHERE id=? AND execution_id IS NOT NULL',
       )
       .get(sessionId) as
-      { id: string; host_epoch: string; state: RuntimeSnapshot['state'] } | undefined;
+      | { id: string; host_epoch: string; state: RuntimeSnapshot['state']; error: string | null }
+      | undefined;
     if (!run) return null;
     let messages: MessageView[] = [];
     let turnUsage: RuntimeSnapshot['turnUsage'] = [];
@@ -405,27 +402,20 @@ export class RuntimeService {
       this.db.transaction(() => {
         for (const input of history.inputs ?? [])
           if (input.state === 'committed') {
-            const result = this.db
+            this.db
               .prepare(
-                "UPDATE run_inputs SET state='committed',entry_id=? WHERE id=? AND run_id IN (SELECT id FROM runs WHERE session_id=?)",
+                "UPDATE input_submissions SET state='committed',entry_id=?,pending_text=NULL,pending_paths=NULL WHERE input_id=? AND session_id=?",
               )
               .run(input.entryId, input.inputId, sessionId);
-            if (result.changes)
-              this.db.prepare('DELETE FROM input_drafts WHERE input_id=?').run(input.inputId);
           }
       })();
     }
     if (this.tasks.has(sessionId)) return this.tasks.get(sessionId)!.snapshot;
     const inputs = this.db
       .prepare(
-        'SELECT id AS inputId,kind,state,entry_id AS entryId FROM run_inputs WHERE run_id=? ORDER BY rowid',
+        'SELECT input_id AS inputId,kind,state,entry_id AS entryId FROM input_submissions WHERE execution_id=? ORDER BY sequence',
       )
       .all(run.id) as (RuntimeSnapshot['inputs'][number] & { entryId: string | null })[];
-    const output = this.db
-      .prepare(
-        'SELECT directory FROM output_versions WHERE run_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',
-      )
-      .get(run.id) as { directory: string } | undefined;
     const snapshot: RuntimeSnapshot = {
       schemaVersion: 1,
       sessionId,
@@ -446,15 +436,15 @@ export class RuntimeService {
       error:
         run.state === 'interrupted'
           ? '上次执行意外中断。已保留历史和已生成文件，未确认输入不会自动重发。'
-          : null,
-      ...(output ? { outputDirectory: output.directory } : {}),
+          : run.error,
+      outputDirectory: session.workspace,
     };
     this.recovered.set(sessionId, snapshot);
     this.trimHistoryCache();
     return this.ledger.withDrafts(snapshot);
   }
-  private insertInput(task: Task, input: RunInput) {
-    this.ledger.accept(task.snapshot.runId, task.snapshot.sessionId, input);
+  private insertInput(task: Task, input: RunInput, sources: string[]) {
+    this.ledger.accept(task.snapshot.runId, task.snapshot.sessionId, input, sources);
   }
   private pump() {
     if (this.closing) return;
@@ -486,13 +476,8 @@ export class RuntimeService {
     try {
       const apiKey = task.apiKey;
       if (!apiKey) throw new AppError('MISSING_KEY', '运行凭证已失效');
-      const version = await this.artifacts.openWorkspace(session.id, task.snapshot.runId);
-      task.versionId = version.id;
-      task.outputDirectory = version.directory;
-      if (this.closing || task.snapshot.state !== 'starting') {
-        void this.artifacts.publish(version.id);
-        return;
-      }
+      task.outputDirectory = session.workspace;
+      if (this.closing || task.snapshot.state !== 'starting') return;
       task.host = this.createHost(
         (status) => {
           if (status === 'exited' && isActive(task.snapshot.state) && !this.closing)
@@ -535,10 +520,10 @@ export class RuntimeService {
                 `${this.paths.database}-wal`,
                 `${this.paths.database}-shm`,
                 this.paths.logs,
+                join(this.paths.home, 'backups'),
               ],
               readonlyRoots: this.agentConfigs ? [this.agentConfigs.resourcesRoot] : [],
               inputs: task.filePaths,
-              published: this.artifacts.legacyPaths(session.id),
             },
             toolCallId,
             operation,
@@ -569,6 +554,7 @@ export class RuntimeService {
             `${this.paths.database}-wal`,
             `${this.paths.database}-shm`,
             join(this.paths.home, 'logs'),
+            join(this.paths.home, 'backups'),
           ],
         },
         input: task.input,
@@ -638,10 +624,6 @@ export class RuntimeService {
       await Promise.allSettled([task.startPromise, task.stopPromise, task.finalizePromise]);
       await this.tools.settled(task.snapshot.runId);
     }
-    // An interrupted prior process can leave an open output version to inventory.
-    for (const version of this.artifacts.list(sessionId).versions)
-      if (version.state === 'open') await this.artifacts.publish(version.id);
-    await this.artifacts.settled();
   }
   forget(sessionId: string) {
     const task = this.tasks.get(sessionId);

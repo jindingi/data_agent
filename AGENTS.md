@@ -13,7 +13,7 @@
 ## 产品边界
 
 - 产品是支持数据分析的通用 AI 工作台，保证外围流程与交互，不保证 Agent 的代码、方法或分析结论正确。
-- CSV 由选择器取得原文件路径；只校验路径、存在性、每文件和单次选用总量均不超过 100,000,000 bytes。不做 CSV 解析、编码转换、表格预览、内容复制或文件版本管理；允许按文件 ID 有界读取 UTF-8 原始文本供只读预览。
+- CSV 由选择器取得原文件路径；只校验路径、存在性、每文件和单次选用总量均不超过 100,000,000 bytes。不做 CSV 解析、编码转换、表格预览、内容复制或文件版本管理；允许对 workspace 内文件按临时条目 ID 有界读取 UTF-8 原始文本供只读预览。
 - 使用通用工具与内置 skills，不新增 inspect_csv 等产品专用解析工具。首版仅内置 Python 库，不允许安装额外依赖。
 - pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。只开放 DeepSeek / OpenRouter 的 BYOK 与 Base URL 覆盖；先保存地址/凭证，再通过 `/models` 获取与锁定 SDK 聊天模型目录的交集。修改地址必须重新输入凭证，修改连接清除缓存列表。自定义提供方/未知模型与用户 skills 后置。
 - Agent 默认配置支持行为提示词、工具和内置 skill 开关，保存为不可变修订；首次创建会话时绑定，已有/排队会话不随默认值变化。版本详情、历史恢复和快照策略见技术设计。
@@ -26,7 +26,7 @@
 | `src/main/`                                 | 窗口、受控 IPC、SQLite 单写、凭证、会话准入、工具执行/策略/审批、产物与进程生命周期                           |
 | `src/agent/`                                | utilityProcess 中的 pi session、JSONL、事件/输入身份适配、工具代理；不直接写 SQLite                           |
 | `src/preload/`                              | sandboxed、context-isolated 的窄接口桥；不暴露任意 IPC 或 Node                                                |
-| `src/renderer/`                             | React app、features/sessions/runtime/artifacts、components/ui、styles；不导入 Node、Electron、pi 或 Main 实现 |
+| `src/renderer/`                             | React app、features/sessions/runtime/workspace、components/ui、styles；不导入 Node、Electron、pi 或 Main 实现 |
 | `src/shared/`                               | 可序列化模型与 Zod contracts；不依赖各进程实现或 Node                                                         |
 | `src/node/`                                 | 仅 Node 侧路径、进程、运行时等公共能力                                                                        |
 | `resources/`                                | 内置 skills、可信 Python 辅助脚本、运行时锁定与许可配置                                                       |
@@ -35,7 +35,7 @@
 
 Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信。IPC 必须验证参数、发送窗口、主 frame 与可信完整 URL；不能为了修复 dev 问题放宽成任意 localhost/任意 frame。优先查锁定依赖、本地源码和配置，不照抄最新框架模板。
 
-状态默认在 `~/.data_agent/`：`state.sqlite` 存元数据，`sessions/{sessionId}.jsonl` 复用 pi 原生 session tree，`workspace/{sessionId}/` 存本地产物；同一会话所有 run/steer/follow-up 共用该目录，不再分配 run/version 子目录；历史版本兼容见技术设计。测试不得使用真实业务目录。新增持久化须有迁移/恢复设计，不能假设数据库与 JSONL/文件系统天然原子提交。
+状态默认在 `~/.data_agent/`：`state.sqlite` 存元数据，`sessions/{sessionId}.jsonl` 复用 pi 原生 session tree，`workspace/{sessionId}/` 存本地产物；同一会话所有 run/steer/follow-up 共用该目录，不再分配 run/version 子目录；不维护 output_versions/artifacts 兼容；旧目录只是普通文件目录。删除会话始终保留 workspace。SQLite 仅保留 schema_migrations、app_metadata、sessions、agent_config_revisions、input_submissions、session_sources；完整日志直接读受控磁盘路径，不新增索引/manifest。测试不得使用真实业务目录。新增持久化须有迁移/恢复设计，不能假设数据库与 JSONL/文件系统天然原子提交。
 
 ## Agent 开发强制规范：上下文只追加，缓存前缀必须稳定
 
@@ -59,7 +59,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 详细规则以 [设计原则](docs/design-principles.md) 为准：内容优先、状态稳定、控件可发现；删除无任务用途的装饰信息，不靠标签和口号营造专业感。
 
 - 检查 components.json、现有 Radix/shadcn 组件及 globals.css；保留语义 tokens、data-theme 和现有图标体系，不引入第二套主题状态。
-- 文件预览通过已登记 ID 的 Main 接口读取，不传任意路径。SourcePreview 使用固定版本 highlight.js 的显式语言包，仅展示转义后的源码；大文件截断/高亮限制见技术设计，不引入 CSV 解析或代码执行。
+- 文件预览通过 Main 内存签发的 workspace 条目 ID 的 Main 接口读取，不传任意路径。SourcePreview 使用固定版本 highlight.js 的显式语言包，仅展示转义后的源码；大文件截断/高亮限制见技术设计，不引入 CSV 解析或代码执行。
 - 明确空态、加载、失败、审批、禁用、hover/focus 的行为；纯图标按钮同时提供可访问名称和 Tooltip。
 - 可搜索模型列表复用 `features/models/ModelPicker`（Radix Popover + cmdk），搜索置于弹层内；保留键盘、输入法和关闭后焦点恢复，不另设常驻搜索框。
 - 校验独立滚动、长 Markdown、局部横滚、焦点恢复和三种窗口尺寸；流式消息不得抢阅读位置。

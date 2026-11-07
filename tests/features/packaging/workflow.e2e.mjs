@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import { openPreview } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
@@ -12,9 +13,9 @@ const taskTool = (name, args) => ({ tool: { name, args } });
 
 async function listing(page, sessionId) {
   return until(async () => {
-    const v = await rpc(page, { type: 'artifacts.list', sessionId });
-    return v.versions.length && v.versions.every((v) => v.state === 'published') ? v : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 
 async function deliver(page, sessionId, previousRunId) {
@@ -29,9 +30,9 @@ async function deliver(page, sessionId, previousRunId) {
     60000,
   );
   assert.equal(final.state, 'completed', final.error ?? '');
-  const files = (await listing(page, sessionId)).files.filter((f) => f.runId === final.runId);
-  assert(files.some((f) => f.relativePath === 'report.md' && f.state === 'ready' && f.size > 0));
-  assert(files.some((f) => f.kind === 'png' && f.state === 'ready' && f.size > 0));
+  const files = await listing(page, sessionId);
+  assert(files.some((f) => f.relativePath === 'report.md' && f.size > 0));
+  assert(files.some((f) => f.name.endsWith('.png') && f.size > 0));
   await openPreview(page, '预览');
   await until(
     () =>

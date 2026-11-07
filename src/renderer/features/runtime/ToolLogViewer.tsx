@@ -14,6 +14,8 @@ export function ToolLogViewer({
     [selected, setSelected] = useState('');
   const [page, setPage] = useState<LogPage>(),
     [offsets, setOffsets] = useState<number[]>([]);
+  const [listOffset, setListOffset] = useState(0),
+    [nextListOffset, setNextListOffset] = useState<number | null>(null);
   const [opened, setOpened] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -33,18 +35,21 @@ export function ToolLogViewer({
       setBusy(false);
     }
   }
-  async function open() {
+  async function open(offset = 0) {
     setOpened(true);
-    const value = await request({ type: 'logs.list', sessionId, toolCallId });
-    setLogs(value);
-    if (value[0]) {
+    const value = await request({ type: 'logs.list', sessionId, toolCallId, offset });
+    setLogs(value.logs);
+    setListOffset(offset);
+    setNextListOffset(value.nextOffset);
+    setPage(undefined);
+    if (value.logs[0]) {
       setOffsets([]);
-      await load(value[0].id, 0);
+      await load(value.logs[0].id, 0);
     }
   }
   if (!opened)
     return (
-      <Button size="sm" variant="outline" onClick={() => void action(open)}>
+      <Button size="sm" variant="outline" onClick={() => void action(() => open())}>
         查看完整日志
       </Button>
     );
@@ -78,6 +83,24 @@ export function ToolLogViewer({
             </option>
           ))}
         </select>
+      )}
+      {(listOffset > 0 || nextListOffset !== null) && (
+        <div className="maintenance-actions">
+          <Button
+            size="sm"
+            disabled={busy || listOffset === 0}
+            onClick={() => void action(() => open(Math.max(0, listOffset - 100)))}
+          >
+            上一组记录
+          </Button>
+          <Button
+            size="sm"
+            disabled={busy || nextListOffset === null}
+            onClick={() => void action(() => open(nextListOffset!))}
+          >
+            下一组记录
+          </Button>
+        </div>
       )}
       {error && <p role="alert">{error}</p>}
       {!busy && !logs.length && <p>未保存可读取的完整日志。</p>}

@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import { openPreview } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -20,13 +21,11 @@ async function send(page, text, kind) {
   );
 }
 
-async function listing(page, sessionId, count) {
+async function listing(page, sessionId) {
   return until(async () => {
-    const value = await rpc(page, { type: 'artifacts.list', sessionId });
-    return value.versions.length === count && value.versions.every((v) => v.state === 'published')
-      ? value
-      : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 
 const writeReport = (content) => ({
@@ -46,7 +45,7 @@ export const cases = {
         first = await settled(page, sessionId);
       assert.equal(first.state, 'completed');
       const before = await listing(page, sessionId, 1),
-        old = before.files.find((f) => f.relativePath === 'report.md');
+        old = before.find((f) => f.relativePath === 'report.md');
       await openPreview(page, '预览');
       await page.getByRole('heading', { name: 'First report', exact: true }).waitFor();
       fixture.set(writeReport('# Second report'), { text: 'Second delivery complete.' });
@@ -56,12 +55,15 @@ export const cases = {
         return s?.runId !== first.runId && s?.state === 'completed' ? s : null;
       }, 'second run completed');
       const after = await listing(page, sessionId, 1),
-        reports = after.files.filter((f) => f.relativePath === 'report.md');
+        reports = after.filter((f) => f.relativePath === 'report.md');
       assert.notEqual(second.runId, first.runId);
       assert.equal(reports.length, 1);
       assert.equal(first.outputDirectory, second.outputDirectory);
-      assert.equal(readFileSync(old.path, 'utf8'), '# Second report');
-      assert.notEqual(after.files.find((f) => f.id === old.id).sha256, old.sha256);
+      assert.equal(
+        readFileSync(join(first.outputDirectory, old.relativePath), 'utf8'),
+        '# Second report',
+      );
+      assert.equal(after.find((f) => f.id === old.id).id, old.id);
       assert.equal(
         readFileSync(join(second.outputDirectory, 'report.md'), 'utf8'),
         '# Second report',

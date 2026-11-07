@@ -7,7 +7,6 @@ import type { SessionService } from '../services/sessions';
 import type { FilePicker } from '../services/file-picker';
 import type { CredentialService } from '../services/credentials';
 import type { RuntimeService } from '../services/runtime';
-import type { ArtifactService } from '../services/artifacts';
 import type { DeletionService } from '../services/deletion';
 import type { LogService } from '../services/logs';
 import type { InteractionBroker } from '../services/interactions';
@@ -28,7 +27,6 @@ export interface HandlerDependencies {
     action: 'close_reopen' | 'quit' | 'host_pid',
     sessionId?: string,
   ) => number | null;
-  artifacts: ArtifactService;
   workspaceFiles: WorkspaceFileService;
   logs: LogService;
   deletion: DeletionService;

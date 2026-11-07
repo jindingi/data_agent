@@ -37,7 +37,6 @@ export async function startApp(
     port: selectedPort,
     pickFiles,
     pickDirectory,
-    exportDirectory,
     saveFile,
     testModelBaseUrl,
   } = {},
@@ -82,7 +81,6 @@ export async function startApp(
   delete env.DATA_AGENT_TEST_SAVE_FILE;
   if (automation && saveFile) env.DATA_AGENT_TEST_SAVE_FILE = saveFile;
   delete env.DATA_AGENT_TEST_EXPORT_DIRECTORY;
-  if (automation && exportDirectory) env.DATA_AGENT_TEST_EXPORT_DIRECTORY = exportDirectory;
   delete env.DATA_AGENT_TEST_MODEL_BASE_URL;
   // Deliberately pass this even in the normal-startup test: Main must ignore it
   // without the explicit automation flag, rather than the harness hiding it.

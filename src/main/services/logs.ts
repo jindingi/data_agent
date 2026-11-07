@@ -4,7 +4,7 @@ import { constants, realpathSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { toolLogDirectory } from '../../node/tool-log-path';
 import { AppError } from '../../shared/errors';
-import type { ToolLog, LogPage } from '../../shared/maintenance';
+import type { ToolLog, ToolLogListing, LogPage } from '../../shared/maintenance';
 export class LogService {
   private canonicalRoot: string;
   private entries = new Map<string, { path: string; sessionId: string; toolCallId: string }>();
@@ -14,7 +14,7 @@ export class LogService {
   ) {
     this.canonicalRoot = realpathSync(root);
   }
-  async list(sessionId: string, toolCallId: string): Promise<ToolLog[]> {
+  async list(sessionId: string, toolCallId: string, offset = 0): Promise<ToolLogListing> {
     if (!(await this.authorized(sessionId, toolCallId)))
       throw new AppError('LOG_NOT_FOUND', '工具不属于当前会话');
     const directory = toolLogDirectory(this.root, sessionId, toolCallId);
@@ -22,18 +22,24 @@ export class LogService {
       if ((await realpath(directory)) !== join(this.canonicalRoot, relative(this.root, directory)))
         throw new Error('redirect');
       const rows: ToolLog[] = [];
+      let seen = 0,
+        nextOffset: number | null = null;
       for await (const item of await opendir(directory)) {
-        if (rows.length >= 100) break;
         if (!item.isFile() || !/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}\.log$/i.test(item.name))
           continue;
+        if (seen++ < offset) continue;
+        if (rows.length === 100) {
+          nextOffset = offset + rows.length;
+          break;
+        }
         const id = randomUUID();
         this.entries.set(id, { sessionId, toolCallId, path: join(directory, item.name) });
         rows.push({ id, runId: item.name.slice(0, -4), toolCallId });
       }
       while (this.entries.size > 1000) this.entries.delete(this.entries.keys().next().value!);
-      return rows;
+      return { logs: rows, nextOffset };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { logs: [], nextOffset: null };
       throw new AppError('LOG_UNAVAILABLE', '日志目录已变更，无法读取');
     }
   }
@@ -44,7 +50,10 @@ export class LogService {
     try {
       if ((await realpath(row.path)) !== join(this.canonicalRoot, relative(this.root, row.path)))
         throw new Error('redirect');
-      const handle = await open(row.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const handle = await open(
+        row.path,
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      );
       try {
         const stat = await handle.stat();
         if (!stat.isFile() || stat.size > 10 * 1024 * 1024) throw new Error('invalid log');

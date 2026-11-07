@@ -126,8 +126,8 @@ export class AgentConfigService {
   /** Called inside the session creation transaction, before any first input can queue. */
   bindNew(sessionId: string) {
     this.db
-      .prepare('INSERT INTO session_agent_configs VALUES (?,?)')
-      .run(sessionId, JSON.stringify(this.current()));
+      .prepare('UPDATE sessions SET agent_config_revision=?,agent_config_override=NULL WHERE id=?')
+      .run(this.current().revision, sessionId);
   }
   details(sessionId: string): SessionAgentConfig {
     const row = this.session(sessionId);
@@ -172,9 +172,11 @@ export class AgentConfigService {
   private resolve(id: string): AgentBinding {
     const session = this.session(id);
     const row = this.db
-      .prepare('SELECT snapshot FROM session_agent_configs WHERE session_id=?')
-      .get(id) as { snapshot: string } | undefined;
-    if (row) {
+      .prepare(
+        'SELECT COALESCE(s.agent_config_override,r.snapshot) AS snapshot FROM sessions s LEFT JOIN agent_config_revisions r ON r.revision=s.agent_config_revision WHERE s.id=?',
+      )
+      .get(id) as { snapshot: string | null } | undefined;
+    if (row && row.snapshot !== null) {
       const binding = verifyBinding(JSON.parse(row.snapshot));
       const integrity = inspectSessionFile(
         session.file,
@@ -212,8 +214,8 @@ export class AgentConfigService {
     const binding = this.recoverLegacy(session.file);
     materializeSkills(this.resourcesRoot, binding);
     this.db
-      .prepare('INSERT INTO session_agent_configs VALUES (?,?)')
-      .run(id, JSON.stringify(binding));
+      .prepare('UPDATE sessions SET agent_config_override=? WHERE id=?')
+      .run(JSON.stringify(binding), id);
     return binding;
   }
   private recoverLegacy(file: string): AgentBinding {

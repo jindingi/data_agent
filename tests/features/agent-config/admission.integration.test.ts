@@ -10,7 +10,6 @@ import { CredentialService } from '../../../src/main/services/credentials';
 import { RuntimeService } from '../../../src/main/services/runtime';
 import type { ToolHandler } from '../../../src/main/services/agent-process';
 import { ToolService } from '../../../src/main/services/tools';
-import { ArtifactService } from '../../../src/main/services/artifacts';
 import { InteractionBroker } from '../../../src/main/services/interactions';
 import { getRuntimePaths } from '../../../src/node/runtime-paths';
 import { ensureAppPaths, getAppPaths } from '../../../src/node/app-paths';
@@ -60,7 +59,7 @@ it('agent-config.admission queued and running sessions retain bindings; Main rej
   const tools = new ToolService(
     getRuntimePaths(process.cwd(), '', false),
     paths.logs,
-    new InteractionBroker(db),
+    new InteractionBroker(),
   );
   const execute = vi
     .spyOn(tools, 'execute')
@@ -74,12 +73,6 @@ it('agent-config.admission queued and running sessions retain bindings; Main rej
     paths,
     agentConfigs: configs,
     tools,
-    artifacts: new ArtifactService(
-      db,
-      sessions,
-      () => false,
-      () => {},
-    ),
     reader: { readHistory: async () => ({ messages: [] }) },
     publish: () => {},
     changed: () => {},

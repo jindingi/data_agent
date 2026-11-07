@@ -19,15 +19,11 @@ export interface SessionRecord {
   createdAt: string;
   updatedAt: string;
 }
-export interface FileReference {
-  id: string;
-  sessionId: string;
+export interface SelectedFile {
   path: string;
   name: string;
   size: number;
-  missing: boolean;
 }
-export type SelectedFile = Pick<FileReference, 'path' | 'name' | 'size'>;
 export interface HistoryItem {
   id: string;
   role: string;
@@ -35,7 +31,6 @@ export interface HistoryItem {
 }
 export interface SessionDetail {
   session: SessionRecord;
-  files: FileReference[];
   history: HistoryItem[];
   messages?: import('./runtime').MessageView[];
 }

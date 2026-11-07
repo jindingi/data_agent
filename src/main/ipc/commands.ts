@@ -26,7 +26,6 @@ export async function dispatchCommand(
     testBaseUrl,
     interactions,
     automationControl,
-    artifacts,
     workspaceFiles,
     logs,
     deletion,
@@ -110,43 +109,6 @@ export async function dispatchCommand(
     case 'automation.control': {
       if (!automationControl) throw new AppError('UNSUPPORTED_COMMAND', '自动化入口未开启');
       return success(command.type, automationControl(command.action, command.sessionId));
-    }
-    case 'artifacts.list':
-      return success(command.type, artifacts.list(command.sessionId));
-    case 'files.preview':
-      return success(command.type, await sessions.previewFile(command.sessionId, command.fileId));
-    case 'files.copy': {
-      const preview = await sessions.previewFile(command.sessionId, command.fileId);
-      if (preview.text === undefined)
-        throw new AppError('TEXT_UNAVAILABLE', '当前文件没有可复制的文本');
-      clipboard.writeText(preview.text);
-      return success(command.type, null);
-    }
-    case 'files.reveal':
-      shell.showItemInFolder(await sessions.inputLocation(command.sessionId, command.fileId));
-      return success(command.type, null);
-    case 'artifacts.reveal':
-      shell.showItemInFolder(await artifacts.location(command.sessionId, command.artifactId));
-      return success(command.type, null);
-    case 'artifacts.preview':
-      return success(command.type, await artifacts.preview(command.sessionId, command.artifactId));
-    case 'artifacts.copy': {
-      const preview = await artifacts.preview(command.sessionId, command.artifactId);
-      if (preview.artifact.state !== 'ready' || preview.text === undefined)
-        throw new AppError('TEXT_UNAVAILABLE', '当前文件没有可复制的文本');
-      clipboard.writeText(preview.text);
-      return success(command.type, null);
-    }
-    case 'artifacts.export': {
-      const parent = await picker.chooseExportDirectory();
-      return success(
-        command.type,
-        parent ? await artifacts.exportVersion(command.sessionId, command.versionId, parent) : null,
-      );
-    }
-    case 'artifacts.revealExport': {
-      shell.showItemInFolder(await artifacts.exportLocation(command.sessionId, command.path));
-      return success(command.type, null);
     }
     case 'workspace.open': {
       const error = await shell.openPath(sessions.get(command.sessionId).workspace);
@@ -238,7 +200,10 @@ export async function dispatchCommand(
     case 'sessions.delete':
       return success(command.type, await deletion.remove(command.sessionId));
     case 'logs.list':
-      return success(command.type, await logs.list(command.sessionId, command.toolCallId));
+      return success(
+        command.type,
+        await logs.list(command.sessionId, command.toolCallId, command.offset),
+      );
     case 'logs.page':
       return success(
         command.type,
@@ -268,7 +233,6 @@ export async function dispatchCommand(
           : { items: [], messages: active?.messages ?? [] };
       return success(command.type, {
         session,
-        files: sessions.files(session.id),
         history: transcript.items,
         messages: transcript.messages,
       });
@@ -280,21 +244,6 @@ export async function dispatchCommand(
     }
     case 'sessions.archive': {
       const value = sessions.archive(command.sessionId, command.archived);
-      changed();
-      return success(command.type, value);
-    }
-    case 'files.pick': {
-      const value = sessions.addFiles(command.sessionId, await picker.chooseFiles());
-      changed();
-      return success(command.type, value);
-    }
-    case 'files.add': {
-      const value = sessions.addFiles(command.sessionId, command.paths);
-      changed();
-      return success(command.type, value);
-    }
-    case 'files.remove': {
-      const value = sessions.removeFile(command.sessionId, command.fileId);
       changed();
       return success(command.type, value);
     }

@@ -25,7 +25,7 @@ export const cases = {
       );
       await page.getByRole('button', { name: '切换结果面板' }).click();
       await openPreview(page, '预览');
-      await page.getByRole('heading', { name: '还没有预览' }).waitFor();
+      await page.getByText('从文件列表选择文件进行预览', { exact: true }).waitFor();
       await page.getByRole('button', { name: '关闭结果面板' }).click();
       await page.getByRole('button', { name: '收起侧栏' }).click();
       assert.equal(await page.getByLabel('会话侧栏').count(), 0);

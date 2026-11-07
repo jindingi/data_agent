@@ -35,7 +35,7 @@ flowchart LR
   PB --> WB[执行监督器 B]
   WA --> RA[Python / bash 进程组 A]
   WB --> RB[Python / bash 进程组 B]
-  Main --> Artifacts[文件登记 / 展示检查 / 导出]
+  Main --> Workspace[目录浏览 / 有界预览 / 单文件另存]
   PA <-->|审批 / 澄清| Main
   PB <-->|审批 / 澄清| Main
 ```
@@ -49,7 +49,7 @@ flowchart LR
 - InteractionBroker：按 sessionId/runId/toolCallId 绑定审批与澄清；关闭窗口不取消，Cmd+Q/停止/崩溃取消。
 - CredentialService：BYOK 加密持久化，只发送当前模型凭证到对应 Host；Renderer 不接收已保存的明文 key。
 - file-selection.ts / SessionService：获取所选文件路径，检查真实路径、存在性、大小和合计大小。导入时不读取 CSV 内容、不解析、不生成表格预览；不复制源文件、不监测外部替换、不维护数据版本。
-- ArtifactService：登记候选文件、分配/核对 artifact 身份，检查访问权限和展示条件，提供受控读取与导出；在任务收束时扫描登记本轮文件。不检查报告数值、关联键或分析结论。
+- WorkspaceFileService：按层浏览实际目录、签发临时条目 ID、有界预览与单文件另存；不依赖 Agent 执行、数据库文件索引或产物发布。
 
 ### Agent Host
 
@@ -74,10 +74,10 @@ data_agent/
       index.ts                  # 启动、单实例、窗口和退出生命周期
       ipc/handlers.ts / commands.ts / dependencies.ts
       services/                 # sessions, runtime, agent-process, interactions,
-                                # credentials, file-picker, artifacts, tools,
+                                # credentials, file-picker, workspace, tools,
                                 # policy, deletion, logs
       services/runtime/         # admission、run-ledger、lifecycle
-      services/artifacts-io.ts / tool-operations.ts
+      services/workspace.ts / tool-operations.ts
       storage/database.ts       # schema、migration 和 SQLite 连接
     preload/index.ts
     agent/
@@ -88,7 +88,7 @@ data_agent/
       runtime-context.ts / request-budget.ts / request-evidence.ts
     renderer/
       app/ / components/ui/ / lib/ / styles/
-      features/                 # sessions、composer、models、runtime、artifacts；各自拥有状态
+      features/                 # sessions、composer、models、runtime、workspace；各自拥有状态
     shared/contracts/           # Zod schemas + 可序列化命令/事件 DTO
     shared/models.ts / errors.ts
     node/                       # app-paths, runtime-paths, path-policy, read-text,
@@ -126,20 +126,36 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
     analysis.py / report.md     # Agent 按任务生成的示例文件，并非强制清单
     figures/*.png / tables/*.csv
     .cache/ / .tmp/
-  logs/
+  logs/{sessionId}/{sha256(toolCallId)}/{executionId}.log
+  backups/                     # 升级前一致性 SQLite 备份
   agent-resources/{sha256}/resources/skills/{skillId}/SKILL.md
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
 ```
 
-SQLite 管理会话、文件引用、运行及交互元数据。已实现 `sessions`、`file_refs`、`runs`、`run_inputs`、`input_drafts`、`run_files`、`tool_logs`、`deletion_jobs`、`deletion_files`、`interactions`、`output_versions`、`artifacts`、`submission_receipts`、`conversation_intents`、`app_metadata`、`agent_config_revisions`、`session_agent_configs`、`schema_migrations`；`run_inputs` 只存 inputId/kind/state/native entryId，不存聊天正文。`app_metadata` 存所选模型和 safeStorage 加密后的 provider key，明文不回传 Renderer。`input_drafts` 仅暂存已提交但尚未确认进入 JSONL 的输入文字和路径，原生 record 确认后在同一 SQLite 事务中删除；未知/取消输入保留到用户显式移除。它不作为模型上下文或永久聊天事实源。`run_files` 记录提交时选用的路径/登记大小，`tool_logs` 只存工具输出文件索引、结束原因和进程树采样峰值 RSS；`deletion_jobs`/`deletion_files` 保留明确清理选择与每个路径的进度。仍不另建永久聊天正文表。`file_refs`/`run_files` 都不是 CSV 版本库，不代表冻结文件内容，用户数据替换不进入应用版本管理。
+SQLite 仅保留 6 张应用表：
 
-添加 CSV 时按文件元数据校验单文件及选用合计 ≤100,000,000 bytes；提交任务时检查原路径是否缺失，记录当时选用的路径和已登记大小。排队任务沿用提交时的引用；不冻结文件内容、不检测外部替换，也不按内容解析 CSV。实际读取失败由通用工具返回。关联生成的中间表不算原始 CSV 上传总量，但受执行资源/输出限额约束。路径不是权限令牌，仍走 PolicyService。
+| 表                     | 职责                                                                |
+| ---------------------- | ------------------------------------------------------------------- |
+| schema_migrations      | 事务迁移版本                                                        |
+| app_metadata           | 连接设置、加密凭证、模型偏好及缓存                                  |
+| sessions               | 会话位置/标题/可用性、创建/删除标记、最新执行状态、配置绑定         |
+| agent_config_revisions | 不可变提示词、工具及 skill 正文快照                                 |
+| input_submissions      | 输入身份、接收顺序、执行 ID、ACK/entry ID/摘要及尚未落盘的正文/附件 |
+| session_sources        | 按会话去重的历史来源路径，仅用于保护原文件                          |
+
+sessions.state/error 表示会话可用性，execution_* 表示最新执行。状态写入匹配 session/execution/epoch，重启把未结束执行设为 interrupted，不重放任务。配置完全匹配修订时保存 agent_config_revision 引用；特殊旧绑定原样保存 agent_config_override，不能套用当前默认值。
+
+input_submissions 按 sequence 保存全部执行的未确认输入；原生记录 ACK 后清空 pending_text/pending_paths，保留投递身份与 SHA256 摘要。未知输入不自动重发。session_sources 不是 UI 文件目录、当前选集或模型上下文；prompt/steer/follow-up 接收时和输入记录同事务追加路径。普通追问不 stat 全部历史来源。
+
+每次添加和提交只校验本次附件的路径、存在性、单文件及合计 ≤100,000,000 bytes，不解析 CSV、不冻结内容。实际读取失败由工具返回。路径不是权限令牌，仍走 PolicyService。
+
+迁移 11 在一致性备份后单事务合并旧元数据并删除冗余表，目标没有 tool_logs/output_versions/artifacts 及兼容视图。保留全部未确认输入、配置与原文件保护路径，废弃旧删除目标清单。迁移不打开或改写 JSONL，不搬移/删除 workspace 或旧日志。备份使用 VACUUM INTO，包含已提交 WAL，存于受保护 backups/；未知更高 schema 拒绝打开，失败回滚并报错。禁止用旧二进制打开新库；备份回退不等于后续 JSONL 一并回滚。细节与验收见 [存储简化方案](storage-simplification-plan.md)。
 
 JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。SessionManager 是唯一 JSONL 写者；Main 是唯一 SQLite 写者；二者没有跨介质原子事务。状态使用 creating/draft/persisted/missing 等，启动对账，不把 `message_end` 当落盘 ACK。
 
 `appSessionId` 与 pi header ID 分开；用 `SessionManager.open(exactFile, sessionsDir, cwd)` 保持精确文件布局。草稿没有 JSONL 是正常状态；已有历史却缺失/零字节/损坏时不能静默新建。先只读预检和备份，再使用可能迁移文件的 SDK API。
 
-删除会话先标记 deleting，停止本会话并等待 Host、工具进程和产物登记收束。默认仅清理原生会话记录和登记工具日志；用户显式勾选后才清理登记产物。原始 CSV（包括被另一会话引用的路径）、自选父目录、用户手动放入且未登记的文件保留。按普通文件、路径和登记 hash 校验后逐个删除，不递归清空 workspace；仅移除空的产物祖先目录。路径重定向或内容变更时保留文件和 SQLite 清理记录，重启后可继续，不能用重试修改最初的清理选择。部分失败保留清理记录；外部 workspace 不可用时显示异常，不自动换新目录。读取不存在的源 CSV 正常报错，不实现外部变更恢复功能。
+删除会话先标记 deleting，阻止新输入、停止该会话并等待 Host/工具写者退出。仅清理固定路径的原生 JSONL 与新布局内部日志，之后删除 sessions（投递/来源记录级联删除）；配置修订保留。workspace 及原 CSV 始终保留，不扫描、不清理空目录，用户自行删除。内部文件清理失败把错误存入 sessions 并允许重启重试；清理必须校验根、路径、链接及与所有 workspace 的重叠。迁移后不执行旧 deletion_files 里的产物删除指令。
 
 ## 5. 命令、事件与运行状态
 
@@ -154,7 +170,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 
 运行状态：queued → starting → running / waiting_approval / waiting_input → 终态 completed/failed/cancelled/interrupted。取消过程中等待实际工具回收，不单独持久化 cancelling 状态。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
 
-运行终态与文件展示状态分开：`runs.state` / `RuntimeSnapshot.state` 记录 SDK/进程是否完成；P4 的 `ArtifactRecord.state` 使用 ready/empty/too_large/invalid/changed/missing 描述文件访问和展示条件（类型还预留 unsupported）。产物目录登记状态为 open/published，登记错误另存 error；兼容字段仍名为 output_versions/versionId，共享目录并不代表历史快照。ready 不表示内容正确，普通文件仍可能需要导出后用其他应用打开；缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
+运行终态与文件展示分开：sessions.execution_state / RuntimeSnapshot.state 记录 SDK/进程生命周期；WorkspaceFileService 返回当前文件及预览提示，不持久化 ready/published 状态。不存在报告不改写已结束的执行状态，普通聊天允许没有产物。测试可以约定 report.md 非空，产品不据此判断分析正确。
 
 Host 内保留可序列化的活动投影；快照 = 当前分支持久化历史 + 活动 partial/tool/interaction/queue + seq 水位。Renderer 重载恢复该快照，再补后续事件；Host 崩溃不承诺恢复尚未落盘的每个 token。
 
@@ -170,7 +186,7 @@ SDK 原生 steer/followUp 没有应用 inputId 参数；同文本消息不能靠
 
 确认持久化后才把 input 标 committed；未知结果标 unknown，不能自动重放。abort 后显式清 SDK 队列，未消费输入保留未发送。同一文本的两次用户输入仍是两个 inputId。
 
-Main 在接受输入时原子登记 run_inputs 与 input_drafts，再交给 Host；全局排队时同样保留文字。重启后只读原生历史对账 committed，清理已落盘草稿；剩余未知/取消输入通过 Main 的 unsentInputs 投影呈现，可放回输入框或显式移除，不自动重发。未发送输入跨后续 run 保留，移除按会话和 inputId 校验，不能删除活动队列中的输入。JSONL 仍为唯一永久会话内容。用户主动停止会清除暂时性模型错误，以 cancelled 收束；运行超时保留限额错误，以 failed 收束。
+Main 在接受输入时原子登记 input_submissions 与 session_sources，再交给 Host；全局排队时同样保留文字。重启后只读原生历史对账 committed，清空已落盘输入的 pending 正文/路径；剩余未知/取消输入通过 Main 的 unsentInputs 投影呈现，可放回输入框或显式移除，不自动重发。未发送输入跨后续 run 保留，移除按会话和 inputId 校验，不能删除活动队列中的输入。JSONL 仍为唯一永久会话内容。用户主动停止会清除暂时性模型错误，以 cancelled 收束；运行超时保留限额错误，以 failed 收束。
 
 ### 上下文稳定性与执行限制
 
@@ -192,7 +208,7 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 `shared/agent-config.ts` 定义 schemaVersion=1、行为提示词（最多 32,000 字符）、固定工具 ID 与内置 skill ID。只接受白名单并按固定顺序归一化；skill 开启要求 read，纯聊天允许工具与 skills 均为空。`composeAgentPrompt` 将可编辑行为、只读工作区约束及与启用能力一致的说明组合；关闭 data-analysis 时不再留下固定读取指令。默认组合保留此前完整提示词字节，减少非必要上下文变化。
 
-`main/services/agent-config.ts` 是 SQLite 唯一写者。迁移 10 新增 `agent_config_revisions(revision,snapshot)` 与 `session_agent_configs(session_id,snapshot)`；snapshot 包括配置、提示词协议版本、skill 正文/描述/路径/哈希和指纹。最新修订作为默认配置，不为旧会话覆盖绑定；无实际变化不增版本，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存修订均在 SQLite 事务内。会话创建事务同时写入绑定，故首次输入排队前已固定；未接收的首页草稿仍不创建会话。配置与 skill 正文是配置数据，不是第二份聊天记录。
+`main/services/agent-config.ts` 是 SQLite 唯一写者。agent_config_revisions 保存修订，sessions 保存修订引用或特殊历史覆盖；snapshot 包括配置、提示词协议版本、skill 正文/描述/路径/哈希和指纹。最新修订作为默认配置，不为旧会话覆盖绑定；无实际变化不增版本，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存修订均在 SQLite 事务内。会话创建事务同时写入绑定，故首次输入排队前已固定；未接收的首页草稿仍不创建会话。配置与 skill 正文是配置数据，不是第二份聊天记录。
 
 Main 从可信打包目录取内置 skill，将启用正文按内容哈希物化到 `agent-resources/{sha256}/resources/skills/{id}/SKILL.md`，拒绝缓存路径符号链接及正文哈希不符。文件缺失可从 SQLite 快照恢复；创建缓存后数据库事务失败产生的孤立缓存不影响绑定，不自动清理仍可能被引用的版本。已保存的启用 skill 保持原内容，应用升级不隐式更新旧默认配置；新的未启用资源可在明确启用并保存时纳入修订。配置资源允许读取，但可检测写入/删除被策略拒绝。这仍是尽力规则检查，不宣称文件系统不可绕过。
 
@@ -249,27 +265,21 @@ Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Ag
 
 实际的路径/审批与分类器探针见 [policy/probe.py](../validation/policy/probe.py)；探针是有限规则机制证明，不是完整生产规则集合。
 
-## 9. 通用产物管理与 UI 展示
+## 9. 工作区浏览与文件展示
 
-同一 session 共用 SessionService 分配的 workspace。普通 prompt 创建新的运行账本，但不创建新产物目录；steer/follow-up 同样保持目录不变。system prompt 在新会话初始化时包含固定工作区、输出目录与默认工具 cwd。工具、审批和进程仍按 run 管理，不把产物目录和任务生命周期绑在一起。
+同一 session 的 prompt、steer、follow-up 共用固定 workspace。新执行只更新运行身份，不生成版本目录或发布清单；system prompt 与上下文前缀保持稳定。任务收束仍等待 Host/工具退出，但不等待目录登记。
 
-`ArtifactService.openWorkspace` 复用 directory 等于 session.workspace 的唯一 output_versions 行，将 run_id 更新为当前任务并设为 open；该表名与 versionId 仅为兼容既有 SQLite/IPC，不再表示每轮文件快照。无需破坏性 schema 迁移。后续任务开始前等待上一任务停止写入和登记结束；启动时恢复 open 目录的登记，分配目录前等待同目录未完成扫描。任务结束后扫描工作区，按相对路径更新 size/hash/state，保留同路径 artifact ID；仅在完整扫描成功后移除已删除文件的登记。文件状态/哈希变化驱动预览重新读取，避免同 ID 下继续显示旧报告。
+WorkspaceFileService 按层异步列目录，每层最多 2,000 条并明确提示截断；目录展开才读取，默认隐藏点文件，可显示隐藏文件。符号链接及特殊文件不跟随，不支持项明确标注；敏感内部路径拒绝。条目 ID 存 Main 有界内存（10,000 项），不写数据库、不跨重启承诺有效。无 Agent 任务时也能查看手动文件。隐藏面板不扫描；打开、手动刷新和工具/执行终态触发合并刷新，保留当前选择，不自动选择新报告。
 
-兼容策略：保留旧 output_versions/artifacts 行和原 runs/.../versions/... 文件，不搬移、不删除、不冒充当前快照。共享工作区扫描排除已登记旧版本目录及当前原 CSV 引用，隐藏文件/符号链接跳过；旧版本产物仍禁止可识别的覆盖。新生成文件直接写 workspace，可按任务更新同名文件。默认不提供每轮历史副本；需保留旧结果时用户先导出或让 Agent 另命名。新会话不显示版本选择器，有遗留版本时才显示“会话文件/历史版本”。
+workspace.list/resolve/preview/copy/reveal/saveAs 接口只接受会话及 Main 签发条目 ID；resolve 仅解析选中文件旁的相对链接。Main 检查根身份、会话归属、规范路径及普通文件，拒绝路径逃逸、敏感目录、链接替换及读取中修改。Renderer 不提交任意绝对路径。外部附件只在用户消息中显示路径，不作为目录条目或增加“解除关联”。
 
-登记每目录最多 1,000 个普通文件、5,000 个扫描条目、500 MiB。报告预览最多 2 MiB；PNG 在大小/像素检查后实际解码。空文件或损坏图片保留状态说明，不代表任务或分析正确性。Renderer 只提交 sessionId/artifactId；Main 复核归属、真实路径、大小和 SHA256。Markdown 相对图片只映射同目录登记 PNG，不加载外部图片。导出当前登记文件并保留相对结构，每次创建独立目标目录，不覆盖已有导出；读取期间变更则失败并清理当次 staging。原 CSV 不作为产物复制。外链仍须用户点击及 Main HTTP/HTTPS 校验。
+文本预览最多 128 KiB / 2,000 行，UTF-8 截断保留完整字符；非 UTF-8、二进制及未知扩展名提示原因。Markdown 小于等于 2 MiB 时安全渲染，超过则有界文本预览；空文件明确提示。SourcePreview 使用 highlight.js 11.11.1 core 和显式语言包，只生成转义标记，最多高亮 32,768 字符，不自动猜语言、不解析 CSV、不执行代码。PNG 限 25 MiB、4,000 万像素并实际解码。深浅主题使用现有 tokens。
 
-统一文件预览补充（2026-11-07）：`files.preview/copy/reveal` 只接受 sessionId/fileId；SessionService 验证引用归属，text-preview.ts 校验真实路径、敏感目录、普通文件与读取期间状态。输入 CSV 只读当前文件前 128 KiB，并限制 2,000 行，不解析表格、不复制或冻结原文件。生成代码/文本沿用 artifact ID；仍以 64 KiB 分块校验整文件 SHA256，只保留前 128 KiB 后再限行，不能因为截断预览绕过登记文件完整性。导出仍读取完整产物。未知扩展名、二进制、非 UTF-8 明确提示，不执行源码。新增接口不接受任意路径；Finder 定位同样校验归属和真实路径。
+WorkspacePanel 提供文件/预览 tabs、可调宽度、展开阅读、独立滚动、复制展示内容、Finder 定位和单文件另存。Markdown 可切换源码；WorkspaceReport 禁止 raw HTML、外部自动图片与危险 scheme，相对图片/链接通过同一工作区受控接口解析，HTTP(S) 外链需显式点击。刷新可显示原路径新内容，不再依赖永久 hash 登记。
 
-Renderer 的 SourcePreview 共享只读文本/行号视图，使用 highlight.js 11.11.1 的 core 与显式语言包（[官方 API](https://highlightjs.readthedocs.io/en/latest/api.html)）生成转义后的 token 标记，不自动猜测语言，不引入编辑器。最多对 32,768 字符高亮，更长内容使用纯文本；UTF-8 在截断处保留完整字符。Markdown 默认继续使用 Report 的安全渲染，用户可切换源码。输入与产物保留各自身份，不将输入文件伪装成版本化产物。深浅主题使用统一代码颜色 token。
+“另存文件”由原生保存对话框选择目标，文件最大 500 MiB，以同一个校验后的描述符分块 64 KiB 复制到临时文件，检查源/目标变化后提交；异常清理本次临时文件，不覆盖源文件。只复制选中的文件，不批量打包相对图片。需要整个目录时通过 Finder 操作。旧版本目录如在 workspace 内，仅作为普通目录；无版本选择器、版本导出或旧索引兼容。
 
-不要求 Agent 生成 metrics.json、manifest.json、metric 标记或特定业务 schema，也不交叉核对报告、表格和图表的数值。应用自己的产物索引只保存文件元数据；即使 Agent 自行生成同名 JSON，它也只是普通产物，不成为权威状态来源。
-
-文件存在、非空、路径权限、类型/尺寸上限、图片解码、Markdown 安全渲染属于工作台检查。语义正确性（包括金额是否重复放大、图表是否与计算一致）归独立 LLM-as-a-judge 评测，不在产物登记或展示前运行。非空 report.md 可以满足测试的文件交付断言，即使 Judge 随后认为其结论错误。
-
-当前工作区产物允许受控工具更新；任务结束重新登记 hash 后刷新预览。读取时若文件不符合当前登记的 hash，标为“文件已变更”，等待任务结束重新登记，不返回未验证内容。遗留历史版本仍保持原完整性保护。此规则不引入 CSV 版本管理。
-
-Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载。相对图片由受控 artifact ID 映射真实文件，不允许任意 file URL；外链显式打开。Streamdown 的真实渲染验证范围在验证记录说明，不把静态字符串检查冒充 UI 验证。
+工作台检查文件访问、尺寸与安全渲染，不检查报告业务数值或代码正确性，也不要求 metrics/manifest 文件。Agent 自建 manifest 只是普通文件。语义效果由独立 Judge 评价。
 
 ## 10. 执行限额与可观察性
 
@@ -313,16 +323,16 @@ Renderer 的 `features/composer` 拥有每个会话及首页的草稿，存于�
 
 `files.choose/files.inspect/workspace.choose` 只选择/校验。`conversation.submit` 先校验模型、凭证、原路径和合计大小，再创建会话并进入现有 RuntimeService/pi 队列。原 `sessions.create` 保留给存储恢复与集成 fixture，产品“新会话”不再调用它。首次接收用首个 inputId 作为 session ID，标题取问题前 48 字。
 
-迁移 8 增加 submission_receipts 与 conversation_intents，并为 input_drafts 增加路径：同 inputId 的相同请求返回接收结果，内容不符拒绝；未知结果不自动重发。首次创建异常和启动恢复清理未接收空目录，只用 rmdir，不递归删除未知文件。已有 run 的 intent 只清标记。迁移 9 将早期 receipt 的 payload 转换为 SHA256 摘要；最终 receipt 只存 inputId/sessionId/digest，不永久保留第二份输入正文。输入账本和 receipt 在同一 SQL 事务中提交；文件系统/JSONL 不被假装成同一事务。
+input_submissions 的 inputId + digest 保证提交幂等，相同请求返回接收结果、不同内容拒绝。sessions.creation_pending 替代创建意图表。首次创建失败或重启仅回收未接收的空目录（rmdir，不递归删除未知文件）；已有执行只清标记。投递身份、待确认正文/路径和来源保护在同一 SQL 事务写入；不把 SQLite 与文件系统/JSONL 伪装成同一事务。
 
-pi JSONL 仍用原生 message/custom entry，`data_agent.input_submitted` 增加 paths 元数据；模型上下文注入本条原路径，Renderer 显示对应附件，重启可还原。会话文件引用与待发送附件独立，解除关联不删除源文件。模型配置由 `features/models/use-model-settings` 串行持有，输入区与设置共用 busy、值及错误，设置错误在弹窗内显示。
+pi JSONL 仍用原生 message/custom entry，`data_agent.input_submitted` 增加 paths 元数据；模型上下文注入本条原路径，Renderer 显示对应附件，重启可还原。附件随消息保留，不提供独立关联/解除关联功能。模型配置由 `features/models/use-model-settings` 串行持有，输入区与设置共用 busy、值及错误，设置错误在弹窗内显示。
 
 ### 生命周期、资源及展示所有权
 
-- `runtime/admission.ts` 持有最多两个运行许可及 FIFO；`run-ledger.ts` 只在状态/ACK 变化时写元数据，文本 delta 不重复写 SQLite；`lifecycle.ts` 等待 Host 写者、工具和产物发布，再清理计数并释放许可。RuntimeService 保留公开用例入口。终态 task/恢复 snapshot 缓存各最多 8 项，其他历史按需从 JSONL 读取。
+- `runtime/admission.ts` 持有最多两个运行许可及 FIFO；`run-ledger.ts` 只在状态/ACK 变化时写元数据，文本 delta 不重复写 SQLite；`lifecycle.ts` 等待 Host 写者和工具，再清理计数并释放许可。RuntimeService 保留公开用例入口。终态 task/恢复 snapshot 缓存各最多 8 项，其他历史按需从 JSONL 读取。
 - SessionRuntime 是唯一 pi 会话所有者。上下文、请求/活跃时间预算、脱敏请求证据分开；ToolService 保留统一策略/审批/复查/取消外壳，ToolOperations 只执行已检查的通用操作。每轮结束显式释放工具与日志计数。
-- ArtifactService 导出通过同一已验证文件描述符以 64 KiB 分块读取并校验 SHA256；独占创建目标目录，隐藏 staging 中完成全部文件后提交，失败清理本次新文件，不覆盖已有导出。Markdown/PNG 展示仍受原有大小限制；普通文本仅保留有界前缀。打开导出位置只接受 Main 本次运行记录的最近 64 个成功导出，校验会话和实际目录；Renderer 不能任意打开路径。
-- App 保留布局、导航与快捷键组合。SessionSidebar/Header、Rename/DeleteSessionDialog、Composer/useComposer、SettingsDialog/useModelSettings、RunControls/useActivity、Transcript/ExecutionProcess/transcriptTurns、ArtifactPanel/Report/SourcePreview/ZoomImage/usePanelSize 分别负责各自行为。ArtifactPanel 内拥有阅读状态及请求 ticket，没有额外增加无行为的布局/controller 文件。关闭预览不卸载当前会话面板，新版本不强制改变选择或重新打开面板。
+- WorkspaceFileService 拥有实际文件访问与有界另存；不维护持久化文件目录。
+- App 保留布局、导航与快捷键组合。SessionSidebar/Header、Rename/DeleteSessionDialog、Composer/useComposer、SettingsDialog/useModelSettings、RunControls/useActivity、Transcript/ExecutionProcess/transcriptTurns、WorkspacePanel/WorkspaceReport/SourcePreview/ZoomImage/usePanelSize 分别负责各自行为。WorkspacePanel 内拥有阅读状态及请求 ticket，没有额外增加无行为的布局/controller 文件。关闭预览不卸载当前会话面板，文件变化不强制改变选择或重新打开面板。
 - 单层 52px 顶栏；预览默认占可用区约 45%，聊天/预览分别至少 420px，不足时覆盖阅读。纯图标按钮统一 Radix Tooltip；Tabs/Menu/Dialog 保留键盘、焦点和名称语义。设置及重命名错误在对应弹窗内呈现。
 
 ### 后台验收
@@ -366,3 +376,7 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 - 启动时清理已退役提供方的 credential/endpoint/catalog/connectionRevision/thinking 元数据；退役的默认提供方回到 DeepSeek，要求配置后再使用。不删除 JSONL、会话、报告或工作区；历史模型名称仍可阅读。
 - Main 发现和 UtilityProcess 的探测/正式 SDK 请求使用 Electron `net.fetch`，遵循系统代理，禁用 Cookie 和 HTTP 缓存；生产不读取 shell key/proxy。SDK 的工具、上下文、请求序列化和原生会话格式不变。403 明确提示地区/权限受限，区别于 401 Key 鉴权失败。
 - API 依据：[DeepSeek List Models](https://api-docs.deepseek.com/api/list-models)、[OpenRouter Models](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)、[Electron net](https://www.electronjs.org/docs/latest/api/net)。DeepSeek 的实际 `/models` 响应与 OpenRouter 文档/实测共同验证接口；这些协议资料不代表逐模型产品验收。
+
+## 完整工具日志
+
+日志直接保存在 logs/{sessionId}/{sha256(toolCallId)}/{executionId}.log，不建立 SQLite 索引或 sidecar。查看前用活动工具或原生历史确认归属，再有界列举该工具目录（每页 100 条），正文分页 32 KiB；每次执行仍合计最多保存 10 MiB。Main 返回短期日志 ID，读取再次验证归属、根、普通文件和无重定向。没有新布局日志明确提示“未保存可读取的完整日志”；旧布局文件原样保留，不自动迁移或清理。资源峰值仍由执行监督使用，不为 UI 另存日志元数据。

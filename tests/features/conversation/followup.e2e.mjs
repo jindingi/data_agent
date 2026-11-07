@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -26,13 +27,11 @@ async function runningTool(page, sessionId) {
   }, 'real tool started');
 }
 
-async function listing(page, sessionId, count) {
+async function listing(page, sessionId) {
   return until(async () => {
-    const value = await rpc(page, { type: 'artifacts.list', sessionId });
-    return value.versions.length === count && value.versions.every((v) => v.state === 'published')
-      ? value
-      : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 
 const writeReport = (content) => ({
@@ -84,9 +83,9 @@ export const cases = {
       );
       assert.deepEqual(final.queuedInputs, []);
       const outputs = await listing(page, sessionId, 1),
-        reports = outputs.files.filter((f) => f.relativePath === 'report.md');
+        reports = outputs.filter((f) => f.relativePath === 'report.md');
       assert.deepEqual(
-        reports.map((f) => readFileSync(f.path, 'utf8')),
+        reports.map((f) => readFileSync(join(final.outputDirectory, f.relativePath), 'utf8')),
         ['# Followup 2'],
       );
       assert.equal(final.outputDirectory, active.outputDirectory);

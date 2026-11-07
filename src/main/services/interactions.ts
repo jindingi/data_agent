@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type Database from 'better-sqlite3';
 import type { Interaction, InteractionAnswer } from '../../shared/tools';
 import { AppError } from '../../shared/errors';
 
@@ -13,11 +12,6 @@ export class InteractionBroker {
       cleanup: () => void;
     }
   >();
-  constructor(private db: Database.Database) {
-    db.prepare("UPDATE interactions SET state='cancelled',resolved_at=? WHERE state='pending'").run(
-      new Date().toISOString(),
-    );
-  }
   request(
     value: Omit<Interaction, 'id'>,
     signal: AbortSignal,
@@ -27,19 +21,6 @@ export class InteractionBroker {
     const interaction: Interaction = { ...value, id: randomUUID() };
     return new Promise<InteractionAnswer>((resolve, reject) => {
       const cancel = () => this.cancel(interaction.id);
-      this.db
-        .prepare('INSERT INTO interactions VALUES (?,?,?,?,?,?,?,?,?,NULL)')
-        .run(
-          interaction.id,
-          interaction.sessionId,
-          interaction.runId,
-          interaction.hostEpoch,
-          interaction.toolCallId,
-          interaction.kind,
-          JSON.stringify(interaction),
-          'pending',
-          new Date().toISOString(),
-        );
       this.pending.set(interaction.id, {
         value: interaction,
         resolve,
@@ -68,17 +49,6 @@ export class InteractionBroker {
     )
       throw new AppError('INTERACTION_EXPIRED', '这项请求已结束或不匹配，操作没有再次执行');
     this.pending.delete(binding.id);
-    const state =
-      answer.kind === 'approval'
-        ? answer.decision === 'allow_once'
-          ? 'approved'
-          : 'denied'
-        : answer.answer === null
-          ? 'denied'
-          : 'answered';
-    this.db
-      .prepare('UPDATE interactions SET state=?,resolved_at=? WHERE id=?')
-      .run(state, new Date().toISOString(), binding.id);
     pending.cleanup();
     pending.resolve(answer);
   }
@@ -86,9 +56,6 @@ export class InteractionBroker {
     const pending = this.pending.get(id);
     if (!pending) return;
     this.pending.delete(id);
-    this.db
-      .prepare("UPDATE interactions SET state='cancelled',resolved_at=? WHERE id=?")
-      .run(new Date().toISOString(), id);
     pending.cleanup();
     pending.reject(new AppError('CANCELLED', '交互已取消，未执行待批准操作'));
   }

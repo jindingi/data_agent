@@ -14,7 +14,6 @@ import { RuntimeService } from './services/runtime';
 import { ToolService } from './services/tools';
 import { DeletionService } from './services/deletion';
 import { LogService } from './services/logs';
-import { ArtifactService } from './services/artifacts';
 import { InteractionBroker } from './services/interactions';
 import { getRuntimePaths } from '../node/runtime-paths';
 import type { ModelOption } from '../shared/runtime';
@@ -59,7 +58,6 @@ let window: BrowserWindow | null = null;
 let host: AgentProcess | undefined;
 let db: ReturnType<typeof openDatabase> | undefined;
 let runtime: RuntimeService | undefined;
-let artifacts: ArtifactService | undefined;
 let deletion: DeletionService | undefined;
 let quitting = false;
 
@@ -108,20 +106,7 @@ if (primaryInstance)
           window.webContents.send(IPC_EVENT, { type: 'host.status', status });
       });
       const credentials = new CredentialService(db, safeStorage);
-      artifacts = new ArtifactService(
-        db,
-        sessions,
-        (bytes) => !nativeImage.createFromBuffer(bytes).isEmpty(),
-        (sessionId) => {
-          if (window && !window.isDestroyed())
-            window.webContents.send(IPC_EVENT, { type: 'artifacts.changed', sessionId });
-        },
-      );
-      for (const session of [...sessions.list(), ...sessions.list('', true)])
-        if (session.state !== 'deleting')
-          for (const version of artifacts.list(session.id).versions)
-            if (version.state === 'open') void artifacts.publish(version.id);
-      const interactions = new InteractionBroker(db);
+      const interactions = new InteractionBroker();
       const logs = new LogService(paths.logs, async (sessionId, toolCallId) => {
         sessions.get(sessionId);
         const snapshot = await runtime?.restoreSnapshot(sessionId);
@@ -160,7 +145,6 @@ if (primaryInstance)
         changed: changed,
         tools: tools,
         testBaseUrl: automation ? process.env.DATA_AGENT_TEST_MODEL_BASE_URL : undefined,
-        artifacts: artifacts,
         skillsDirectory,
         agentConfigs,
       });
@@ -187,6 +171,7 @@ if (primaryInstance)
         [
           paths.sessions,
           paths.logs,
+          join(paths.home, 'backups'),
           paths.database,
           `${paths.database}-wal`,
           `${paths.database}-shm`,
@@ -228,7 +213,6 @@ if (primaryInstance)
               return null;
             }
           : undefined,
-        artifacts: artifacts,
         logs: logs,
         deletion: deletion,
       });
@@ -294,7 +278,6 @@ app.on('before-quit', (event) => {
   host?.stop();
   void Promise.resolve(stopped)
     .then(() => deletion?.settled())
-    .then(() => artifacts?.settled())
     .finally(() => {
       db?.close();
       db = undefined;

@@ -22,7 +22,6 @@ export interface PolicyContext {
   workingDirectory?: string;
   protectedRoots: string[];
   inputs: string[];
-  published: string[];
 }
 export interface PolicyDecision {
   decision: 'allow' | 'ask' | 'deny';
@@ -56,9 +55,6 @@ export class PolicyService {
     const runtimeRoot = await canonicalPath(this.runtime.root, workspace);
     const helpers = await canonicalPath(dirname(this.runtime.helpers), workspace);
     const inputs = await Promise.all(context.inputs.map((path) => canonicalPath(path, workspace)));
-    const published = await Promise.all(
-      context.published.map((path) => canonicalPath(path, workspace)),
-    );
     const mark = (decision: 'ask' | 'deny', reason: string) => {
       if (result.decision !== 'deny') result.decision = decision;
       if (!result.reasons.includes(reason)) result.reasons.push(reason);
@@ -85,10 +81,6 @@ export class PolicyService {
           inside(helpers, actual)
         )
           mark('deny', '禁止修改内置运行时或可信辅助脚本');
-        else if (
-          published.some((file) => file === actual || (action === 'delete' && inside(file, actual)))
-        )
-          mark('deny', '历史版本产物不可覆盖，请将新产物写入会话工作区');
         else if (
           inputs.some((file) => file === actual || (action === 'delete' && inside(file, actual)))
         )

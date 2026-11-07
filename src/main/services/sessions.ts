@@ -1,12 +1,10 @@
 import type { AgentConfigService } from './agent-config';
-import { inspectFiles } from './file-selection';
-import { inputTextPreview, checkedInputPath } from './text-preview';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, realpathSync, statSync, rmdirSync } from 'node:fs';
 import { AppError } from '../../shared/errors';
-import { type SessionRecord, type FileReference } from '../../shared/models';
+import { type SessionRecord } from '../../shared/models';
 import { inspectSessionFile } from '../../node/session-integrity';
 import type { AppPaths } from '../../node/app-paths';
 
@@ -53,7 +51,7 @@ export class SessionService {
           now,
         );
       this.agentConfigs?.bindNew(id);
-      if (intent) this.db.prepare('INSERT INTO conversation_intents VALUES (?)').run(id);
+      if (intent) this.db.prepare('UPDATE sessions SET creation_pending=1 WHERE id=?').run(id);
     })();
     try {
       mkdirSync(workspace, { mode: 0o700 });
@@ -69,14 +67,20 @@ export class SessionService {
     }
   }
   recoverIntents() {
-    for (const row of this.db.prepare('SELECT session_id FROM conversation_intents').all() as {
+    for (const row of this.db
+      .prepare('SELECT id AS session_id FROM sessions WHERE creation_pending=1')
+      .all() as {
       session_id: string;
     }[])
       this.rollbackEmpty(row.session_id);
   }
   rollbackEmpty(id: string) {
-    if (this.db.prepare('SELECT id FROM runs WHERE session_id=?').get(id)) {
-      this.db.prepare('DELETE FROM conversation_intents WHERE session_id=?').run(id);
+    if (
+      this.db
+        .prepare('SELECT execution_id FROM sessions WHERE id=? AND execution_id IS NOT NULL')
+        .get(id)
+    ) {
+      this.db.prepare('UPDATE sessions SET creation_pending=0 WHERE id=?').run(id);
       return;
     }
     const session = this.get(id);
@@ -134,60 +138,12 @@ export class SessionService {
         .run(result.state, result.piSessionId, result.error, row.id);
     }
   }
-  files(sessionId: string): FileReference[] {
+  sources(sessionId: string): string[] {
     this.get(sessionId);
-    const files = this.db
-      .prepare(
-        'SELECT id, session_id AS sessionId, path, name, size FROM file_refs WHERE session_id=? ORDER BY added_at, id',
-      )
-      .all(sessionId) as Omit<FileReference, 'missing'>[];
-    return files.map((f) => ({ ...f, missing: !existsSync(f.path) }));
-  }
-  private inputReference(sessionId: string, fileId: string) {
-    const file = this.files(sessionId).find((file) => file.id === fileId);
-    if (!file) throw new AppError('FILE_NOT_FOUND', '文件未关联到当前会话');
-    return file;
-  }
-  private previewProtectedRoots() {
-    return [
-      this.paths.sessions,
-      this.paths.logs,
-      this.paths.database,
-      `${this.paths.database}-wal`,
-      `${this.paths.database}-shm`,
-    ];
-  }
-  previewFile(sessionId: string, fileId: string) {
-    return inputTextPreview(
-      this.inputReference(sessionId, fileId).path,
-      this.previewProtectedRoots(),
-    );
-  }
-  inputLocation(sessionId: string, fileId: string) {
-    return checkedInputPath(
-      this.inputReference(sessionId, fileId).path,
-      this.previewProtectedRoots(),
-    );
-  }
-  addFiles(sessionId: string, selected: string[]) {
-    this.assertMutable(sessionId);
-    const current = this.files(sessionId);
-    const seen = new Set(current.map((f) => f.path));
-    const additions = inspectFiles([...current.map((f) => f.path), ...selected])
-      .filter((file) => !seen.has(file.path))
-      .map((file) => ({ ...file, id: randomUUID(), sessionId }));
-    this.db.transaction(() => {
-      const insert = this.db.prepare(
-        'INSERT INTO file_refs (id,session_id,path,name,size,added_at) VALUES (?,?,?,?,?,?)',
-      );
-      for (const f of additions)
-        insert.run(f.id, sessionId, f.path, f.name, f.size, new Date().toISOString());
-    })();
-    return this.files(sessionId);
-  }
-  removeFile(sessionId: string, fileId: string) {
-    this.assertMutable(sessionId);
-    this.db.prepare('DELETE FROM file_refs WHERE id=? AND session_id=?').run(fileId, sessionId);
-    return this.files(sessionId);
+    return (
+      this.db
+        .prepare('SELECT path FROM session_sources WHERE session_id=? ORDER BY path')
+        .all(sessionId) as { path: string }[]
+    ).map((row) => row.path);
   }
 }

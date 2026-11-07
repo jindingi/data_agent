@@ -54,7 +54,7 @@ export const cases = {
       assert.equal(await page.getByRole('textbox', { name: '分析需求' }).inputValue(), '');
       assert.equal(await page.locator('.attachment-list').count(), 0);
       await page.getByLabel('本次附件').getByText('data.csv', { exact: true }).waitFor();
-      assert.equal((await rpc(page, { type: 'sessions.open', sessionId: id })).files.length, 1);
+      assert(fixture.requests.some((r) => JSON.stringify(r.messages).includes(csv)));
       assert(
         fixture.requests[0].messages.some(
           (m) => m.role === 'user' && JSON.stringify(m.content).includes(csv),

@@ -1,3 +1,4 @@
+import { workspaceFiles } from '../../support/desktop.mjs';
 import { openExecutionProcesses } from '../../support/desktop.mjs';
 import { openPreview } from '../../support/desktop.mjs';
 import assert from 'node:assert/strict';
@@ -12,9 +13,9 @@ const taskTool = (name, args) => ({ tool: { name, args } });
 
 async function listing(page, sessionId) {
   return until(async () => {
-    const v = await rpc(page, { type: 'artifacts.list', sessionId });
-    return v.versions.length && v.versions.every((v) => v.state === 'published') ? v : null;
-  }, 'all versions published');
+    const files = await workspaceFiles(page, sessionId);
+    return files.length ? files : null;
+  }, 'workspace files available');
 }
 export const cases = {
   async 'composer.packaged-input'({ dir }) {

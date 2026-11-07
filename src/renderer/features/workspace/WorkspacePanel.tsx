@@ -35,11 +35,15 @@ export function WorkspacePanel({
     [tab, setTab] = useState('files');
   const [showHidden, setShowHidden] = useState(false),
     [busy, setBusy] = useState(false);
-  const [directories, setDirectories] = useState<Record<string, WorkspaceListing>>({});
+  const [directories, setDirectories] = useState<
+    Record<string, WorkspaceListing & { error?: string }>
+  >({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
   const [selected, setSelected] = useState<WorkspaceEntry>();
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   const [preview, setPreview] = useState<WorkspacePreview>();
   const [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -66,18 +70,30 @@ export function WorkspacePanel({
             ] as const;
           } catch (error) {
             if (id === 'root') throw error;
-            return [id, { entries: [], truncated: false }] as const;
+            return [
+              id,
+              { entries: [], truncated: false, error: (error as Error).message },
+            ] as const;
           }
         }),
       );
       if (ticket !== epoch.current) return;
       const next = Object.fromEntries(values);
       setDirectories(next);
-      setSelected((previous) => {
-        if (!previous) return previous;
-        const current = values.flatMap(([, v]) => v.entries).find((e) => e.id === previous.id);
-        return current ?? previous;
-      });
+      const previous = selectedRef.current;
+      let current =
+        previous && values.flatMap(([, v]) => v.entries).find((e) => e.id === previous.id);
+      if (previous && !current) {
+        // Relative links can select a file whose parent is not expanded in the tree.
+        current = await request({
+          type: 'workspace.resolve',
+          sessionId,
+          entryId: previous.id,
+          href: encodeURIComponent(previous.name),
+        });
+      }
+      if (ticket !== epoch.current) return;
+      if (selectedRef.current?.id === previous?.id && current) setSelected(current);
     } catch (error) {
       if (ticket === epoch.current) setError((error as Error).message);
     } finally {
@@ -215,7 +231,12 @@ export function WorkspacePanel({
         {listing.truncated && (
           <li className="artifact-notice">仅显示部分条目，请在 Finder 中查看全部内容。</li>
         )}
-        {!listing.entries.length && (
+        {listing.error && (
+          <li role="alert" className="artifact-notice">
+            {listing.error}
+          </li>
+        )}
+        {!listing.error && !listing.entries.length && (
           <li className="artifact-notice">{id === 'root' ? '工作区暂无文件' : '空目录'}</li>
         )}
       </ul>
@@ -337,6 +358,8 @@ export function WorkspacePanel({
           ) : preview ? (
             preview.image ? (
               <ZoomImage src={preview.image} alt={preview.entry.relativePath} />
+            ) : preview.text === '' ? (
+              <p className="artifact-notice">文件为空</p>
             ) : preview.text !== undefined ? (
               preview.entry.name.toLowerCase().endsWith('.md') && !source ? (
                 <WorkspaceReport preview={preview} choose={choose} onError={setError} />

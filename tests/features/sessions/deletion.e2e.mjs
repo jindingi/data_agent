@@ -43,11 +43,7 @@ export const cases = {
       };
       fixture.set(loop, loop);
       const { id: a } = await createStoredSession(page, true);
-      await rpc(page, { type: 'files.pick', sessionId: a });
-      await until(
-        async () => (await rpc(page, { type: 'sessions.open', sessionId: a })).files.length === 1,
-        'CSV registered',
-      );
+      await page.getByRole('button', { name: '添加 CSV 文件', exact: true }).click();
       await rpc(page, { type: 'sessions.rename', sessionId: a, title: 'Delete A' });
       await page.getByRole('textbox', { name: '分析需求' }).fill('Keep working until stopped.');
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
