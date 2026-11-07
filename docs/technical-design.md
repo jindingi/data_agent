@@ -204,6 +204,10 @@ Host 接收 `agentConfig` 快照，通过现有 `createAgentSession` 初始化�
 
 Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Agent 配置、本地与诊断；Agent 编辑与只读会话详情位于 `features/agent-config/`。IPC 为 `agentConfig.get/save` 和 `sessions.agentConfig`，Renderer 不提供文件路径。编辑页保留跨分类草稿，关闭时确认未保存修改，统一保存/撤销；默认版本与会话实际版本分别显示，旧版本不视为故障。
 
+完整提示词预览通过 `agentConfig.preview` IPC 交给 Host；Main 验证草稿与默认修订号并提供可信 skill 元数据，Renderer 不拼接提示词或导入 SDK。`agent/workbench-session.ts` 的 `createWorkbenchSession` 是正式执行和预览共用的 SDK 创建入口，统一 ResourceLoader 与工具注册；`configurationResources` 提供相同的 preamble 与 skill 描述。SDK 1.5.0 没有公开独立的 prompt builder，因此预览使用显式内存 SessionManager/SettingsManager、无凭证且禁用网络发现的 ModelRuntime、无扩展和拒绝执行的工具代理，从 SDK `session.systemPrompt` 取得真实文本后立即 dispose；不调用 prompt、不创建文件/进程或请求模型。仅展开时加载，编辑防抖 250ms，旧请求结果不能覆盖新草稿。工作区使用绝对占位路径，skill 使用当前修订的可信快照路径；保留 SDK 的 `<skills>`、`<available_skills>`、`<cwd>` 标签与顺序。工具参数另在 API tools 字段，不伪装成系统提示词内容。
+
+会话详情优先使用原生 JSONL 投影的 `getCurrentSystemMessage` 与 SDK `getSystemMessageText`，显示已记录的当前系统提示词，不能按最新模板重建历史。尚无系统记录才用该会话绑定配置组装，并标明来源；读取不修改 JSONL。此调整不改变已有发送内容、配置修订或前缀。
+
 开发服务使用构建配置提供的资源根，避免 Vite `--entry` 使 `app.getAppPath()` 指向构建入口后找不到内置 skill/runtime；真实目录只在 serve 模式注入，生产构建为空字符串并使用应用自身资源路径，不将开发者绝对路径带入 .app。恢复会话时校验完整系统段（含顺序）和工具声明，不删除无法识别的历史段；不兼容时停止并提示配置待确认。
 
 本地真实测试固定：

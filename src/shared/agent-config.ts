@@ -92,6 +92,11 @@ export interface SessionAgentConfig {
   defaultRevision: number;
   error: string | null;
   workspace: string;
+  prompt?: AgentPromptView;
+}
+export interface AgentPromptView {
+  text: string;
+  source: 'assembled' | 'history';
 }
 /** Stable application constraints; behavior text is the only editable prompt section. */
 export function composeAgentPrompt(workspace: string, config: AgentConfig): string {

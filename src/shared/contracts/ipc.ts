@@ -2,6 +2,7 @@ import {
   agentConfigSchema,
   type AgentConfigSettings,
   type SessionAgentConfig,
+  type AgentPromptView,
 } from '../agent-config';
 import { z } from 'zod';
 import {
@@ -19,6 +20,14 @@ import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maint
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...base,
+      type: z.literal('agentConfig.preview'),
+      config: agentConfigSchema,
+      expectedRevision: z.number().int().positive(),
+    })
+    .strict(),
   z.object({ ...base, type: z.literal('agentConfig.get') }).strict(),
   z
     .object({
@@ -283,6 +292,7 @@ export type AppEvent =
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'agentConfig.preview': AgentPromptView;
   'agentConfig.get': AgentConfigSettings;
   'agentConfig.save': AgentConfigSettings;
   'sessions.agentConfig': SessionAgentConfig;

@@ -32,12 +32,34 @@ export async function dispatchCommand(
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'agentConfig.preview': {
+      const result = await host.request({
+        type: 'agentConfig.preview',
+        binding: agentConfigs.preview(command.config, command.expectedRevision),
+        workspace: '/〈新会话工作区〉',
+      });
+      return success(command.type, { text: result.text, source: result.source });
+    }
     case 'agentConfig.get':
       return success(command.type, agentConfigs.settings());
     case 'agentConfig.save':
       return success(command.type, agentConfigs.save(command.config, command.expectedRevision));
-    case 'sessions.agentConfig':
-      return success(command.type, agentConfigs.details(command.sessionId));
+    case 'sessions.agentConfig': {
+      const details = agentConfigs.details(command.sessionId);
+      if (details.binding) {
+        const session = sessions.get(command.sessionId);
+        const result = await host.request({
+          type: 'agentConfig.preview',
+          binding: details.binding,
+          workspace: details.workspace,
+          ...(session.state === 'persisted' && session.piSessionId
+            ? { history: { file: session.sessionFile, piSessionId: session.piSessionId } }
+            : {}),
+        });
+        details.prompt = { text: result.text, source: result.source };
+      }
+      return success(command.type, details);
+    }
     case 'files.choose':
       return success(command.type, inspectFiles(await picker.chooseFiles()));
     case 'files.inspect':

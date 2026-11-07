@@ -43,7 +43,7 @@ export function SessionAgentConfigDialog({
         {value && (
           <>
             {value.binding ? (
-              <AgentConfigDetails binding={value.binding} workspace={value.workspace} />
+              <AgentConfigDetails binding={value.binding} prompt={value.prompt} />
             ) : (
               <p role="alert" className="maintenance-error">
                 配置待确认：{value.error}。原会话已保留，继续运行前需要恢复配置记录。

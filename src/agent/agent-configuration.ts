@@ -20,6 +20,12 @@ export function configuredSkills(binding: AgentBinding): Skill[] {
     sourceInfo: { path: s.filePath, source: 'bundled', scope: 'temporary', origin: 'top-level' },
   }));
 }
+export function configurationResources(binding: AgentBinding, workspace: string) {
+  return {
+    prompt: binding.legacyPreamble ?? composeAgentPrompt(workspace, binding.config),
+    skills: configuredSkills(binding),
+  };
+}
 /** Check before allowing pi to rebuild a prompt. Never silently patch an existing prefix. */
 export function bindAgentConfiguration(
   manager: SessionManager,
@@ -45,8 +51,7 @@ export function bindAgentConfiguration(
     );
   const messages = manager.buildSessionProjection().messages;
   const previous = getCurrentSystemMessage(messages);
-  const prompt = binding.legacyPreamble ?? composeAgentPrompt(workspace, binding.config);
-  const skills = configuredSkills(binding);
+  const { prompt, skills } = configurationResources(binding, workspace);
   if (previous) {
     const expectedSkills = skills.length
       ? `<skills>\n${formatSkillsForPrompt(skills).trim()}\n</skills>`

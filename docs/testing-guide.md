@@ -148,3 +148,5 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 `pnpm test -- --feature agent-config` 执行配置 schema 与真实 SDK 请求测试、SQLite 版本/历史恢复、并发排队绑定与 Main 工具检查、后台 CDP 设置交互。`agent-config.requests` 比较实际序列化请求，覆盖 skill 开关、全部工具关闭、工具循环、steer/follow-up、新附件和重启；普通全量中的 `conversation.retry-compaction` 继续覆盖明确的压缩边界。`agent-config.settings` 覆盖三尺寸/深浅主题、未保存关闭确认、保存冲突保留草稿、只读版本详情与新会话不提前创建。
 
 重放场景把 APP_ROOT 路径绑定到当前 skill 快照根，并在请求前核对快照正文与内置正文相同；只是可移植路径发生变化，完整请求匹配、原响应与 usage 样本保持不变。没有删除提示词或工具字段的匹配，也没有 live 回退。
+
+`agent-config.requests` 同时比较预览与最终 HTTP 请求中的 system 文本，覆盖启用/关闭 skill 和全工具关闭；历史预览必须等于原生记录且 JSONL 字节不变。`agent-config.settings` 验证展开加载、草稿更新、真实 XML 标签与顺序、工具/skill 关闭后的预览、会话详情与实际请求逐字一致，并检查预览不增加模型调用或会话数量。

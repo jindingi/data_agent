@@ -6,6 +6,7 @@ import { SessionRuntime } from './session-runtime';
 import { createModelRuntime, modelCatalog } from './models';
 import { testModelConnection } from './model-connection';
 import { ToolClient } from './tool-client';
+import { previewAgentPrompt } from './prompt-preview';
 
 // Use the same system proxy as Main model discovery, without cookies or cached responses.
 const modelFetch: typeof fetch = (input, init) =>
@@ -42,6 +43,13 @@ parent.on('message', ({ ports }) => {
     if (tools.receive(request)) return;
     try {
       switch (request.type) {
+        case 'agentConfig.preview':
+          port.postMessage({
+            type: 'agentConfig.previewed',
+            id: request.id,
+            ...(await previewAgentPrompt(request.binding, request.workspace, request.history)),
+          });
+          break;
         case 'ping':
           port.postMessage({ type: 'pong', id: request.id, text: request.text, pid: process.pid });
           break;

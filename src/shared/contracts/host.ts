@@ -29,6 +29,18 @@ const runtimeConfigSchema = z
   })
   .strict();
 export const hostRequestSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      id,
+      type: z.literal('agentConfig.preview'),
+      binding: agentBindingSchema,
+      workspace: z.string().min(1),
+      history: z
+        .object({ file: z.string().min(1), piSessionId: z.string().min(1) })
+        .strict()
+        .optional(),
+    })
+    .strict(),
   z.object({ id, type: z.literal('tool.result'), result: toolResultSchema }).strict(),
   z.object({ id, type: z.literal('tool.update'), output: z.string() }).strict(),
   z
@@ -67,6 +79,14 @@ export const hostRequestSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('runtime.snapshot') }).strict(),
 ]);
 export const hostResponseSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('agentConfig.previewed'),
+      id,
+      text: z.string(),
+      source: z.enum(['assembled', 'history']),
+    })
+    .strict(),
   z
     .object({
       id,
@@ -124,6 +144,7 @@ export type HostInput = HostRequest extends infer T
   : never;
 type HostResponse = z.infer<typeof hostResponseSchema>;
 export interface HostResponses {
+  'agentConfig.preview': Extract<HostResponse, { type: 'agentConfig.previewed' }>;
   ping: Extract<HostResponse, { type: 'pong' }>;
   'history.read': Extract<HostResponse, { type: 'history' }>;
   'models.list': Extract<HostResponse, { type: 'models' }>;
@@ -135,6 +156,7 @@ export interface HostResponses {
 }
 export type HostCommand = Extract<HostInput, { type: keyof HostResponses }>;
 export const hostReplyTypes = {
+  'agentConfig.preview': 'agentConfig.previewed',
   ping: 'pong',
   'history.read': 'history',
   'models.list': 'models',

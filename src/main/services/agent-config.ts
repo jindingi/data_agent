@@ -82,6 +82,14 @@ export class AgentConfigService {
     })();
     return this.settings();
   }
+  preview(config: AgentConfig, expectedRevision: number): AgentBinding {
+    if (this.current().revision !== expectedRevision)
+      throw new AppError('CONFIG_CONFLICT', '配置已更新，请重新加载后查看预览');
+    return this.build(
+      normalizeAgentConfig(config),
+      this.editableSkills().filter((s) => config.enabledSkills.includes(s.id)),
+    );
+  }
   private editableSkills() {
     const saved = this.current().skills;
     return this.bundled.map((skill) => saved.find((s) => s.id === skill.id) ?? skill);

@@ -1,12 +1,12 @@
 import {
   agentConfigSchema,
-  composeAgentPrompt,
   normalizeAgentConfig,
   toolIds,
   toolLabels,
 } from '../../../shared/agent-config';
 import { Button } from '../../components/ui/button';
 import type { AgentConfigController } from './use-agent-config';
+import { PromptPreview } from './PromptPreview';
 
 export function AgentConfigSettings({ controller }: { controller: AgentConfigController }) {
   const { settings, draft, setDraft, busy, error, notice } = controller;
@@ -65,20 +65,7 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
           </Button>
           <span>{draft.systemPrompt.length.toLocaleString()} / 32,000 字符</span>
         </div>
-        <details className="agent-config-details">
-          <summary>查看完整提示词与 Skills 索引</summary>
-          <p>预览使用当前草稿；工作区在新会话创建后确定。技能路径由应用生成。</p>
-          <pre>
-            {composeAgentPrompt('〈新会话工作区〉', draft)}
-            {draft.enabledSkills.length
-              ? '\n\n启用的 Skills（按需通过 read 读取）：\n' +
-                settings.availableSkills
-                  .filter((s) => draft.enabledSkills.includes(s.id))
-                  .map((s) => `${s.name}\n${s.description}\n位置：〈此版本的内置 skill 快照〉`)
-                  .join('\n')
-              : ''}
-          </pre>
-        </details>
+        <PromptPreview config={draft} revision={settings.current.revision!} />
       </section>
       <section className="settings-section">
         <h3>工具</h3>

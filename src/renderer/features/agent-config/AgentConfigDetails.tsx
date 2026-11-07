@@ -1,11 +1,11 @@
-import { composeAgentPrompt, toolLabels, type AgentBinding } from '../../../shared/agent-config';
+import { toolLabels, type AgentBinding, type AgentPromptView } from '../../../shared/agent-config';
 
 export function AgentConfigDetails({
   binding,
-  workspace,
+  prompt,
 }: {
   binding: AgentBinding;
-  workspace: string;
+  prompt?: AgentPromptView;
 }) {
   return (
     <div className="agent-config-details">
@@ -15,7 +15,12 @@ export function AgentConfigDetails({
       </p>
       <details>
         <summary>系统提示词</summary>
-        <pre>{binding.legacyPreamble ?? composeAgentPrompt(workspace, binding.config)}</pre>
+        <p>
+          {prompt?.source === 'history'
+            ? '来自此会话原生记录中的当前系统提示词。'
+            : '尚无已记录的系统提示词，以下按此会话固定配置组装。'}
+        </p>
+        {prompt ? <pre aria-label="会话系统提示词">{prompt.text}</pre> : <p>系统提示词不可用。</p>}
       </details>
       <details>
         <summary>启用的工具（{binding.config.enabledTools.length}）</summary>

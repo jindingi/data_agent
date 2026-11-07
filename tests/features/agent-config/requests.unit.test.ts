@@ -15,6 +15,7 @@ import type { RuntimeSnapshot } from '../../../src/shared/runtime';
 import { systemPrompt } from '../../../src/agent/runtime-context';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { bindAgentConfiguration } from '../../../src/agent/agent-configuration';
+import { previewAgentPrompt } from '../../../src/agent/prompt-preview';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -154,6 +155,11 @@ it.each([true, false])(
     await vi.waitFor(() => expect(snapshot?.state).toBe('completed'), { timeout: 8000 });
     expect(payloads.length).toBeGreaterThanOrEqual(3);
     const firstSystem = JSON.stringify(payloads[0].messages[0]);
+    const preview = await previewAgentPrompt(agentConfig, config.workspace);
+    expect(preview.source).toBe('assembled');
+    expect(preview.text).toBe((payloads[0].messages[0] as { content: string }).content);
+    expect(preview.text).toContain('<cwd>');
+    expect(preview.text.includes('<skills>')).toBe(withSkill);
     expect(firstSystem).toContain('Synthetic custom instructions.');
     expect(firstSystem.includes('<available_skills>')).toBe(withSkill);
     if (!withSkill) expect(firstSystem).not.toContain('data-analysis');
@@ -163,6 +169,13 @@ it.each([true, false])(
       .split('\n')
       .map((line) => JSON.parse(line));
     expect(records.filter((e) => e.customType === 'data_agent.agent_config')).toHaveLength(1);
+    const beforePreview = readFileSync(config.file, 'utf8');
+    const historyPreview = await previewAgentPrompt(agentConfig, config.workspace, {
+      file: config.file,
+      piSessionId: records[0].id,
+    });
+    expect(historyPreview).toEqual({ text: preview.text, source: 'history' });
+    expect(readFileSync(config.file, 'utf8')).toBe(beforePreview);
     await runtime.dispose();
     snapshot = undefined;
     runtime = await SessionRuntime.create(
@@ -201,7 +214,8 @@ it('registers no fallback tools when all tools and skills are disabled', async (
   cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'workspace'));
   mkdirSync(join(root, 'sessions'));
-  let payload: { tools?: unknown[] } | undefined, snapshot: RuntimeSnapshot | undefined;
+  let payload: { tools?: unknown[]; messages: { content: string }[] } | undefined,
+    snapshot: RuntimeSnapshot | undefined;
   vi.stubGlobal(
     'fetch',
     async () =>
@@ -211,6 +225,7 @@ it('registers no fallback tools when all tools and skills are disabled', async (
       ),
   );
   const execute = vi.fn();
+  const agentConfig = binding({ ...defaultAgentConfig, enabledTools: [], enabledSkills: [] });
   const runtime = await SessionRuntime.create(
     {
       sessionId: randomUUID(),
@@ -222,7 +237,7 @@ it('registers no fallback tools when all tools and skills are disabled', async (
       model: { provider: 'deepseek', model: 'deepseek-flash' },
       apiKey: 'synthetic',
       protectedRoots: [],
-      agentConfig: binding({ ...defaultAgentConfig, enabledTools: [], enabledSkills: [] }),
+      agentConfig,
     },
     (value) => {
       snapshot = value;
@@ -240,4 +255,6 @@ it('registers no fallback tools when all tools and skills are disabled', async (
   expect(payload?.tools ?? []).toHaveLength(0);
   expect(execute).not.toHaveBeenCalled();
   expect(JSON.stringify(payload)).not.toContain('available_skills');
+  const preview = await previewAgentPrompt(agentConfig, join(root, 'workspace'));
+  expect(preview.text).toBe(payload!.messages[0].content);
 });

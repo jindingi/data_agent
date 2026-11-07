@@ -7,7 +7,6 @@ import { requestEvidence } from './request-evidence';
 import { systemPrompt } from './runtime-context';
 import { dirname } from 'node:path';
 import {
-  createAgentSession,
   createExtensionRuntime,
   loadSkillsFromDir,
   SessionManager,
@@ -21,7 +20,7 @@ import {
 import type { ModelChoice, RunInput, ThinkingLevel, RuntimeSnapshot } from '../shared/runtime';
 import { AppError } from '../shared/errors';
 import { inspectSessionFile } from '../node/session-integrity';
-import { createResourceLoader } from './resource-loader';
+import { createWorkbenchSession } from './workbench-session';
 import { createModelRuntime } from './models';
 import { InputIdentity, trustedExtension, inputId, messageText } from './input-identity';
 import { EventAdapter } from './event-adapter';
@@ -176,7 +175,7 @@ export class SessionRuntime {
           registeredTools,
         )
       : undefined;
-    const loader = createResourceLoader({
+    const resources = {
       systemPrompt:
         configured?.prompt ??
         priorSystem?.sections?.preamble ??
@@ -187,8 +186,8 @@ export class SessionRuntime {
           ? loadSkillsFromDir({ dir: config.skillsDirectory, source: 'bundled' }).skills
           : []),
       extensions: { extensions: [handlers], errors: [], runtime: createExtensionRuntime() },
-    });
-    const { session } = await createAgentSession({
+    };
+    const { session } = await createWorkbenchSession({
       cwd: priorCwd ?? config.workspace,
       agentDir: dirname(config.file),
       sessionManager: instance.manager,
@@ -202,9 +201,8 @@ export class SessionRuntime {
         followUpMode: 'one-at-a-time',
         cacheWarming: 'off',
       }),
-      resourceLoader: loader,
-      tools: registeredTools.map((tool) => tool.name),
-      customTools: registeredTools,
+      resources,
+      registeredTools,
     });
     instance.session = session;
     instance.unsubscribeTools = dependencies?.tools?.subscribe((interactions) => {

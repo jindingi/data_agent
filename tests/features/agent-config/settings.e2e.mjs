@@ -29,7 +29,35 @@ export const cases = {
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByRole('tab', { name: 'Agent 配置', exact: true }).click();
       const prompt = page.getByRole('textbox', { name: '系统提示词', exact: true });
+      const beforePreview = (await rpc(page, { type: 'sessions.list' })).length;
+      const requestsBeforePreview = fixture.requests.length;
+      await page.getByText('查看完整系统提示词预览', { exact: true }).click();
+      const preview = page.locator('pre[aria-label="完整系统提示词预览"]');
+      await until(
+        async () => (await preview.textContent().catch(() => ''))?.includes('<available_skills>'),
+        'SDK preview with skill tags',
+      );
+      const previewText = await preview.innerText();
+      assert(previewText.includes('<skills>'));
+      assert(previewText.includes('<location>'));
+      assert(previewText.includes('<cwd>\n/〈新会话工作区〉\n</cwd>'));
+      await preview.hover();
+      await page.mouse.wheel(0, 900);
+      await until(
+        () => preview.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 2),
+        'read SDK preview through cwd',
+      );
+      await preview.screenshot({ path: join(root, 'sdk-prompt-preview-skills-tail.png') });
+      assert.equal((await rpc(page, { type: 'sessions.list' })).length, beforePreview);
+      assert.equal(fixture.requests.length, requestsBeforePreview);
       await prompt.fill('Synthetic configuration draft.');
+      await until(
+        async () =>
+          (await preview.textContent().catch(() => ''))?.startsWith(
+            'Synthetic configuration draft.',
+          ),
+        'preview updates from current draft',
+      );
       await page.getByRole('tab', { name: '模型与连接', exact: true }).click();
       await page.getByRole('tab', { name: 'Agent 配置', exact: true }).click();
       assert.equal(await prompt.inputValue(), 'Synthetic configuration draft.');
@@ -48,6 +76,13 @@ export const cases = {
       await page.getByRole('switch', { name: '启用 data-analysis', exact: true }).uncheck();
       for (const id of v1.config.enabledTools)
         await page.getByRole('switch', { name: `启用 ${id}`, exact: true }).uncheck();
+      await page.getByText('查看完整系统提示词预览', { exact: true }).click();
+      await until(async () => {
+        const text = await preview.textContent().catch(() => '');
+        return text?.includes('<cwd>') && !text.includes('<skills>');
+      }, 'disabled skill disappears from SDK preview');
+      await page.screenshot({ path: join(root, 'sdk-prompt-preview.png') });
+      await page.getByText('查看完整系统提示词预览', { exact: true }).click();
       for (const [width, height] of [
         [1440, 900],
         [1180, 760],
@@ -101,6 +136,17 @@ export const cases = {
       await details.getByText('系统提示词', { exact: true }).click();
       assert((await details.innerText()).includes('版本 v1'));
       assert((await details.innerText()).includes('当前默认配置为 v3'));
+      assert.equal(
+        await details.locator('pre[aria-label="会话系统提示词"]').innerText(),
+        fixture.requests[0].messages[0].content,
+      );
+      const savedPrompt = details.locator('pre[aria-label="会话系统提示词"]');
+      await savedPrompt.hover();
+      await page.mouse.wheel(0, 1200);
+      await until(
+        () => savedPrompt.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 2),
+        'read stored system prompt through cwd',
+      );
       await details.screenshot({ path: join(root, 'session-config.png') });
       const count = (await rpc(page, { type: 'sessions.list' })).length;
       await details.getByRole('button', { name: '使用最新配置新建会话', exact: true }).click();
