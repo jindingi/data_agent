@@ -220,7 +220,7 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
       }, 'three generated artifacts registered');
       assert(listing.files.every((file) => file.state === 'ready'));
       assert(listing.files.every((file) => file.path.startsWith(final.outputDirectory + '/')));
-      assert(final.outputDirectory.includes(`/runs/${final.runId}/versions/`));
+      assert(final.outputDirectory.endsWith(`/workspace/${sessionId}`));
       assert.equal(readFileSync(join(final.outputDirectory, 'report.md'), 'utf8').length > 0, true);
       assert(
         fixture.requests[0].messages.some(
@@ -241,7 +241,7 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
         'real PNG decoded in report preview',
       );
       assert.equal(await page.locator('[data-run-state="completed"]').innerText(), '执行完成');
-      await page.getByRole('button', { name: '导出这一版', exact: true }).click();
+      await page.getByRole('button', { name: '导出文件', exact: true }).click();
       await page.getByRole('status').filter({ hasText: '已导出：' }).waitFor();
       const exportRoot = join(exported, readdirSync(exported)[0]);
       assert.equal(
@@ -252,6 +252,42 @@ Path('report.md').write_text('# Delivery report\n\nThis content is not a busines
       assert(!existsSync(join(exportRoot, 'sales.csv')));
       for (let i = 0; i < 2; i++)
         assert.deepEqual(readFileSync([sourceA, sourceB][i]), original[i]);
+      // The same Markdown and image IDs must display newly written image bytes.
+      const originalImage = await image.getAttribute('src');
+      const firstChart = listing.files.find((file) => file.kind === 'png');
+      fixture.set(
+        {
+          tool: {
+            name: 'write',
+            args: {
+              path: 'analysis.py',
+              content: script
+                .replace("combined['amount']", "combined['amount'] * 2")
+                .replace("plt.title('地区销售')", "plt.title('更新后的地区销售')"),
+            },
+          },
+        },
+        { tool: { name: 'bash', args: { command: 'python3 analysis.py' } } },
+        { text: 'Updated chart in the shared workspace.' },
+      );
+      await page.getByRole('textbox', { name: '分析需求' }).fill('只更新图表，保留报告正文。');
+      await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+      await until(async () => {
+        const value = await rpc(page, { type: 'runtime.snapshot', sessionId });
+        return value?.runId !== final.runId && value?.state === 'completed';
+      }, 'chart update completed');
+      await until(async () => {
+        const next = await rpc(page, { type: 'artifacts.list', sessionId });
+        return next.files.some(
+          (file) => file.id === firstChart.id && file.sha256 !== firstChart.sha256,
+        );
+      }, 'same image ID re-registered with new hash');
+      await until(
+        async () =>
+          (await image.getAttribute('src')) !== originalImage &&
+          (await image.evaluate((node) => node.complete && node.naturalWidth > 0)),
+        'updated PNG displayed inside unchanged Markdown',
+      );
       await page.screenshot({ path: join(root, 'report-chart.png'), fullPage: true });
       assert.deepEqual(app.errors, []);
       const evidence = {

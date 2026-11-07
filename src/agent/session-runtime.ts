@@ -1,7 +1,8 @@
+import { getCurrentSystemMessage } from '@earendil-works/pi-ai';
 import { RequestBudget } from './request-budget';
 import { TurnUsageLedger } from './turn-usage';
 import { requestEvidence } from './request-evidence';
-import { systemPrompt, currentContext } from './runtime-context';
+import { systemPrompt } from './runtime-context';
 import { dirname } from 'node:path';
 import {
   createAgentSession,
@@ -11,7 +12,6 @@ import {
   SettingsManager,
   type AgentSession,
   type ContextEvent,
-  type ContextWithSystemEvent,
   type BeforeProviderRequestEvent,
   type MessageEndEvent,
   type ModelRuntime,
@@ -40,10 +40,8 @@ export interface RuntimeConfig {
   thinkingLevel?: ThinkingLevel;
   apiKey: string;
   testBaseUrl?: string;
-  outputDirectory?: string;
   skillsDirectory?: string;
   protectedRoots: string[];
-  filePaths: string[];
 }
 /** One Host, one native session writer. The caller owns admission and process lifetime. */
 export class SessionRuntime {
@@ -62,8 +60,6 @@ export class SessionRuntime {
   private redact = <T>(value: T): T => value;
   private interactions: Interaction[] = [];
   private outputDirectory: string | undefined;
-  private nextOutputInput: string | undefined;
-  private outputError: string | undefined;
   private unsubscribeTools: (() => void) | undefined;
   private constructor(private publish: (snapshot: RuntimeSnapshot) => void) {}
   static async create(
@@ -95,7 +91,7 @@ export class SessionRuntime {
     if (!['draft', 'persisted'].includes(integrity.state))
       throw new AppError('HISTORY_UNAVAILABLE', integrity.error || '会话不可用');
     const instance = new SessionRuntime(publish);
-    instance.outputDirectory = config.outputDirectory;
+    instance.outputDirectory = config.workspace;
     instance.manager = SessionManager.open(config.file, dirname(config.file), config.workspace);
     instance.identity = new InputIdentity(instance.manager);
     instance.turnUsage = new TurnUsageLedger(instance.manager);
@@ -113,42 +109,9 @@ export class SessionRuntime {
           'context',
           [
             async (event: unknown) => {
-              if (instance.nextOutputInput && dependencies?.tools?.advanceOutput) {
-                const id = instance.nextOutputInput;
-                instance.nextOutputInput = undefined;
-                try {
-                  instance.outputDirectory = await dependencies.tools.advanceOutput(id);
-                  instance.manager.appendCustomEntry('data_agent.output_version', {
-                    inputId: id,
-                    directory: instance.outputDirectory,
-                  });
-                  instance.flush();
-                } catch {
-                  instance.outputError = '无法切换后续提问的产物版本，本轮已停止。';
-                  instance.adapter.error = instance.outputError;
-                }
-              }
               const result = instance.identity.context(event as ContextEvent);
               dependencies?.onContext?.({ type: 'context', ...result });
               return result;
-            },
-          ],
-        ],
-        [
-          'context_with_system',
-          [
-            async (event: unknown) => {
-              const messages = (event as ContextWithSystemEvent).messages;
-              return {
-                messages: [
-                  ...messages,
-                  {
-                    role: 'system' as const,
-                    content: currentContext(instance.outputDirectory, instance.budget.requests),
-                    timestamp: 0,
-                  },
-                ],
-              };
             },
           ],
         ],
@@ -164,15 +127,40 @@ export class SessionRuntime {
         ],
       ]),
     );
+    const priorSystem = getCurrentSystemMessage(instance.manager.buildSessionProjection().messages);
+    // Keep the native system prefix for resumed sessions. New attachments travel with
+    // their user input; budgets are enforced at the transport boundary, never injected.
+    const priorCwd = priorSystem?.sections?.cwd?.match(/^<cwd>\n([\s\S]*)\n<\/cwd>$/)?.[1];
+    // Upgrade old run/version sessions once, by appending to history instead of rewriting
+    // an already-sent system prefix. New sessions need no extra context messages.
+    if (
+      priorCwd &&
+      priorCwd !== config.workspace &&
+      !instance.manager
+        .getEntries()
+        .some(
+          (entry) =>
+            entry.type === 'custom_message' &&
+            entry.customType === 'data_agent.workspace_migration',
+        )
+    ) {
+      instance.manager.appendCustomMessageEntry(
+        'data_agent.workspace_migration',
+        `工作台目录规则已升级：本会话后续任务统一在 ${config.workspace} 工作并保存产物；历史中的 run/version 输出目录不再用于新产物。旧文件保留供读取。这是一次性目录迁移说明，不是新的用户任务。`,
+        false,
+      );
+    }
     const loader = createResourceLoader({
-      systemPrompt: systemPrompt(config, Boolean(dependencies?.tools)),
+      systemPrompt:
+        priorSystem?.sections?.preamble ??
+        systemPrompt(config.workspace, Boolean(dependencies?.tools)),
       skills: config.skillsDirectory
         ? loadSkillsFromDir({ dir: config.skillsDirectory, source: 'bundled' }).skills
         : [],
       extensions: { extensions: [handlers], errors: [], runtime: createExtensionRuntime() },
     });
     const { session } = await createAgentSession({
-      cwd: config.outputDirectory ?? config.workspace,
+      cwd: priorCwd ?? config.workspace,
       agentDir: dirname(config.file),
       sessionManager: instance.manager,
       modelRuntime: runtime,
@@ -212,7 +200,6 @@ export class SessionRuntime {
     // public stream entry instead, so request 21 never reaches the provider (including retries).
     const stream = session.agent.streamFunction;
     session.agent.streamFunction = (...args) => {
-      if (instance.outputError) throw new Error(instance.outputError);
       try {
         instance.budget.consume();
       } catch (error) {
@@ -228,11 +215,6 @@ export class SessionRuntime {
     session.subscribe((event) => {
       if (event.type === 'message_start' && event.message.role === 'user') {
         const id = inputId(messageText(event.message));
-        if (
-          id &&
-          instance.identity.snapshot().find((input) => input.inputId === id)?.kind === 'followUp'
-        )
-          instance.nextOutputInput = id;
         if (id) instance.turnUsage.begin(id);
         instance.identity.consumed(event.message);
       }

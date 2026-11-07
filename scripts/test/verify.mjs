@@ -1,3 +1,4 @@
+import { cases as cacheUsage } from '../../tests/e2e/cache-usage.mjs';
 import { cases as turnUsage } from '../../tests/e2e/turn-usage.mjs';
 import { cases as ux } from '../../tests/e2e/ux.mjs';
 import { cases as filePreview } from '../../tests/e2e/file-preview.mjs';
@@ -78,6 +79,7 @@ function nativeCase(id) {
   return { assertion: matches[0].fullName, electronNodeABI: true };
 }
 const cases = mergeCases(
+  cacheUsage,
   executionProcess,
   turnUsage,
   filePreview,

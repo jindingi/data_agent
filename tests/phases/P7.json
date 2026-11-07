@@ -74,6 +74,7 @@
     "R-WRITES",
     "R-EXPORT",
     "R-RESOURCE-RELEASE",
+    "P2-LIVE-CACHE",
     "P7-ALL"
   ],
   "requiresBuild": true,

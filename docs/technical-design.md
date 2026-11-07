@@ -123,9 +123,8 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
   state.sqlite
   sessions/{appSessionId}.jsonl
   workspace/{appSessionId}/
-    runs/{runId}/versions/{versionId}/
-      analysis.py / report.md     # Agent 按任务生成的示例文件，并非强制清单
-      figures/*.png / tables/*.csv
+    analysis.py / report.md     # Agent 按任务生成的示例文件，并非强制清单
+    figures/*.png / tables/*.csv
     .cache/ / .tmp/
   logs/
 # CSV 仍位于用户选择的原路径，不在这里另建 inputs 副本。
@@ -154,7 +153,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 
 运行状态：queued → starting → running / waiting_approval / waiting_input → 终态 completed/failed/cancelled/interrupted。取消过程中等待实际工具回收，不单独持久化 cancelling 状态。run 启动失败或最终终态时释放会话准入许可；单工具失败或审批拒绝只结束该工具/交互，SDK 继续时不能释放许可。执行状态以 SDK/进程的实际生命周期为准，不以自然语言声明推断，也不据此判定分析正确。
 
-运行终态与文件展示状态分开：`runs.state` / `RuntimeSnapshot.state` 记录 SDK/进程是否完成；P4 的 `ArtifactRecord.state` 使用 ready/empty/too_large/invalid/changed/missing 描述文件访问和展示条件（类型还预留 unsupported）。输出版本状态为 open/published，登记错误另存 error。ready 不表示内容正确，普通文件仍可能需要导出后用其他应用打开；缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
+运行终态与文件展示状态分开：`runs.state` / `RuntimeSnapshot.state` 记录 SDK/进程是否完成；P4 的 `ArtifactRecord.state` 使用 ready/empty/too_large/invalid/changed/missing 描述文件访问和展示条件（类型还预留 unsupported）。产物目录登记状态为 open/published，登记错误另存 error；兼容字段仍名为 output_versions/versionId，共享目录并不代表历史快照。ready 不表示内容正确，普通文件仍可能需要导出后用其他应用打开；缺失报告也不改写已结束的 SDK 状态。UI 使用“执行完成”“已生成报告”“文件不存在/无法展示”，不设置表示分析正确性的状态。普通聊天允许没有产物；测试可约定必须生成某个非空文件。
 
 Host 内保留可序列化的活动投影；快照 = 当前分支持久化历史 + 活动 partial/tool/interaction/queue + seq 水位。Renderer 重载恢复该快照，再补后续事件；Host 崩溃不承诺恢复尚未落盘的每个 token。
 
@@ -171,6 +170,12 @@ SDK 原生 steer/followUp 没有应用 inputId 参数；同文本消息不能靠
 确认持久化后才把 input 标 committed；未知结果标 unknown，不能自动重放。abort 后显式清 SDK 队列，未消费输入保留未发送。同一文本的两次用户输入仍是两个 inputId。
 
 Main 在接受输入时原子登记 run_inputs 与 input_drafts，再交给 Host；全局排队时同样保留文字。重启后只读原生历史对账 committed，清理已落盘草稿；剩余未知/取消输入通过 Main 的 unsentInputs 投影呈现，可放回输入框或显式移除，不自动重发。未发送输入跨后续 run 保留，移除按会话和 inputId 校验，不能删除活动队列中的输入。JSONL 仍为唯一永久会话内容。用户主动停止会清除暂时性模型错误，以 cancelled 收束；运行超时保留限额错误，以 failed 收束。
+
+### 上下文稳定性与执行限制
+
+不再注册逐请求追加动态 system 消息的 context_with_system hook。工具结果由 pi 正常追加；附件路径经 InputIdentity 随对应用户消息投影，后续恢复保持相同位置与表示。新会话固定 system prompt/cwd/工具声明/skill 声明，预算变化不进入上下文。请求上限通过 streamFunction 入口拦截第 21 次调用（含重试），活跃执行时间和工具超时由监督机制停止；仅 UI 显示限制错误。不依赖 SDK 扩展抛错来阻断，因为某些扩展错误会被 SDK 捕获后继续请求。
+
+恢复旧会话时复用原生历史中的 system preamble/cwd，不能为升级改写已发送前缀。旧 cwd 为 run/version 目录的会话只追加一次原生隐藏 custom_message `data_agent.workspace_migration` 说明后续改用共享目录；保留原位置，重启不重复添加。这是迁移兼容，不是逐请求状态提示。新会话没有此消息。上下文压缩是唯一允许重建前缀的例外；当前提供方最终序列化请求的前缀由测试直接比较，不能仅检查中间消息数组。服务端缓存命中仍受提供方策略影响。
 
 ## 7. 通用工具、资源和模型
 
@@ -203,7 +208,7 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 | 普通外部读、正常内部读                 | allow                                                          |
 | 普通 workspace 内新文件写入            | allow                                                          |
 | 已声明源 CSV 的可识别修改              | ask，即使源文件恰好位于 workspace 内也不默写；默认分析写新产物 |
-| 已发布产物的可识别修改                 | deny；产物修改请求写新版本                                     |
+| 旧版历史目录产物的可识别修改           | deny；会话共享目录的当前产物允许更新                           |
 | state/sessions/凭证配置、敏感路径      | deny 读写                                                      |
 | 检测到 workspace 外写删                | ask                                                            |
 | 已识别 curl/wget/requests/httpx 等联网 | ask；说明可识别的目标和动作                                    |
@@ -221,13 +226,15 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 ## 9. 通用产物管理与 UI 展示
 
-应用分配 run/version 输出位置；普通提问创建新 run/version；同一持续执行 run 的 follow-up 在 SDK 实际消费输入后，通过受信 context hook 等待 Main 发布上一版并分配新版本。Main 更新工具默认目录，Host 更新该次模型上下文中的输出目录；steer 保持当前版本。版本分配失败停止本轮，不让下一次模型请求继续写旧目录。Main 在输出位置扫描候选文件并登记到 SQLite artifacts，身份、归属、真实路径、文件类型、尺寸和 hash 由 Main 获取。版本 ID 或 artifact ID 冲突拒绝登记；模型自报的文件路径仍须检查。
+同一 session 共用 SessionService 分配的 workspace。普通 prompt 创建新的运行账本，但不创建新产物目录；steer/follow-up 同样保持目录不变。system prompt 在新会话初始化时包含固定工作区、输出目录与默认工具 cwd。工具、审批和进程仍按 run 管理，不把产物目录和任务生命周期绑在一起。
 
-P4 的 `ArtifactService` 在 SDK 任务终态后扫描应用分配的输出目录；只登记普通文件，跳过隐藏文件与符号链接。每版最多 1,000 个文件、5,000 个扫描条目、500 MiB；报告预览最多 2 MiB，超限仍可导出。PNG 在大小/像素检查后交给 Electron 实际解码。空文件或损坏图片保留登记并标明无法展示，不将其状态当成任务执行或分析正确性结论。应用退出先等待已开始的目录分配/登记再关闭 SQLite，重启扫描未发布版本以保留已生成文件。
+`ArtifactService.openWorkspace` 复用 directory 等于 session.workspace 的唯一 output_versions 行，将 run_id 更新为当前任务并设为 open；该表名与 versionId 仅为兼容既有 SQLite/IPC，不再表示每轮文件快照。无需破坏性 schema 迁移。后续任务开始前等待上一任务停止写入和登记结束；启动时恢复 open 目录的登记，分配目录前等待同目录未完成扫描。任务结束后扫描工作区，按相对路径更新 size/hash/state，保留同路径 artifact ID；仅在完整扫描成功后移除已删除文件的登记。文件状态/哈希变化驱动预览重新读取，避免同 ID 下继续显示旧报告。
 
-Renderer 只请求 sessionId/artifactId，由 Main 再核对版本目录、真实路径、大小和 SHA256；预览不接受任意磁盘路径。Markdown 的相对图片只映射同版本已登记 PNG，外部图片不加载；外链只能经用户点击和 Main HTTP/HTTPS 校验后打开。整版导出保持相对目录结构，不拷贝原 CSV；已登记文件发生变化时拒绝冒充旧版本读取或导出。
+兼容策略：保留旧 output_versions/artifacts 行和原 runs/.../versions/... 文件，不搬移、不删除、不冒充当前快照。共享工作区扫描排除已登记旧版本目录及当前原 CSV 引用，隐藏文件/符号链接跳过；旧版本产物仍禁止可识别的覆盖。新生成文件直接写 workspace，可按任务更新同名文件。默认不提供每轮历史副本；需保留旧结果时用户先导出或让 Agent 另命名。新会话不显示版本选择器，有遗留版本时才显示“会话文件/历史版本”。
 
-统一文件预览补充（2026-11-07）：`files.preview/copy/reveal` 只接受 sessionId/fileId；SessionService 验证引用归属，text-preview.ts 校验真实路径、敏感目录、普通文件与读取期间状态。输入 CSV 只读当前文件前 128 KiB，并限制 2,000 行，不解析表格、不复制或冻结原文件。生成代码/文本沿用 artifact ID；仍以 64 KiB 分块校验整文件 SHA256，只保留前 128 KiB 后再限行，不能因为截断预览绕过历史版本完整性。导出仍读取完整产物。未知扩展名、二进制、非 UTF-8 明确提示，不执行源码。新增接口不接受任意路径；Finder 定位同样校验归属和真实路径。
+登记每目录最多 1,000 个普通文件、5,000 个扫描条目、500 MiB。报告预览最多 2 MiB；PNG 在大小/像素检查后实际解码。空文件或损坏图片保留状态说明，不代表任务或分析正确性。Renderer 只提交 sessionId/artifactId；Main 复核归属、真实路径、大小和 SHA256。Markdown 相对图片只映射同目录登记 PNG，不加载外部图片。导出当前登记文件并保留相对结构，每次创建独立目标目录，不覆盖已有导出；读取期间变更则失败并清理当次 staging。原 CSV 不作为产物复制。外链仍须用户点击及 Main HTTP/HTTPS 校验。
+
+统一文件预览补充（2026-11-07）：`files.preview/copy/reveal` 只接受 sessionId/fileId；SessionService 验证引用归属，text-preview.ts 校验真实路径、敏感目录、普通文件与读取期间状态。输入 CSV 只读当前文件前 128 KiB，并限制 2,000 行，不解析表格、不复制或冻结原文件。生成代码/文本沿用 artifact ID；仍以 64 KiB 分块校验整文件 SHA256，只保留前 128 KiB 后再限行，不能因为截断预览绕过登记文件完整性。导出仍读取完整产物。未知扩展名、二进制、非 UTF-8 明确提示，不执行源码。新增接口不接受任意路径；Finder 定位同样校验归属和真实路径。
 
 Renderer 的 SourcePreview 共享只读文本/行号视图，使用 highlight.js 11.11.1 的 core 与显式语言包（[官方 API](https://highlightjs.readthedocs.io/en/latest/api.html)）生成转义后的 token 标记，不自动猜测语言，不引入编辑器。最多对 32,768 字符高亮，更长内容使用纯文本；UTF-8 在截断处保留完整字符。Markdown 默认继续使用 Report 的安全渲染，用户可切换源码。输入与产物保留各自身份，不将输入文件伪装成版本化产物。深浅主题使用统一代码颜色 token。
 
@@ -235,7 +242,7 @@ Renderer 的 SourcePreview 共享只读文本/行号视图，使用 highlight.js
 
 文件存在、非空、路径权限、类型/尺寸上限、图片解码、Markdown 安全渲染属于工作台检查。语义正确性（包括金额是否重复放大、图表是否与计算一致）归独立 LLM-as-a-judge 评测，不在产物登记或展示前运行。非空 report.md 可以满足测试的文件交付断言，即使 Judge 随后认为其结论错误。
 
-已发布产物登记 hash；受控工具拒绝识别出的覆盖，更新生成新版本。外部用户修改文件不受应用隔离，读取时若发现已登记产物不一致，标为“文件已变更”，不能继续冒充原始发布版本。此规则针对应用产物，不引入 CSV 版本管理。
+当前工作区产物允许受控工具更新；任务结束重新登记 hash 后刷新预览。读取时若文件不符合当前登记的 hash，标为“文件已变更”，等待任务结束重新登记，不返回未验证内容。遗留历史版本仍保持原完整性保护。此规则不引入 CSV 版本管理。
 
 Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载。相对图片由受控 artifact ID 映射真实文件，不允许任意 file URL；外链显式打开。Streamdown 的真实渲染验证范围在验证记录说明，不把静态字符串检查冒充 UI 验证。
 
@@ -243,9 +250,9 @@ Markdown 禁止 raw HTML，保留 sanitize；远程图片默认不自动加载�
 
 初始产品默认值：单工具执行 180 秒；单 run 活跃执行时间 10 分钟、最多 20 次模型请求；HTTP 暂时性失败最多重试 2 次且计入限额。工作台不判定业务错误或统计“业务自修复次数”；Agent 可在总预算内自行修复代码或解释无法完成的原因。等待用户审批/澄清不计活跃执行计时，但继续占会话名额，可显式停止。截断日志不截断错误状态。
 
-每次 `context_with_system` 给模型提供当前输出目录和剩余请求预算，内置 skill 引导先交付核心文件、再做可选美化并预留最终回复。提示只是帮助 Agent 规划；20 次硬上限及错误状态不因模型声称完成而改变。
+不向模型注入剩余请求次数提示。内置 skill 仅提供通用分析与交付指导；20 次硬上限由请求入口阻断，错误状态不因模型声称完成而改变。
 
-工具单次 UI 文本有界，进程输出保留前 60 KiB 加截断提示（低于 64 KiB）；进程日志每 run 合计最多保留最早 10 MiB，超出部分不再写盘。`logs.list/page` 按 sessionId 与登记 logId 读取，每页 32 KiB、保留 UTF-8 字符边界，不接受任意路径。会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；初始 run 产物目录上限 500 MiB（含同一 run 的各个输出版本）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
+工具单次 UI 文本有界，进程输出保留前 60 KiB 加截断提示（低于 64 KiB）；进程日志每 run 合计最多保留最早 10 MiB，超出部分不再写盘。`logs.list/page` 按 sessionId 与登记 logId 读取，每页 32 KiB、保留 UTF-8 字符边界，不接受任意路径。会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；会话工作区文件总量上限 500 MiB（跨 run 累计）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
 
 100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。正式 P6 基准由 `tests/e2e/p6-benchmark.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数字见本地阶段结果。
 

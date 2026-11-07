@@ -57,7 +57,7 @@ it('P6-DELETE-STORAGE retains deletion inventory across restart, rejects changed
   await mkdir(external);
   const session = sessions.create(external),
     runId = run(session.id);
-  const version = await artifacts.createVersion(session.id, runId);
+  const version = await artifacts.openWorkspace(session.id, runId);
   const report = join(version.directory, 'report.md'),
     original = join(version.directory, 'source.csv');
   await writeFile(report, '# report');
@@ -139,7 +139,7 @@ it('P6-DELETE-STORAGE retains deletion inventory across restart, rejects changed
   expect(db.prepare('SELECT * FROM deletion_files').all()).toEqual([]);
   expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   const keep = sessions.create(external),
-    second = await artifacts.createVersion(keep.id, run(keep.id));
+    second = await artifacts.openWorkspace(keep.id, run(keep.id));
   await writeFile(join(second.directory, 'keep.md'), '# retained');
   await artifacts.publish(second.id);
   expect((await deletion.remove(keep.id, false)).complete).toBe(true);

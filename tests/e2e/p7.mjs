@@ -109,20 +109,16 @@ async function story(dir, offline) {
     );
     const first = await deliver(page, id);
     track();
-    const old = readFileSync(join(first.outputDirectory, 'report.md'));
     assert(
       first.tools.some((t) => t.output.includes('/Contents/Resources/runtime/python/bin/python3')),
     );
-    assert(
-      fixture.requests[0].messages.some(
-        (m) => m.role === 'system' && m.content.includes('剩余最多20次'),
-      ),
-    );
-    assert(
-      fixture.requests[2].messages.some(
-        (m) => m.role === 'system' && m.content.includes('剩余最多18次'),
-      ),
-    );
+    assert(!JSON.stringify(fixture.requests).includes('剩余最多'));
+    for (let i = 1; i < fixture.requests.length; i++) {
+      assert.deepEqual(
+        fixture.requests[i].messages.slice(0, fixture.requests[i - 1].messages.length),
+        fixture.requests[i - 1].messages,
+      );
+    }
     fixture.set(
       taskTool('write', {
         path: 'analysis.py',
@@ -134,8 +130,10 @@ async function story(dir, offline) {
     await page.getByRole('textbox', { name: '分析需求' }).fill('继续，生成新版报告和图表。');
     await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
     const second = await deliver(page, id, first.runId);
-    assert.notEqual(first.outputDirectory, second.outputDirectory);
-    assert.deepEqual(readFileSync(join(first.outputDirectory, 'report.md')), old);
+    assert.equal(first.outputDirectory, second.outputDirectory);
+    assert(
+      readFileSync(join(first.outputDirectory, 'report.md'), 'utf8').includes('Packaged followup'),
+    );
     track();
     assert.deepEqual(app.errors, []);
     await app.stop();

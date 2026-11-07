@@ -1,4 +1,4 @@
-import { selectSession } from '../support/desktop.mjs';
+import { openPreview, selectSession } from '../support/desktop.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -528,18 +528,21 @@ export const cases = {
       assert.equal(first.state, 'completed');
       const before = await listing(page, sessionId, 1),
         old = before.files.find((f) => f.relativePath === 'report.md');
+      await openPreview(page, '预览');
+      await page.getByRole('heading', { name: 'First report', exact: true }).waitFor();
       fixture.set(writeReport('# Second report'), { text: 'Second delivery complete.' });
       await send(page, 'Continue from previous delivery and create a new report.');
       const second = await until(async () => {
         const s = await rpc(page, { type: 'runtime.snapshot', sessionId });
         return s?.runId !== first.runId && s?.state === 'completed' ? s : null;
       }, 'second run completed');
-      const after = await listing(page, sessionId, 2),
+      const after = await listing(page, sessionId, 1),
         reports = after.files.filter((f) => f.relativePath === 'report.md');
       assert.notEqual(second.runId, first.runId);
-      assert.equal(reports.length, 2);
-      assert.equal(readFileSync(old.path, 'utf8'), '# First report');
-      assert.equal(after.files.find((f) => f.id === old.id).sha256, old.sha256);
+      assert.equal(reports.length, 1);
+      assert.equal(first.outputDirectory, second.outputDirectory);
+      assert.equal(readFileSync(old.path, 'utf8'), '# Second report');
+      assert.notEqual(after.files.find((f) => f.id === old.id).sha256, old.sha256);
       assert.equal(
         readFileSync(join(second.outputDirectory, 'report.md'), 'utf8'),
         '# Second report',
@@ -552,9 +555,21 @@ export const cases = {
           ),
       );
       assert.equal(second.messages.filter((m) => m.role === 'user').length, 2);
+      await page.getByRole('heading', { name: 'Second report', exact: true }).waitFor();
+      assert.equal(await page.getByLabel('选择产物版本').count(), 0);
+      for (let i = 1; i < fixture.requests.length; i++)
+        assert.deepEqual(
+          fixture.requests[i].messages.slice(0, fixture.requests[i - 1].messages.length),
+          fixture.requests[i - 1].messages,
+        );
+      assert(!existsSync(join(second.outputDirectory, 'runs')));
       await page.screenshot({ path: join(root, 'multiturn.png'), fullPage: true });
       assert.deepEqual(app.errors, []);
-      return { distinctRuns: true, historyInActualRequest: true, priorArtifactPreserved: true };
+      return {
+        distinctRuns: true,
+        historyInActualRequest: true,
+        sameWorkspaceAndUpdatedArtifact: true,
+      };
     } finally {
       await app?.stop();
       await fixture.close();
@@ -602,6 +617,10 @@ export const cases = {
         1,
       );
       assert.equal(final.outputDirectory, output);
+      assert.deepEqual(
+        fixture.requests[1].messages.slice(0, fixture.requests[0].messages.length),
+        fixture.requests[0].messages,
+      );
       return { batchCompletedBeforeSteer: true, steerCommittedOnce: true, sameOutputVersion: true };
     } finally {
       await app?.stop();
@@ -647,41 +666,32 @@ export const cases = {
         2,
       );
       assert.deepEqual(final.queuedInputs, []);
-      const outputs = await listing(page, sessionId, 3),
+      const outputs = await listing(page, sessionId, 1),
         reports = outputs.files.filter((f) => f.relativePath === 'report.md');
-      assert.deepEqual(reports.map((f) => readFileSync(f.path, 'utf8')).sort(), [
-        '# Followup 1',
-        '# Followup 2',
-        'first',
-      ]);
-      assert.equal(new Set(reports.map((f) => f.path)).size, 3);
+      assert.deepEqual(
+        reports.map((f) => readFileSync(f.path, 'utf8')),
+        ['# Followup 2'],
+      );
+      assert.equal(final.outputDirectory, active.outputDirectory);
       assert.equal(fixture.requests.length, 6);
       assert.equal(fixture.requests[2].messages.filter((m) => m.role === 'user').length, 2);
       assert.equal(fixture.requests[4].messages.filter((m) => m.role === 'user').length, 3);
-      const paths = fixture.requests
-        .filter((_, i) => [0, 2, 4].includes(i))
-        .map((p) => JSON.stringify(p.messages.filter((m) => m.role === 'system')));
-      assert(
-        paths[1].includes(
-          reports
-            .find((f) => readFileSync(f.path, 'utf8') === '# Followup 1')
-            .path.replace('/report.md', ''),
-        ),
-      );
-      assert(
-        paths[2].includes(
-          reports
-            .find((f) => readFileSync(f.path, 'utf8') === '# Followup 2')
-            .path.replace('/report.md', ''),
-        ),
-      );
+      for (let i = 1; i < fixture.requests.length; i++) {
+        assert.deepEqual(
+          fixture.requests[i].messages.slice(0, fixture.requests[i - 1].messages.length),
+          fixture.requests[i - 1].messages,
+        );
+        assert.deepEqual(fixture.requests[i].tools, fixture.requests[0].tools);
+      }
+      assert(!JSON.stringify(fixture.requests).includes('剩余最多'));
       await page.screenshot({ path: join(root, 'followup.png'), fullPage: true });
       assert.deepEqual(app.errors, []);
       return {
         sameRun: true,
         distinctInputIds: true,
         consumedOnceInOrder: true,
-        threePreservedVersions: true,
+        sharedWorkspace: true,
+        stableRequestPrefix: true,
       };
     } finally {
       await app?.stop();

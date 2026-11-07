@@ -21,21 +21,11 @@ const runtimeConfigSchema = z
     thinkingLevel: thinkingLevelSchema.optional(),
     apiKey: z.string().min(1).max(4096),
     protectedRoots: z.array(z.string()),
-    filePaths: z.array(z.string()),
     testBaseUrl: z.string().url().optional(),
-    outputDirectory: z.string().optional(),
     skillsDirectory: z.string().optional(),
   })
   .strict();
 export const hostRequestSchema = z.discriminatedUnion('type', [
-  z
-    .object({
-      id,
-      type: z.literal('output.result'),
-      directory: z.string().optional(),
-      error: z.string().optional(),
-    })
-    .strict(),
   z.object({ id, type: z.literal('tool.result'), result: toolResultSchema }).strict(),
   z.object({ id, type: z.literal('tool.update'), output: z.string() }).strict(),
   z
@@ -65,7 +55,6 @@ export const hostRequestSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('runtime.snapshot') }).strict(),
 ]);
 export const hostResponseSchema = z.discriminatedUnion('type', [
-  z.object({ id, type: z.literal('output.advance'), inputId: id }).strict(),
   z
     .object({
       id,

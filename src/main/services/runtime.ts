@@ -36,13 +36,11 @@ type HostFactory = (
   snapshot: (snapshot: RuntimeSnapshot) => void,
   tool: ToolHandler,
   cancelTool: (toolCallId: string) => void,
-  advanceOutput: (inputId: string) => Promise<string>,
 ) => RuntimeHost;
 interface Task {
   thinkingLevel: ThinkingLevel;
   filePaths: string[];
   startPromise?: Promise<void>;
-  advancePromise?: Promise<string>;
   stopPromise?: Promise<void>;
   finalizePromise?: Promise<void>;
   snapshot: RuntimeSnapshot;
@@ -53,7 +51,6 @@ interface Task {
   starting: boolean;
   outputDirectory?: string;
   versionId?: string;
-  inputVersions?: Map<string, string>;
 }
 interface RuntimeDependencies {
   db: Database.Database;
@@ -78,7 +75,6 @@ export class RuntimeService {
   private recovered = new Map<string, RuntimeSnapshot>();
   private closing = false;
   private startingTasks = new Set<Promise<void>>();
-  private advancingTasks = new Set<Promise<string>>();
   private db: Database.Database;
   private sessions: SessionService;
   private credentials: CredentialService;
@@ -174,7 +170,7 @@ export class RuntimeService {
       task.finalizePromise = this.lifecycle.finish(
         snapshot.runId,
         task.versionId,
-        [task.stopPromise, task.startPromise, task.advancePromise],
+        [task.stopPromise, task.startPromise],
         () => {
           this.admission.release(snapshot.runId);
           this.trimHistoryCache();
@@ -307,7 +303,8 @@ export class RuntimeService {
       messages = history.messages;
       turnUsage = history.turnUsage ?? [];
     }
-    // A read RPC yields: recheck admission before creating another task for the same session.
+    await current?.finalizePromise;
+    // A read RPC and prior inventory yield: recheck admission before creating another task for the same session.
     if (this.closing) throw new AppError('QUITTING', '应用正在退出');
     const latest = this.sessions.get(sessionId);
     if (latest.archived || !['draft', 'persisted'].includes(latest.state))
@@ -443,42 +440,6 @@ export class RuntimeService {
     this.trimHistoryCache();
     return this.ledger.withDrafts(snapshot);
   }
-  private advanceOutput(task: Task, inputId: string) {
-    const advance = this.performAdvanceOutput(task, inputId);
-    task.advancePromise = advance;
-    this.advancingTasks.add(advance);
-    void advance.then(
-      () => this.advancingTasks.delete(advance),
-      () => this.advancingTasks.delete(advance),
-    );
-    return advance;
-  }
-  private async performAdvanceOutput(task: Task, inputId: string) {
-    if (this.closing || !task.host || !isActive(task.snapshot.state))
-      throw new Error('Run unavailable');
-    const input = this.db
-      .prepare('SELECT kind FROM run_inputs WHERE id=? AND run_id=?')
-      .get(inputId, task.snapshot.runId) as { kind: string } | undefined;
-    if (input?.kind !== 'followUp') throw new Error('Unknown follow-up');
-    task.inputVersions ??= new Map();
-    const known = task.inputVersions.get(inputId);
-    if (known) return known;
-    // The SDK context hook reaches here only after consuming the next follow-up at a tool boundary.
-    if (task.versionId) await this.artifacts.publish(task.versionId);
-    if (this.closing || !isActive(task.snapshot.state)) throw new Error('Run stopped');
-    const version = await this.artifacts.createVersion(
-      task.snapshot.sessionId,
-      task.snapshot.runId,
-    );
-    if (this.closing || !isActive(task.snapshot.state)) {
-      await this.artifacts.publish(version.id);
-      throw new Error('Run stopped');
-    }
-    task.versionId = version.id;
-    task.outputDirectory = version.directory;
-    task.inputVersions.set(inputId, version.directory);
-    return version.directory;
-  }
   private insertInput(task: Task, input: RunInput) {
     this.ledger.accept(task.snapshot.runId, task.snapshot.sessionId, input);
   }
@@ -512,7 +473,7 @@ export class RuntimeService {
     try {
       const apiKey = task.apiKey;
       if (!apiKey) throw new AppError('MISSING_KEY', '运行凭证已失效');
-      const version = await this.artifacts.createVersion(session.id, task.snapshot.runId);
+      const version = await this.artifacts.openWorkspace(session.id, task.snapshot.runId);
       task.versionId = version.id;
       task.outputDirectory = version.directory;
       if (this.closing || task.snapshot.state !== 'starting') {
@@ -548,7 +509,7 @@ export class RuntimeService {
                 this.paths.logs,
               ],
               inputs: task.filePaths,
-              published: this.artifacts.publishedPaths(session.id),
+              published: this.artifacts.legacyPaths(session.id),
             },
             toolCallId,
             operation,
@@ -556,7 +517,6 @@ export class RuntimeService {
           );
         },
         (toolCallId) => this.tools.cancelTool(task.snapshot.runId, toolCallId),
-        (inputId) => this.advanceOutput(task, inputId),
       );
       await task.host.request({
         type: 'runtime.start',
@@ -570,7 +530,6 @@ export class RuntimeService {
           model: task.model,
           thinkingLevel: task.thinkingLevel,
           apiKey,
-          outputDirectory: task.outputDirectory,
           skillsDirectory: this.skillsDirectory,
           ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),
           protectedRoots: [
@@ -580,7 +539,6 @@ export class RuntimeService {
             `${this.paths.database}-shm`,
             join(this.paths.home, 'logs'),
           ],
-          filePaths: task.filePaths,
         },
         input: task.input,
       });
@@ -641,12 +599,7 @@ export class RuntimeService {
             input.state === 'pending' ? { ...input, state: 'cancelled' } : input,
           ),
         });
-      await Promise.allSettled([
-        task.startPromise,
-        task.advancePromise,
-        task.stopPromise,
-        task.finalizePromise,
-      ]);
+      await Promise.allSettled([task.startPromise, task.stopPromise, task.finalizePromise]);
       await this.tools.settled(task.snapshot.runId);
     }
     // An interrupted prior process can leave an open output version to inventory.
@@ -683,7 +636,7 @@ export class RuntimeService {
       task.host?.stop();
       task.apiKey = undefined;
     }
-    await Promise.allSettled([...this.startingTasks, ...this.advancingTasks]);
+    await Promise.allSettled([...this.startingTasks]);
     await this.lifecycle.settled();
     await this.tools.settled();
   }

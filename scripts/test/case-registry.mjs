@@ -38,7 +38,7 @@ const packaged = new Set([
   'P7-DEFAULTS',
   'P7-ALL',
 ]);
-const live = new Set(['P2-LIVE-READ', 'P3-LIVE-TOOLS', 'P4-LIVE', 'P7-LIVE']);
+const live = new Set(['P2-LIVE-CACHE', 'P2-LIVE-READ', 'P3-LIVE-TOOLS', 'P4-LIVE', 'P7-LIVE']);
 export function mergeCases(...groups) {
   const cases = {};
   for (const group of groups)

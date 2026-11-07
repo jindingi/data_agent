@@ -242,6 +242,7 @@ export function App() {
           key={sessions.selected ?? 'home'}
           hidden={!panel}
           sessionId={sessions.selected}
+          workspace={current?.workspace}
           inputs={files}
           removeInput={(id) => act(sessions.removeFile(id))}
           close={() => {

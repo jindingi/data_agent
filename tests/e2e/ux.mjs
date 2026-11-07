@@ -247,10 +247,10 @@ export const cases = {
       await page.mouse.move(b.x - 70, b.y + 150);
       await page.mouse.up();
       assert((await page.locator('.result-panel').evaluate((n) => n.clientWidth)) > initial + 32);
-      const version = await page.getByLabel('选择产物版本').inputValue();
+      const version = await page.getByLabel('选择预览文件').inputValue();
       await page.getByRole('button', { name: '展开结果面板' }).click();
       await page.getByRole('button', { name: '缩小结果面板' }).click();
-      assert.equal(await page.getByLabel('选择产物版本').inputValue(), version);
+      assert.equal(await page.getByLabel('选择预览文件').inputValue(), version);
       await page.getByRole('button', { name: '关闭结果面板' }).hover();
       await page.getByRole('tooltip', { name: '关闭结果面板' }).waitFor();
       await page.keyboard.press('Escape');

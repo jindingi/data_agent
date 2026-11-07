@@ -25,6 +25,7 @@ export function ArtifactPanel({
   sessionId,
   hidden,
   inputs,
+  workspace,
   removeInput,
   close,
   onError,
@@ -32,6 +33,7 @@ export function ArtifactPanel({
   sessionId: string | null;
   hidden: boolean;
   inputs: FileReference[];
+  workspace: string | undefined;
   removeInput: (id: string) => void;
   close: () => void;
   onError: (error: string) => void;
@@ -99,6 +101,7 @@ export function ArtifactPanel({
       files[0]);
   const chosenId = chosen?.id;
   const chosenState = chosen?.state;
+  const chosenHash = chosen?.sha256;
   useEffect(() => {
     let mounted = true;
     setPreview(undefined);
@@ -125,7 +128,7 @@ export function ArtifactPanel({
     return () => {
       mounted = false;
     };
-  }, [sessionId, chosenId, chosenState, inputId]);
+  }, [sessionId, chosenId, chosenState, chosenHash, inputId]);
   async function exportFiles() {
     if (!sessionId || !versionId) return;
     setExporting(true);
@@ -224,7 +227,7 @@ export function ArtifactPanel({
             <Button
               size="icon"
               variant="ghost"
-              aria-label="导出这一版"
+              aria-label="导出文件"
               disabled={
                 exporting || listing.versions.find((v) => v.id === versionId)?.state !== 'published'
               }
@@ -245,9 +248,10 @@ export function ArtifactPanel({
             <X />
           </Button>
         </div>
-        {(listing.versions.length > 0 || (tab === 'reports' && inputs.length > 0)) && (
+        {(listing.versions.length > 1 ||
+          (tab === 'reports' && (files.length > 0 || inputs.length > 0))) && (
           <div className="artifact-toolbar">
-            {listing.versions.length > 0 && !chosenInput && (
+            {listing.versions.length > 1 && !chosenInput && (
               <select
                 aria-label="选择产物版本"
                 value={versionId}
@@ -257,10 +261,11 @@ export function ArtifactPanel({
                   setExported('');
                 }}
               >
-                {listing.versions.map((version, index) => (
+                {listing.versions.map((version) => (
                   <option key={version.id} value={version.id}>
-                    {index === 0 ? '最新 · ' : ''}
-                    {new Date(version.createdAt).toLocaleString()}
+                    {version.directory === workspace
+                      ? '会话文件'
+                      : `历史版本 · ${new Date(version.createdAt).toLocaleString()}`}
                   </option>
                 ))}
               </select>

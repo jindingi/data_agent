@@ -48,7 +48,7 @@ async function version() {
     'test',
     new Date().toISOString(),
   );
-  return artifacts.createVersion(sessionId, id);
+  return artifacts.openWorkspace(sessionId, id);
 }
 it('P4-ARTIFACT registers actual bounded files without trusting agent manifests or correctness claims', async () => {
   const v = await version();
@@ -95,48 +95,90 @@ it('P4-ARTIFACT registers actual bounded files without trusting agent manifests 
   await writeFile(code.path, source.slice(0, -1) + 'y');
   await expect(artifacts.preview(sessionId, code.id)).rejects.toThrow('文件已变更');
 });
-it('P4-VERSIONS preserves earlier bytes and IDs, guards their writes, and exports relative files', async () => {
+it('P4-VERSIONS reuses the session workspace, refreshes changed files and preserves legacy output', async () => {
   const first = await version();
+  expect(first.directory).toBe(sessions.get(sessionId).workspace);
   await mkdir(join(first.directory, 'figures'));
-  await writeFile(join(first.directory, 'report.md'), '# Earlier\n\n[Data](figures/table.csv)\n');
+  await writeFile(join(first.directory, 'report.md'), '# Earlier');
+  await writeFile(join(first.directory, 'obsolete.txt'), 'remove me');
   await writeFile(join(first.directory, 'figures/table.csv'), 'x\n1\n');
   await artifacts.publish(first.id);
   const original = artifacts
     .list(sessionId)
     .files.find((file) => file.relativePath === 'report.md')!;
+  const firstExport = await artifacts.exportVersion(sessionId, first.id, root);
   const second = await version();
-  await writeFile(join(second.directory, 'report.md'), '# New report');
-  await artifacts.publish(second.id);
-  const list = artifacts.list(sessionId);
-  const reports = list.files.filter((file) => file.relativePath === 'report.md');
-  expect(reports).toHaveLength(2);
-  expect(new Set(reports.map((file) => file.id)).size).toBe(2);
-  expect(new Set(reports.map((file) => file.path)).size).toBe(2);
-  expect(await readFile(original.path, 'utf8')).toContain('# Earlier');
-  expect((await artifacts.preview(sessionId, original.id)).artifact.sha256).toBe(original.sha256);
+  expect(second.id).toBe(first.id);
+  expect(second.directory).toBe(first.directory);
   const policy = new PolicyService(getRuntimePaths(process.cwd(), '', false));
   const context = {
     workspace: sessions.get(sessionId).workspace,
     workingDirectory: second.directory,
     protectedRoots: [],
     inputs: [],
-    published: artifacts.publishedPaths(sessionId),
+    published: artifacts.legacyPaths(sessionId),
   };
   expect(
     (await policy.inspect(context, { name: 'write', path: original.path, content: 'overwrite' }))
       .decision,
-  ).toBe('deny');
-  const exported = await artifacts.exportVersion(sessionId, first.id, root);
-  expect(await readFile(join(exported, 'report.md'), 'utf8')).toContain('figures/table.csv');
+  ).toBe('allow');
+  await writeFile(
+    join(second.directory, 'report.md'),
+    '# New report\n\n[Data](figures/table.csv)\n',
+  );
+  await rm(join(second.directory, 'obsolete.txt'));
+  await artifacts.publish(second.id);
+  const list = artifacts.list(sessionId);
+  expect(list.versions).toHaveLength(1);
+  const reports = list.files.filter((file) => file.relativePath === 'report.md');
+  expect(reports).toHaveLength(1);
+  expect(reports[0].id).toBe(original.id);
+  expect(reports[0].sha256).not.toBe(original.sha256);
+  expect(reports[0].runId).toBe(second.runId);
+  expect(list.files.some((file) => file.relativePath === 'obsolete.txt')).toBe(false);
+  expect((await artifacts.preview(sessionId, original.id)).text).toContain('# New report');
+  const exported = await artifacts.exportVersion(sessionId, second.id, root);
   expect(await readFile(join(exported, 'figures/table.csv'), 'utf8')).toBe('x\n1\n');
-  await expect(artifacts.exportVersion(sessions.create().id, first.id, root)).rejects.toThrow(
+  expect(await readFile(join(firstExport, 'report.md'), 'utf8')).toBe('# Earlier');
+  await expect(artifacts.exportVersion(sessions.create().id, second.id, root)).rejects.toThrow(
     '尚不可导出',
   );
-  await rm(original.path);
-  await expect(artifacts.preview(sessionId, original.id)).rejects.toThrow('不存在');
-  expect(artifacts.list(sessionId).files.find((file) => file.id === original.id)!.state).toBe(
-    'missing',
+
+  // Existing metadata and physical legacy files are not moved or rewritten on upgrade.
+  const legacyId = randomUUID(),
+    legacyDir = join(first.directory, 'runs/old/versions/old');
+  await mkdir(legacyDir, { recursive: true });
+  db.prepare('INSERT INTO output_versions VALUES (?,?,?,?,?,?,?)').run(
+    legacyId,
+    sessionId,
+    first.runId,
+    legacyDir,
+    'open',
+    null,
+    new Date().toISOString(),
   );
+  await writeFile(join(legacyDir, 'report.md'), '# Legacy');
+  await artifacts.publish(legacyId);
+  const third = await version();
+  await artifacts.publish(third.id);
+  const restored = new ArtifactService(
+    db,
+    sessions,
+    () => false,
+    () => {},
+  );
+  const legacyFile = restored.list(sessionId).files.find((file) => file.versionId === legacyId)!;
+  expect((await restored.preview(sessionId, legacyFile.id)).text).toBe('# Legacy');
+  expect(
+    restored.list(sessionId).files.filter((file) => file.path === legacyFile.path),
+  ).toHaveLength(1);
+  context.published = restored.legacyPaths(sessionId);
+  expect(
+    (await policy.inspect(context, { name: 'write', path: legacyFile.path, content: 'overwrite' }))
+      .decision,
+  ).toBe('deny');
+  expect((await restored.openWorkspace(sessionId, third.runId)).directory).toBe(first.directory);
+  await restored.publish(third.id);
 });
 
 it('R-EXPORT streams large artifacts in bounded chunks, preserves exports and cleans failed staging', async () => {
@@ -176,14 +218,16 @@ it('R-EXPORT streams large artifacts in bounded chunks, preserves exports and cl
     '不属于当前会话',
   );
   expect((await stat(join(exported, 'large.bin'))).size).toBe(total);
-  await expect(artifacts.exportVersion(sessionId, v.id, root)).rejects.toThrow();
+  const repeatExport = await artifacts.exportVersion(sessionId, v.id, root);
+  expect(repeatExport).not.toBe(exported);
   const broken = await version();
   await writeFile(join(broken.directory, 'report.md'), 'before');
   await artifacts.publish(broken.id);
   await writeFile(join(broken.directory, 'report.md'), 'changed');
   await expect(artifacts.exportVersion(sessionId, broken.id, root)).rejects.toThrow('变更');
-  await expect(stat(join(root, `Data-Agent-${broken.id}`))).rejects.toMatchObject({
-    code: 'ENOENT',
-  });
+  const { readdir } = await import('node:fs/promises');
+  expect(
+    (await readdir(root)).filter((name) => name.startsWith(`Data-Agent-${broken.id}-`)),
+  ).toHaveLength(2);
   expect((await stat(join(exported, 'large.bin'))).size).toBe(total);
 });

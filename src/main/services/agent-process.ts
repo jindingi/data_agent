@@ -45,7 +45,6 @@ export class AgentProcess {
     onSnapshot: (snapshot: RuntimeSnapshot) => void = () => {},
     onTool?: ToolHandler,
     onToolCancel?: (toolCallId: string) => void,
-    onOutput?: (inputId: string) => Promise<string>,
   ) {
     this.exited = new Promise((resolve) => {
       this.resolveExit = resolve;
@@ -75,22 +74,6 @@ export class AgentProcess {
         port1.on('message', ({ data }) => {
           const parsed = hostResponseSchema.safeParse(data);
           if (!parsed.success) return;
-          if (parsed.data.type === 'output.advance') {
-            const request = parsed.data;
-            void (onOutput ? onOutput(request.inputId) : Promise.reject(new Error('unsupported')))
-              .then((directory) =>
-                this.port?.postMessage({ type: 'output.result', id: request.id, directory }),
-              )
-              .catch(() => {
-                if (this.status === 'ready')
-                  this.port?.postMessage({
-                    type: 'output.result',
-                    id: request.id,
-                    error: '无法切换产物版本，任务已停止',
-                  });
-              });
-            return;
-          }
           if (parsed.data.type === 'tool.cancel') {
             onToolCancel?.(parsed.data.toolCallId);
             return;

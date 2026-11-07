@@ -80,7 +80,7 @@ export class PolicyService {
         else if (
           published.some((file) => file === actual || (action === 'delete' && inside(file, actual)))
         )
-          mark('deny', '已发布产物不可覆盖，请生成新版本');
+          mark('deny', '历史版本产物不可覆盖，请将新产物写入会话工作区');
         else if (
           inputs.some((file) => file === actual || (action === 'delete' && inside(file, actual)))
         )

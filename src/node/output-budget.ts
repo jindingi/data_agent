@@ -8,10 +8,7 @@ export function runOutputRoot(context: {
   runId: string;
   workingDirectory?: string;
 }) {
-  const root = join(context.workspace, 'runs', context.runId);
-  return context.workingDirectory && inside(context.workingDirectory, root)
-    ? root
-    : (context.workingDirectory ?? context.workspace);
+  return context.workspace;
 }
 /** A bounded accounting pass, not an OS sandbox or a disk quota. */
 export async function checkOutputBudget(

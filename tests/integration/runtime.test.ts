@@ -69,7 +69,6 @@ async function harness(
     model: { provider: 'runtime-test', model: 'stream' },
     apiKey: 'synthetic-runtime-key',
     protectedRoots: [join(root, 'sessions')],
-    filePaths: [],
   };
   const snapshots: RuntimeSnapshot[] = [];
   const requests: unknown[] = [];

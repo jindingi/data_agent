@@ -131,15 +131,8 @@ if (primaryInstance)
         sessions: sessions,
         credentials: credentials,
         paths: paths,
-        createHost: (status, snapshot, tool, cancelTool, advanceOutput) =>
-          new AgentProcess(
-            join(here, 'agent.js'),
-            status,
-            snapshot,
-            tool,
-            cancelTool,
-            advanceOutput,
-          ),
+        createHost: (status, snapshot, tool, cancelTool) =>
+          new AgentProcess(join(here, 'agent.js'), status, snapshot, tool, cancelTool),
         reader: host,
         publish: (snapshot) => {
           if (window && !window.isDestroyed())

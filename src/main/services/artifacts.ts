@@ -34,15 +34,28 @@ export class ArtifactService {
     private decodePng: (bytes: Buffer) => boolean,
     private changed: (sessionId: string) => void,
   ) {}
-  async createVersion(sessionId: string, runId: string): Promise<OutputVersion> {
+  async openWorkspace(sessionId: string, runId: string): Promise<OutputVersion> {
     const session = this.sessions.get(sessionId);
     const run = this.db.prepare('SELECT session_id FROM runs WHERE id=?').get(runId) as
       { session_id: string } | undefined;
     if (run?.session_id !== sessionId) throw new AppError('RUN_NOT_FOUND', '任务不存在');
-    const id = randomUUID(),
-      directory = join(session.workspace, 'runs', runId, 'versions', id);
+    const directory = session.workspace;
     if ((await canonicalPath(directory, session.workspace)) !== directory)
       throw new AppError('OUTPUT_PATH_CHANGED', '输出目录存在重定向，请恢复工作区目录');
+    const existing = this.db
+      .prepare(
+        `SELECT ${versionProjection} FROM output_versions WHERE session_id=? AND directory=?`,
+      )
+      .get(sessionId, directory) as OutputVersion | undefined;
+    if (existing) {
+      await this.scanning.get(existing.id);
+      this.db
+        .prepare("UPDATE output_versions SET run_id=?,state='open',error=NULL WHERE id=?")
+        .run(runId, existing.id);
+      this.changed(sessionId);
+      return { ...existing, runId, state: 'open', error: null };
+    }
+    const id = randomUUID();
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const value: OutputVersion = {
       id,
@@ -59,13 +72,13 @@ export class ArtifactService {
     return value;
   }
   list(sessionId: string): ArtifactListing {
-    this.sessions.get(sessionId);
+    const { workspace } = this.sessions.get(sessionId);
     return {
       versions: this.db
         .prepare(
-          `SELECT ${versionProjection} FROM output_versions WHERE session_id=? ORDER BY created_at DESC,id`,
+          `SELECT ${versionProjection} FROM output_versions WHERE session_id=? ORDER BY CASE WHEN directory=? THEN 0 ELSE 1 END,created_at DESC,id`,
         )
-        .all(sessionId) as OutputVersion[],
+        .all(sessionId, workspace) as OutputVersion[],
       files: this.db
         .prepare(
           `SELECT ${artifactProjection} FROM artifacts WHERE session_id=? ORDER BY created_at DESC,relative_path`,
@@ -73,8 +86,14 @@ export class ArtifactService {
         .all(sessionId) as ArtifactRecord[],
     };
   }
-  publishedPaths(sessionId: string): string[] {
-    return this.list(sessionId).files.map((file) => file.path);
+  /** Only pre-upgrade immutable versions remain protected from tool writes. */
+  legacyPaths(sessionId: string): string[] {
+    const workspace = this.sessions.get(sessionId).workspace;
+    const listing = this.list(sessionId);
+    const legacy = new Set(
+      listing.versions.filter((v) => v.directory !== workspace).map((v) => v.id),
+    );
+    return listing.files.filter((file) => legacy.has(file.versionId)).map((file) => file.path);
   }
   private version(id: string) {
     const row = this.db
@@ -91,7 +110,7 @@ export class ArtifactService {
     if (!row) throw new AppError('ARTIFACT_NOT_FOUND', '产物不存在或不属于当前会话');
     return row;
   }
-  /** Only app-allocated output roots are scanned. Agent manifests are ordinary files. */
+  /** Inventory the shared workspace after its writers stop. Legacy inventories remain readable. */
   publish(versionId: string): Promise<void> {
     const existing = this.scanning.get(versionId);
     if (existing) return existing;
@@ -102,6 +121,17 @@ export class ArtifactService {
   private async scan(versionId: string) {
     const version = this.version(versionId);
     if (version.state === 'published') return;
+    const session = this.sessions.get(version.sessionId);
+    const shared = version.directory === session.workspace;
+    const excluded = new Set([
+      ...this.sessions.files(version.sessionId).map((file) => file.path),
+      ...(shared
+        ? this.list(version.sessionId)
+            .versions.filter((v) => v.id !== versionId)
+            .map((v) => v.directory)
+        : []),
+    ]);
+    const seen = new Set<string>();
     let bytes = 0,
       count = 0,
       scanned = 0;
@@ -113,6 +143,7 @@ export class ArtifactService {
           if (++scanned > 5000) throw new Error('输出目录条目超过 5,000 个，请减少文件数量');
           if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
           const path = join(directory, entry.name);
+          if (excluded.has(path)) continue;
           if (entry.isDirectory()) {
             await walk(path);
             continue;
@@ -188,9 +219,10 @@ export class ArtifactService {
               value.state = 'too_large';
               value.error = '报告超过 2 MiB，请导出后查看';
             }
+            seen.add(path);
             this.db
               .prepare(
-                'INSERT INTO artifacts VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(version_id,relative_path) DO UPDATE SET state=excluded.state,size=excluded.size,sha256=excluded.sha256,error=excluded.error',
+                'INSERT INTO artifacts VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(version_id,relative_path) DO UPDATE SET run_id=excluded.run_id,kind=excluded.kind,state=excluded.state,size=excluded.size,sha256=excluded.sha256,error=excluded.error',
               )
               .run(
                 value.id,
@@ -212,6 +244,15 @@ export class ArtifactService {
         }
       };
       await walk(version.directory);
+      // Remove stale inventory only after a complete scan; a failed scan must not
+      // discard records for files it never reached. Stable paths retain their IDs.
+      if (shared) {
+        const remove = this.db.prepare('DELETE FROM artifacts WHERE id=?');
+        this.db.transaction(() => {
+          for (const file of this.list(version.sessionId).files)
+            if (file.versionId === versionId && !seen.has(file.path)) remove.run(file.id);
+        })();
+      }
       this.db
         .prepare("UPDATE output_versions SET state='published',error=NULL WHERE id=?")
         .run(versionId);
@@ -231,13 +272,13 @@ export class ArtifactService {
         .prepare('UPDATE artifacts SET state=?,error=? WHERE id=?')
         .run(
           state,
-          state === 'missing' ? '文件已不存在' : '文件已变更，不能作为原发布版本读取',
+          state === 'missing' ? '文件已不存在' : '文件已变更，等待任务结束后重新登记',
           file.id,
         );
       this.changed(file.sessionId);
       throw new AppError(
         'ARTIFACT_CHANGED',
-        state === 'missing' ? '文件已不存在' : '文件已变更，请生成新版本',
+        state === 'missing' ? '文件已不存在' : '文件已变更，请等待任务结束后重试',
       );
     }
   }
@@ -282,7 +323,10 @@ export class ArtifactService {
     const version = this.version(versionId);
     if (version.sessionId !== sessionId || version.state !== 'published')
       throw new AppError('VERSION_UNAVAILABLE', '该版本尚不可导出');
-    const root = join(await realpath(parent), `Data-Agent-${version.id}`);
+    const root = join(
+      await realpath(parent),
+      `Data-Agent-${version.id}-${randomUUID().slice(0, 8)}`,
+    );
     if (inside(root, this.sessions.get(sessionId).workspace))
       throw new AppError('INVALID_EXPORT', '请选择工作区外的导出目录');
     // Reserve the final name exclusively. Only a hidden staging directory contains bytes until all hashes pass.
