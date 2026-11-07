@@ -1,3 +1,4 @@
+import { inspectFiles } from '../services/file-selection';
 import { shell, clipboard } from 'electron';
 import type { Command, CommandResponses, Result } from '../../shared/contracts/ipc';
 import { AppError } from '../../shared/errors';
@@ -29,6 +30,18 @@ export async function dispatchCommand(
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'files.choose':
+      return success(command.type, inspectFiles(await picker.chooseFiles()));
+    case 'files.inspect':
+      return success(command.type, inspectFiles(command.paths));
+    case 'workspace.choose':
+      return success(command.type, (await picker.chooseDirectory()) ?? null);
+    case 'conversation.submit':
+      await catalogReady;
+      return success(
+        command.type,
+        await runtime.submitConversation(command.input, command.sessionId, command.parent),
+      );
     case 'automation.control': {
       if (!automationControl) throw new AppError('UNSUPPORTED_COMMAND', '自动化入口未开启');
       return success(command.type, automationControl(command.action, command.sessionId));

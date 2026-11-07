@@ -1,6 +1,6 @@
 import type { AgentSessionEvent, SessionManager } from '@earendil-works/pi-coding-agent';
 import type { MessageView, RuntimeSnapshot, ToolView } from '../shared/runtime';
-import { messageText, type InputIdentity } from './input-identity';
+import { messageText, inputId, type InputIdentity } from './input-identity';
 
 const LIMIT = 64 * 1024;
 export function bounded(text: string) {
@@ -53,6 +53,9 @@ export function projectMessage(
   return {
     id,
     role: raw.role,
+    ...(raw.role === 'user' && strip(messageText(raw)) !== messageText(raw)
+      ? { inputId: inputId(messageText(raw)) }
+      : {}),
     blocks,
     ...(raw.toolCallId ? { toolCallId: raw.toolCallId, isError: raw.isError } : {}),
   };
@@ -155,7 +158,10 @@ export class EventAdapter {
       ...this.ids,
       seq: ++this.seq,
       state: this.state,
-      messages: this.messages,
+      messages: this.messages.map((message) => ({
+        ...message,
+        paths: this.identity.paths(message.inputId),
+      })),
       tools: [...this.tools.values()],
       inputs: this.identity.snapshot(),
       queuedInputs: this.identity.pending(),

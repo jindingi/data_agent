@@ -1236,3 +1236,19 @@ summary:focus-visible {
 .result-panel[hidden] {
   display: none;
 }
+.message-attachments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.message-attachments span {
+  padding: 4px 8px;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.markdown-body th,
+.markdown-body td {
+  min-width: 120px;
+}

@@ -22,12 +22,12 @@ export async function configure(page, key = 'synthetic-p3-fixture-key') {
 export async function submit(page, text = 'Execute the requested fixture action.') {
   const known = new Set((await rpc(page, { type: 'sessions.list' })).map((session) => session.id));
   await page.getByRole('button', { name: '新会话', exact: true }).click();
+  await page.getByRole('textbox', { name: '分析需求' }).fill(text);
+  await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
   const sessionId = await until(async () => {
     const id = await page.getByTestId('session-title').getAttribute('data-session-id');
     return id && !known.has(id) ? id : null;
-  }, 'new session selected');
-  await page.getByRole('textbox', { name: '分析需求' }).fill(text);
-  await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
+  }, 'first submission accepted');
   return sessionId;
 }
 export async function settled(page, sessionId) {

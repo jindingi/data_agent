@@ -24,6 +24,13 @@ export function readHistory(file: string, workspace: string, expectedId: string)
           : [],
       ),
   );
+  const attachments = new Map(
+    manager.getEntries().flatMap((entry) => {
+      if (entry.type !== 'custom' || entry.customType !== 'data_agent.input_submitted') return [];
+      const value = entry.data as { inputId: string; paths?: string[] };
+      return [[value.inputId, value.paths ?? []] as const];
+    }),
+  );
   for (const entry of manager.getBranch()) {
     if (entry.type !== 'message') continue;
     const message = entry.message;
@@ -42,7 +49,9 @@ export function readHistory(file: string, workspace: string, expectedId: string)
       role: message.role,
       text: message.role === 'user' ? stripEnvelope(text, known) : text,
     });
-    messages.push(projectMessage(entry.id, message, (text) => stripEnvelope(text, known)));
+    const view = projectMessage(entry.id, message, (text) => stripEnvelope(text, known));
+    if (view.inputId) view.paths = attachments.get(view.inputId);
+    messages.push(view);
   }
   const inputs = manager.getEntries().flatMap((entry) => {
     if (entry.type !== 'message' || entry.message.role !== 'user') return [];

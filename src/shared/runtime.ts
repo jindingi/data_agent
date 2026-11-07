@@ -35,6 +35,7 @@ export const inputSchema = z
     inputId: z.string().uuid(),
     kind: z.enum(['prompt', 'steer', 'followUp']),
     text: z.string().trim().min(1).max(100_000),
+    paths: z.array(z.string().min(1).max(8192).startsWith('/')).max(100).optional(),
   })
   .strict();
 export type RunInput = z.infer<typeof inputSchema>;
@@ -55,6 +56,8 @@ export const messageSchema = z.object({
   pending: z.boolean().optional(),
   toolCallId: z.string().optional(),
   isError: z.boolean().optional(),
+  inputId: z.string().uuid().optional(),
+  paths: z.array(z.string()).optional(),
 });
 export const toolSchema = z.object({
   id: z.string(),

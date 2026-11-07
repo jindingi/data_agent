@@ -27,6 +27,7 @@ export interface FileReference {
   size: number;
   missing: boolean;
 }
+export type SelectedFile = Pick<FileReference, 'path' | 'name' | 'size'>;
 export interface HistoryItem {
   id: string;
   role: string;

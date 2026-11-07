@@ -1,9 +1,10 @@
+import { inspectFiles } from './file-selection';
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import { basename, join } from 'node:path';
-import { existsSync, mkdirSync, realpathSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { existsSync, mkdirSync, realpathSync, statSync, rmdirSync } from 'node:fs';
 import { AppError } from '../../shared/errors';
-import { MAX_INPUT_BYTES, type SessionRecord, type FileReference } from '../../shared/models';
+import { type SessionRecord, type FileReference } from '../../shared/models';
 import { inspectSessionFile } from '../../node/session-integrity';
 import type { AppPaths } from '../../node/app-paths';
 
@@ -30,16 +31,26 @@ export class SessionService {
     if (!row) throw new AppError('SESSION_NOT_FOUND', '会话不存在');
     return { ...row, archived: Boolean(row.archived) };
   }
-  create(parent = this.paths.workspace) {
+  create(parent = this.paths.workspace, id: string = randomUUID(), intent = false) {
     if (!statSync(parent).isDirectory()) throw new AppError('INVALID_WORKSPACE', '请选择可用目录');
-    const id = randomUUID(),
-      now = new Date().toISOString();
+    const now = new Date().toISOString();
     const workspace = join(realpathSync(parent), id);
-    this.db
-      .prepare(
-        'INSERT INTO sessions (id,title,workspace,session_file,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-      )
-      .run(id, '新会话', workspace, join(this.paths.sessions, `${id}.jsonl`), 'creating', now, now);
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          'INSERT INTO sessions (id,title,workspace,session_file,state,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+        )
+        .run(
+          id,
+          '新会话',
+          workspace,
+          join(this.paths.sessions, `${id}.jsonl`),
+          'creating',
+          now,
+          now,
+        );
+      if (intent) this.db.prepare('INSERT INTO conversation_intents VALUES (?)').run(id);
+    })();
     try {
       mkdirSync(workspace, { mode: 0o700 });
       this.faults?.afterWorkspaceCreated?.();
@@ -52,6 +63,27 @@ export class SessionService {
         `无法完成工作区创建：${error instanceof Error ? error.message : '未知错误'}`,
       );
     }
+  }
+  recoverIntents() {
+    for (const row of this.db.prepare('SELECT session_id FROM conversation_intents').all() as {
+      session_id: string;
+    }[])
+      this.rollbackEmpty(row.session_id);
+  }
+  rollbackEmpty(id: string) {
+    if (this.db.prepare('SELECT id FROM runs WHERE session_id=?').get(id)) {
+      this.db.prepare('DELETE FROM conversation_intents WHERE session_id=?').run(id);
+      return;
+    }
+    const session = this.get(id);
+    // Never recursively delete a directory that may contain user/agent files.
+    if (existsSync(session.sessionFile)) return;
+    try {
+      if (existsSync(session.workspace)) rmdirSync(session.workspace);
+    } catch {
+      return;
+    }
+    this.db.prepare('DELETE FROM sessions WHERE id=?').run(id);
   }
   private assertMutable(id: string) {
     if (this.get(id).state === 'deleting')
@@ -111,25 +143,9 @@ export class SessionService {
     this.assertMutable(sessionId);
     const current = this.files(sessionId);
     const seen = new Set(current.map((f) => f.path));
-    const additions: Omit<FileReference, 'missing'>[] = [];
-    for (const raw of selected) {
-      let path, stat;
-      try {
-        path = realpathSync(raw);
-        stat = statSync(path);
-      } catch {
-        throw new AppError('FILE_NOT_FOUND', '所选文件不存在或无法访问');
-      }
-      if (seen.has(path)) continue;
-      if (!stat.isFile() || !path.toLowerCase().endsWith('.csv'))
-        throw new AppError('INVALID_FILE', '请选择 CSV 文件');
-      if (stat.size > MAX_INPUT_BYTES)
-        throw new AppError('INPUT_TOO_LARGE', '单个 CSV 文件不能超过 100 MB');
-      additions.push({ id: randomUUID(), sessionId, path, name: basename(path), size: stat.size });
-      seen.add(path);
-    }
-    if ([...current, ...additions].reduce((sum, f) => sum + f.size, 0) > MAX_INPUT_BYTES)
-      throw new AppError('INPUT_TOO_LARGE', '选用的 CSV 总大小不能超过 100 MB');
+    const additions = inspectFiles([...current.map((f) => f.path), ...selected])
+      .filter((file) => !seen.has(file.path))
+      .map((file) => ({ ...file, id: randomUUID(), sessionId }));
     this.db.transaction(() => {
       const insert = this.db.prepare(
         'INSERT INTO file_refs (id,session_id,path,name,size,added_at) VALUES (?,?,?,?,?,?)',

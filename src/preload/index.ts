@@ -3,6 +3,19 @@ import { IPC_COMMAND, IPC_EVENT } from '../shared/channels';
 import type { AppEvent, DesktopAPI } from '../shared/contracts/ipc';
 
 const api: DesktopAPI = {
+  inspectDroppedFiles: (files) => {
+    const paths = files.map((file) => webUtils.getPathForFile(file));
+    if (!paths.length || paths.some((path) => !path))
+      return Promise.resolve({
+        ok: false,
+        error: { code: 'INVALID_FILE', message: '请拖入本机上的 CSV 文件' },
+      });
+    return ipcRenderer.invoke(IPC_COMMAND, {
+      type: 'files.inspect',
+      paths,
+      requestId: crypto.randomUUID(),
+    });
+  },
   addFiles: (sessionId, files) => {
     const paths = files.map((file) => webUtils.getPathForFile(file));
     if (!paths.length || paths.some((path) => !path))

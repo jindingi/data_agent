@@ -66,14 +66,6 @@ export function useSessions(search: string, archived: boolean, onError: (message
   useEffect(() => {
     void load();
   }, [load]);
-  async function create(chooseWorkspace = false) {
-    const value = await request({ type: 'sessions.create', chooseWorkspace });
-    if (value) {
-      select(value.id);
-      await refresh();
-    }
-    return value;
-  }
   async function rename(title: string) {
     if (!selected) return;
     await request({ type: 'sessions.rename', sessionId: selected, title });
@@ -90,22 +82,9 @@ export function useSessions(search: string, archived: boolean, onError: (message
     select(null);
     await refresh();
   }
-  async function pickFiles() {
-    const sessionId = selectedRef.current ?? (await create())?.id;
-    if (!sessionId) return;
-    await request({ type: 'files.pick', sessionId });
-    await load();
-  }
   async function removeFile(fileId: string) {
     if (!selected) return;
     await request({ type: 'files.remove', sessionId: selected, fileId });
-    await load();
-  }
-  async function addFiles(files: File[]) {
-    const sessionId = selectedRef.current ?? (await create())?.id;
-    if (!sessionId) return;
-    const result = await window.dataAgent.addFiles(sessionId, files);
-    if (!result.ok) throw new Error(result.error.message);
     await load();
   }
   return {
@@ -113,11 +92,8 @@ export function useSessions(search: string, archived: boolean, onError: (message
     selected,
     detail,
     select,
-    create,
     rename,
     archiveCurrent,
-    pickFiles,
-    addFiles,
     removeFile,
     refresh,
     load,

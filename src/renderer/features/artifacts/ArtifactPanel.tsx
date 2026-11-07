@@ -130,12 +130,14 @@ export function ArtifactPanel({
   sessionId,
   hidden,
   inputs,
+  removeInput,
   close,
   onError,
 }: {
   sessionId: string | null;
   hidden: boolean;
   inputs: FileReference[];
+  removeInput: (id: string) => void;
   close: () => void;
   onError: (error: string) => void;
 }) {
@@ -367,6 +369,9 @@ export function ArtifactPanel({
                     <div key={file.id}>
                       <FileText size={17} />
                       <strong>{file.name}</strong>
+                      <Button size="sm" variant="ghost" onClick={() => removeInput(file.id)}>
+                        解除关联
+                      </Button>
                       <span>{file.path}</span>
                       <small>
                         {file.missing

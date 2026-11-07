@@ -1,3 +1,4 @@
+import { inspectFiles } from './file-selection';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type Database from 'better-sqlite3';
@@ -94,16 +95,25 @@ export class RuntimeService {
   private withDrafts(snapshot: RuntimeSnapshot): RuntimeSnapshot {
     const drafts = this.db
       .prepare(
-        `SELECT i.id AS inputId,i.kind,d.text,i.run_id AS runId,i.state
+        `SELECT i.id AS inputId,i.kind,d.text,d.paths,i.run_id AS runId,i.state
       FROM input_drafts d JOIN run_inputs i ON i.id=d.input_id JOIN runs r ON r.id=i.run_id
       WHERE r.session_id=? ORDER BY i.rowid`,
       )
-      .all(snapshot.sessionId) as (RunInput & { runId: string; state: string })[];
+      .all(snapshot.sessionId) as (Omit<RunInput, 'paths'> & {
+      paths: string;
+      runId: string;
+      state: string;
+    })[];
     const unsentInputs = drafts
       .filter(
         (d) => d.runId !== snapshot.runId || d.state !== 'pending' || !isActive(snapshot.state),
       )
-      .map(({ inputId, kind, text }) => ({ inputId, kind, text }));
+      .map(({ inputId, kind, text, paths }) => ({
+        inputId,
+        kind,
+        text,
+        paths: JSON.parse(paths) as string[],
+      }));
     return {
       ...snapshot,
       queuedInputs: isActive(snapshot.state) ? (snapshot.queuedInputs ?? []) : [],
@@ -175,6 +185,77 @@ export class RuntimeService {
       this.pump();
     }
   }
+  private submissions = new Map<
+    string,
+    Promise<{ sessionId: string; snapshot: RuntimeSnapshot }>
+  >();
+  submitConversation(input: RunInput, sessionId?: string, parent?: string) {
+    const pending = this.submissions.get(input.inputId);
+    if (pending)
+      return pending.then(async (accepted) => {
+        const receipt = this.db
+          .prepare('SELECT payload FROM submission_receipts WHERE input_id=?')
+          .get(input.inputId) as { payload: string } | undefined;
+        if (
+          (sessionId && sessionId !== accepted.sessionId) ||
+          receipt?.payload !== JSON.stringify(input)
+        )
+          throw new AppError('INPUT_CONFLICT', '提交身份已用于不同内容');
+        return accepted;
+      });
+    const task = this.acceptConversation(input, sessionId, parent);
+    this.submissions.set(input.inputId, task);
+    void task.finally(() => this.submissions.delete(input.inputId)).catch(() => {});
+    return task;
+  }
+  private async acceptConversation(input: RunInput, sessionId?: string, parent?: string) {
+    const receipt = this.db
+      .prepare('SELECT session_id,payload FROM submission_receipts WHERE input_id=?')
+      .get(input.inputId) as { session_id: string; payload: string } | undefined;
+    if (receipt) {
+      if (
+        (sessionId && sessionId !== receipt.session_id) ||
+        receipt.payload !== JSON.stringify(input)
+      )
+        throw new AppError('INPUT_CONFLICT', '提交身份已用于不同内容');
+      const snapshot = await this.restoreSnapshot(receipt.session_id);
+      if (!snapshot) throw new AppError('SUBMISSION_UNAVAILABLE', '已接收输入的运行状态不可用');
+      return { sessionId: receipt.session_id, snapshot };
+    }
+    if (this.closing) throw new AppError('QUITTING', '应用正在退出');
+    const model = this.credentials.selected();
+    this.credentials.validate(model);
+    this.credentials.key(model.provider);
+    inspectFiles([
+      ...(sessionId ? this.sessions.files(sessionId).map((f) => f.path) : []),
+      ...(input.paths ?? []),
+    ]);
+    let id = sessionId;
+    try {
+      id ??= this.sessions.create(parent, input.inputId, true).id;
+      const snapshot = await this.submit(id, input);
+      this.db.prepare('DELETE FROM conversation_intents WHERE session_id=?').run(id);
+      if (!sessionId) this.sessions.rename(id, input.text.trim().slice(0, 48));
+      this.changed();
+      return { sessionId: id, snapshot };
+    } catch (error) {
+      const accepted = this.db
+        .prepare('SELECT session_id FROM submission_receipts WHERE input_id=?')
+        .get(input.inputId) as { session_id: string } | undefined;
+      if (accepted) {
+        const snapshot = await this.restoreSnapshot(accepted.session_id);
+        if (snapshot) return { sessionId: accepted.session_id, snapshot };
+      }
+      if (!sessionId) {
+        // create() may have failed after recording its intent.
+        const intent = this.db
+          .prepare('SELECT session_id FROM conversation_intents WHERE session_id=?')
+          .get(input.inputId);
+        if (intent) this.sessions.rollbackEmpty(input.inputId);
+      }
+      throw error;
+    }
+  }
   async submit(sessionId: string, input: RunInput) {
     if (this.closing) throw new AppError('QUITTING', '应用正在退出');
     if (this.sessions.get(sessionId).state === 'deleting')
@@ -188,7 +269,13 @@ export class RuntimeService {
         !['running', 'waiting_approval', 'waiting_input'].includes(current.snapshot.state)
       )
         throw new AppError('NOT_RUNNING', '任务尚在等待启动，请稍后插话');
+      inspectFiles([
+        ...this.sessions.files(sessionId).map((file) => file.path),
+        ...(input.paths ?? []),
+      ]);
       this.insertInput(current, input);
+      this.sessions.addFiles(sessionId, input.paths ?? []);
+      current.filePaths = this.sessions.files(sessionId).map((file) => file.path);
       try {
         await current.host.request({ type: 'runtime.input', input });
       } catch (error) {
@@ -208,9 +295,9 @@ export class RuntimeService {
     const session = this.sessions.get(sessionId);
     if (session.archived || !['draft', 'persisted'].includes(session.state))
       throw new AppError('SESSION_UNAVAILABLE', session.error || '请先恢复会话后再提问');
-    const files = this.sessions.files(sessionId);
-    if (files.some((file) => file.missing))
-      throw new AppError('INPUT_MISSING', '部分原文件不可用，请移除缺失文件或重新选择');
+    const existingFiles = this.sessions.files(sessionId);
+    const files = inspectFiles([...existingFiles.map((file) => file.path), ...(input.paths ?? [])]);
+
     let messages: MessageView[] = [];
     if (session.piSessionId && session.state === 'persisted')
       messages = (
@@ -265,6 +352,7 @@ export class RuntimeService {
           .prepare('INSERT INTO run_files(run_id,path,size) VALUES (?,?,?)')
           .run(task.snapshot.runId, file.path, file.size);
       this.insertInput(task, input);
+      this.sessions.addFiles(sessionId, input.paths ?? []);
       this.db
         .prepare('UPDATE sessions SET updated_at=? WHERE id=?')
         .run(new Date().toISOString(), sessionId);
@@ -389,7 +477,12 @@ export class RuntimeService {
       this.db
         .prepare('INSERT INTO run_inputs VALUES (?,?,?,?,NULL)')
         .run(input.inputId, task.snapshot.runId, input.kind, 'pending');
-      this.db.prepare('INSERT INTO input_drafts VALUES (?,?)').run(input.inputId, input.text);
+      this.db
+        .prepare('INSERT INTO input_drafts (input_id,text,paths) VALUES (?,?,?)')
+        .run(input.inputId, input.text, JSON.stringify(input.paths ?? []));
+      this.db
+        .prepare('INSERT INTO submission_receipts VALUES (?,?,?)')
+        .run(input.inputId, task.snapshot.sessionId, JSON.stringify(input));
     })();
   }
   private pump() {

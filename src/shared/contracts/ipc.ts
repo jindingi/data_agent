@@ -6,13 +6,31 @@ import {
   type RuntimeSnapshot,
 } from '../runtime';
 import { interactionAnswerSchema } from '../tools';
-import type { SessionRecord, SessionDetail, FileReference } from '../models';
+import type { SessionRecord, SessionDetail, FileReference, SelectedFile } from '../models';
 import type { ModelSettings } from '../runtime';
 import type { ArtifactListing, ArtifactPreview } from '../artifacts';
 import type { DeletionPreview, DeletionResult, ToolLog, LogPage } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ ...base, type: z.literal('files.choose') }).strict(),
+  z.object({ ...base, type: z.literal('workspace.choose') }).strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('files.inspect'),
+      paths: z.array(z.string().startsWith('/').max(8192)).max(100),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('conversation.submit'),
+      sessionId: z.string().uuid().optional(),
+      parent: z.string().startsWith('/').max(8192).optional(),
+      input: inputSchema,
+    })
+    .strict(),
   z
     .object({
       ...base,
@@ -204,6 +222,10 @@ export type AppEvent =
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'files.choose': SelectedFile[];
+  'files.inspect': SelectedFile[];
+  'workspace.choose': string | null;
+  'conversation.submit': { sessionId: string; snapshot: RuntimeSnapshot };
   'automation.control': number | null;
   'system.info': SystemInfo;
   'system.ping': { type: 'pong'; id: string; text: string; pid: number };
@@ -238,6 +260,7 @@ export interface CommandResponses {
 }
 export type CommandResponse<C extends CommandInput> = CommandResponses[C['type']];
 export interface DesktopAPI {
+  inspectDroppedFiles: (files: File[]) => Promise<Result<SelectedFile[]>>;
   addFiles: (sessionId: string, files: File[]) => Promise<Result<FileReference[]>>;
   request: <C extends CommandInput>(command: C) => Promise<Result<CommandResponse<C>>>;
   subscribe: (listener: (event: AppEvent) => void) => () => void;

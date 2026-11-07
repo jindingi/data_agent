@@ -99,6 +99,20 @@ export const migrations: Migration[] = [
   );
 `,
   },
+  {
+    version: 8,
+    sql: `
+    ALTER TABLE input_drafts ADD COLUMN paths TEXT NOT NULL DEFAULT '[]';
+    CREATE TABLE submission_receipts (
+      input_id TEXT PRIMARY KEY REFERENCES run_inputs(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      payload TEXT NOT NULL
+    );
+    CREATE TABLE conversation_intents (
+      session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE
+    );
+  `,
+  },
 ];
 export function migrate(db: Database.Database, pending = migrations) {
   db.exec(

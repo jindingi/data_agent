@@ -85,6 +85,7 @@ if (primaryInstance)
     .then(() => {
       db = openDatabase(paths.database);
       const sessions = new SessionService(db, paths);
+      sessions.recoverIntents();
       sessions.reconcile();
       host = new AgentProcess(join(here, 'agent.js'), (status) => {
         if (window && !window.isDestroyed())

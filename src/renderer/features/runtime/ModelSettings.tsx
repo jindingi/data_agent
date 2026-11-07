@@ -1,19 +1,11 @@
 import { useState } from 'react';
-import type { ModelSettings as Settings, ThinkingLevel } from '../../../shared/runtime';
-import { request } from '../../lib/desktop';
+import type { ThinkingLevel } from '../../../shared/runtime';
+import type { ModelController } from '../models/use-model-settings';
 import { Button } from '../../components/ui/button';
 
-export function ModelSettings({
-  value,
-  onChange,
-  onError,
-}: {
-  value?: Settings;
-  onChange: (value: Settings) => void;
-  onError: (message: string) => void;
-}) {
+export function ModelSettings({ controller }: { controller: ModelController }) {
+  const { value, busy, error, change } = controller;
   const [key, setKey] = useState('');
-  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState('');
   const model = value?.models.find(
     (model) => model.provider === value.selected.provider && model.model === value.selected.model,
@@ -29,26 +21,27 @@ export function ModelSettings({
   };
   async function save(remove = false) {
     if (!value) return;
-    setBusy(true);
     setSaved('');
-    try {
-      const result = await request({
-        type: 'models.key',
-        provider: value.selected.provider,
-        key: remove ? '' : key,
-      });
+    const result = await change({
+      type: 'models.key',
+      provider: value.selected.provider,
+      key: remove ? '' : key,
+    });
+    if (result) {
       setKey('');
-      onChange(result);
       setSaved(remove ? '已移除凭证' : 'API key 已保存到系统加密存储');
-    } catch (error) {
-      onError(error instanceof Error ? error.message : '保存失败');
-    } finally {
-      setBusy(false);
     }
   }
+
   return (
     <div className="settings-section model-settings">
       <h3>模型连接</h3>
+      {error && (
+        <p role="alert" className="maintenance-error">
+          {error}
+        </p>
+      )}
+      <p>文件在本机处理，必要内容会发送给所选模型。工作区外写入与检测到的联网请求需要批准。</p>
       <label>
         模型
         <select
@@ -58,19 +51,7 @@ export function ModelSettings({
           onChange={async (event) => {
             setKey('');
             setSaved('');
-            setBusy(true);
-            try {
-              onChange(
-                await request({
-                  type: 'models.select',
-                  model: JSON.parse(event.target.value),
-                }),
-              );
-            } catch (error) {
-              onError(error instanceof Error ? error.message : '选择失败');
-            } finally {
-              setBusy(false);
-            }
+            await change({ type: 'models.select', model: JSON.parse(event.target.value) });
           }}
         >
           <option value="" disabled>
@@ -101,19 +82,7 @@ export function ModelSettings({
             value={value?.thinkingLevel}
             disabled={busy}
             onChange={async (event) => {
-              setBusy(true);
-              try {
-                onChange(
-                  await request({
-                    type: 'models.thinking',
-                    level: event.target.value as ThinkingLevel,
-                  }),
-                );
-              } catch (error) {
-                onError(error instanceof Error ? error.message : '设置失败');
-              } finally {
-                setBusy(false);
-              }
+              await change({ type: 'models.thinking', level: event.target.value as ThinkingLevel });
             }}
           >
             {model.thinkingLevels.map((level) => (

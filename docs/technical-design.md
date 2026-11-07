@@ -267,3 +267,13 @@ Renderer 使用统一语义颜色变量，覆盖聊天、设置、审批与文�
 ## 工程重构增量（2026-11-07）
 
 IPC 入口为 main/ipc/handlers.ts，仅负责来源/命令校验与错误映射；commands.ts 分派业务，dependencies.ts 定义必需的命名依赖。shared/contracts/ipc.ts 的 CommandResponses 将每个命令绑定到返回类型，Renderer 不再提供任意 request<T>。Host RPC 同样校验响应类型。测试 runner 使用 scripts/test/run-context.mjs 独立构建与生产依赖打包，不覆盖共享 out/release；复用构建需要源码指纹一致。
+
+### 草稿与提交接收（UX2，2026-11-07）
+
+Renderer 的 `features/composer` 拥有每个会话及首页的草稿，存于当前 Electron userData 的 localStorage（`composer-drafts-v1`，Zod 校验）；文本、路径元数据、工作区选择可恢复，不含 key、不复制 CSV、不创建正式 sessions。输入框只显示待提交附件。文本 revision 与附件 token 用于接收时精确清除，期间新增内容不丢失。
+
+`files.choose/files.inspect/workspace.choose` 只选择/校验。`conversation.submit` 先校验模型、凭证、原路径和合计大小，再创建会话并进入现有 RuntimeService/pi 队列。原 `sessions.create` 保留给存储恢复与集成 fixture，产品“新会话”不再调用它。首次接收用首个 inputId 作为 session ID，标题取问题前 48 字。
+
+迁移 8 增加 submission_receipts 与 conversation_intents，并为 input_drafts 增加路径：同 inputId 的相同请求返回接收结果，内容不符拒绝；未知结果不自动重发。首次创建异常和启动恢复清理未接收空目录，只用 rmdir，不递归删除未知文件。已有 run 的 intent 只清标记。输入账本和 receipt 在同一 SQL 事务中提交；文件系统/JSONL 不被假装成同一事务。
+
+pi JSONL 仍用原生 message/custom entry，`data_agent.input_submitted` 增加 paths 元数据；模型上下文注入本条原路径，Renderer 显示对应附件，重启可还原。会话文件引用与待发送附件独立，解除关联不删除源文件。模型配置由 `features/models/use-model-settings` 串行持有，输入区与设置共用 busy、值及错误，设置错误在弹窗内显示。

@@ -144,6 +144,15 @@ export function Transcript({
                     ? 'Data Agent'
                     : '运行记录'}
               </div>
+              {message.paths?.length ? (
+                <div className="message-attachments" aria-label="本次附件">
+                  {message.paths.map((path) => (
+                    <span key={path} title={path}>
+                      {path.split('/').pop()}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {message.blocks.map((block, index) => {
                 if (block.type === 'text')
                   return (
