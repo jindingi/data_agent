@@ -44,7 +44,7 @@ def output_limit(root):
         with os.scandir(directories.pop()) as entries:
             for entry in entries:
                 count += 1
-                if count > 5000:
+                if count > limits['outputEntries']:
                     return 'output_entry_limit'
                 if entry.is_symlink():
                     continue
@@ -55,7 +55,7 @@ def output_limit(root):
                         total += entry.stat(follow_symlinks=False).st_size
                     except FileNotFoundError:
                         continue
-                    if total > 500 * 1024**2:
+                    if total > limits['outputBytes']:
                         return 'output_limit'
     return None
 
@@ -68,6 +68,7 @@ try:
     if not raw.endswith(b'\n'):
         raise ValueError('Invalid supervisor configuration')
     config = json.loads(raw)
+    limits = config['limits']
     main_pid, host_pid = config['mainPid'], config['hostPid']
     main_identity, host_identity = identity(main_pid), identity(host_pid)
     if not alive(main_pid, main_identity) or not alive(host_pid, host_identity):
@@ -91,7 +92,7 @@ try:
             reason = 'cancelled'; break
         if not alive(main_pid, main_identity) or not alive(host_pid, host_identity):
             reason = 'parent_exit'; break
-        if time.monotonic() - started > min(config.get('timeoutSeconds', 180), 180):
+        if time.monotonic() - started > config['timeoutSeconds']:
             reason = 'timeout'; break
         if time.monotonic() - output_checked >= 0.25:
             output_checked = time.monotonic()
@@ -102,7 +103,7 @@ try:
             parent = psutil.Process(worker.pid)
             rss = sum(p.memory_info().rss for p in [parent] + parent.children(recursive=True) if p.is_running())
             peak = max(peak, rss)
-            if rss > 2 * 1024**3:
+            if rss > limits['processMemoryBytes']:
                 reason = 'memory_limit'; break
         except psutil.Error:
             pass

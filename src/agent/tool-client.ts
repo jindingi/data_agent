@@ -8,6 +8,7 @@ export interface ToolExecutor {
     operation: ToolOperation,
     signal: AbortSignal | undefined,
     update: (output: string) => void,
+    maxOutputBytes?: number,
   ): Promise<ToolResult>;
   subscribe(listener: (interactions: Interaction[]) => void): () => void;
 }
@@ -24,6 +25,7 @@ export class ToolClient implements ToolExecutor {
     operation: ToolOperation,
     signal: AbortSignal | undefined,
     update: (output: string) => void,
+    maxOutputBytes?: number,
   ) {
     signal?.throwIfAborted();
     const id = randomUUID();
@@ -35,7 +37,7 @@ export class ToolClient implements ToolExecutor {
         cleanup: () => signal?.removeEventListener('abort', cancel),
       });
       signal?.addEventListener('abort', cancel, { once: true });
-      this.post({ type: 'tool.request', id, toolCallId, operation });
+      this.post({ type: 'tool.request', id, toolCallId, operation, maxOutputBytes });
       if (signal?.aborted) cancel();
     });
   }

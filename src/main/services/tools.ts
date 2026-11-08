@@ -6,6 +6,8 @@ import { requireRuntime, type RuntimePaths } from '../../node/runtime-paths';
 import { logReadAccess } from '../../node/tool-log-path';
 import { realpathSync } from 'node:fs';
 import type { ToolOperation, ToolResult, Interaction } from '../../shared/tools';
+import { toolLimits } from '../../shared/tool-limits';
+import { boundToolResult } from '../../node/tool-output';
 
 export interface ToolContext extends PolicyContext {
   sessionId: string;
@@ -44,7 +46,9 @@ export class ToolService {
     toolCallId: string,
     operation: ToolOperation,
     observers: ToolObservers,
+    maxOutputBytes: number = toolLimits.resultBytes,
   ): Promise<ToolResult> {
+    const resultBytes = Math.max(0, Math.min(toolLimits.resultBytes, maxOutputBytes));
     const previous = this.tails.get(context.runId) ?? Promise.resolve();
     const item: Active = { runId: context.runId, toolCallId, abort: new AbortController() };
     this.active.add(item);
@@ -54,6 +58,8 @@ export class ToolService {
         try {
           if (this.closed.has(context.runId)) throw new Error('任务已结束');
           item.abort.signal.throwIfAborted();
+          if (resultBytes <= toolLimits.resultNoticeBytes)
+            throw new Error('本批次工具调用过多，请减少并分批调用。');
           requireRuntime(this.resources);
           if (operation.name === 'ask_clarification') {
             const answer = await this.broker.request(
@@ -139,6 +145,7 @@ export class ToolService {
             item.abort.signal,
             observers,
             checked.paths[0]?.path,
+            resultBytes,
           );
         } catch (error) {
           return {
@@ -153,11 +160,12 @@ export class ToolService {
           this.active.delete(item);
         }
       });
-    this.tails.set(context.runId, task);
-    void task.finally(() => {
-      if (this.tails.get(context.runId) === task) this.tails.delete(context.runId);
+    const bounded = task.then((result) => boundToolResult(result, resultBytes));
+    this.tails.set(context.runId, bounded);
+    void bounded.finally(() => {
+      if (this.tails.get(context.runId) === bounded) this.tails.delete(context.runId);
     });
-    return task;
+    return bounded;
   }
   cancelTool(runId: string, toolCallId: string) {
     for (const item of this.active)

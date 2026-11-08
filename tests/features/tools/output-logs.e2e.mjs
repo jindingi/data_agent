@@ -32,9 +32,11 @@ export const cases = {
         (payload) => {
           const result = payload.messages.at(-1).content;
           assert(result.includes('截断'));
-          assert(!result.includes('STDERR_END_SENTINEL'));
+          assert(result.includes('STDERR_END_SENTINEL'));
           assert(!result.includes('\ufffd'));
-          assert(Buffer.byteLength(result.split('\n[输出已截断')[0]) <= 2048);
+          const preview = result.split('\n[输出已截断')[0].split('\n[…中间输出已省略…]\n');
+          assert.equal(preview.length, 2);
+          assert(preview.reduce((sum, part) => sum + Buffer.byteLength(part), 0) <= 2048);
           logPath = result.match(/日志路径：([^\n]+)/)?.[1];
           assert(logPath?.startsWith(join(root, 'data/logs') + '/'));
           saved = readFileSync(logPath, 'utf8');
@@ -74,7 +76,7 @@ export const cases = {
       );
       assert.equal(await page.getByTestId('full-tool-log').count(), 0);
       const resultText = await card.locator('pre').last().innerText();
-      assert(!resultText.includes('STDERR_END_SENTINEL'));
+      assert(resultText.includes('STDERR_END_SENTINEL'));
       assert(resultText.includes(logPath));
       for (const [width, height] of [
         [1080, 760],

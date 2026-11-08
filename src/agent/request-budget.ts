@@ -1,12 +1,13 @@
 /** Transport request count and active-time budget; human waiting does not consume active time. */
+import { executionLimits } from '../shared/tool-limits';
 export class RequestBudget {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private since: number | undefined;
   private remaining: number;
   private count = 0;
   constructor(
-    private requestLimit = 50,
-    milliseconds = 10 * 60_000,
+    private requestLimit: number = executionLimits.requests,
+    milliseconds: number = executionLimits.activeMilliseconds,
   ) {
     this.remaining = milliseconds;
   }

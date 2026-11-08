@@ -1,7 +1,7 @@
 {
   "version": 1,
   "provenance": "deepseek-live",
-  "recordedAt": "2026-11-07T19:48:25.857Z",
+  "recordedAt": "2026-11-08T06:12:20.416Z",
   "sdk": {
     "@earendil-works/pi-ai": "1.5.0",
     "@earendil-works/pi-coding-agent": "1.5.0"
@@ -37,21 +37,33 @@
         "tools": [
           {
             "function": {
-              "description": "Read a text file. offset is a 1-based line number. Output is bounded; read larger datasets with Python if needed.",
+              "description": "Read UTF-8 text, at most 200 lines by default and 48 KiB. offset is a 1-based line. Continue with the returned byteOffset, including within long lines and large logs. Read larger datasets with Python.",
               "name": "read",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "byteOffset": {
+                    "description": "UTF-8 byte position, starting at zero. Use the nextByteOffset returned by read to continue, including within long lines.",
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "limit": {
+                    "description": "Maximum lines to return, default 200.",
                     "maximum": 2000,
                     "minimum": 1,
                     "type": "integer"
                   },
                   "offset": {
+                    "description": "1-based starting line. Cannot be combined with byteOffset.",
+                    "maximum": 9007199254740991,
                     "minimum": 1,
                     "type": "integer"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -64,16 +76,20 @@
           },
           {
             "function": {
-              "description": "Write UTF-8 text to a file, creating parent directories. Existing contents are replaced. External writes require approval. Write scripts and reports using this tool.",
+              "description": "Write UTF-8 text, at most 256 KiB, creating parent directories and replacing existing contents. External writes require approval.",
               "name": "write",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "content": {
+                    "description": "UTF-8 text, at most 262144 encoded bytes.",
                     "maxLength": 262144,
                     "type": "string"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -86,19 +102,25 @@
           },
           {
             "function": {
-              "description": "Replace exactly one occurrence of oldText in a UTF-8 file with newText. Fails without changes if oldText is absent or ambiguous.",
+              "description": "Replace exactly one occurrence of oldText with newText in a UTF-8 file no larger than 2 MiB. Each text is limited to 256 KiB. Fails without changes for absent or ambiguous matches.",
               "name": "edit",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "newText": {
+                    "description": "UTF-8 text, at most 262144 encoded bytes.",
+                    "maxLength": 262144,
                     "type": "string"
                   },
                   "oldText": {
+                    "maxLength": 262144,
                     "minLength": 1,
                     "type": "string"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -111,12 +133,14 @@
           },
           {
             "function": {
-              "description": "Execute bash in the current output directory. python/python3, rg and fd use bundled versions. No user shell startup files. No installing dependencies. Common dangerous operations are blocked; external writes, detected networking and dynamic execution request approval. Default timeout 180 seconds.",
+              "description": "Execute bash in the session workspace. python/python3, rg and fd use bundled versions. No user shell startup files or installing dependencies. Dangerous operations are blocked; detected external writes, networking and dynamic execution request approval. Default and maximum timeout 180 seconds. Returns a bounded head/tail preview; output exceeding 2 KiB is saved to a session log, subject to a 10 MiB/run quota. Use read with byteOffset to inspect it.",
               "name": "bash",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "command": {
                     "maxLength": 100000,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "timeout": {
@@ -134,18 +158,37 @@
           },
           {
             "function": {
-              "description": "Search text using ripgrep regex. Output and file count are bounded. Hidden/sensitive files and directory symlinks are excluded from recursive search.",
+              "description": "Search UTF-8 text using ripgrep regex, or literal=true for literal text. Default 100 total matches. offset skips matches; continue with nextOffset. Output and traversal are bounded, and omitted scope/long lines are reported. Hidden/sensitive files and directory symlinks are excluded.",
               "name": "grep",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "ignoreCase": {
                     "type": "boolean"
                   },
+                  "limit": {
+                    "maximum": 1000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "literal": {
+                    "type": "boolean"
+                  },
+                  "offset": {
+                    "description": "Number of matches to skip. Continue with the returned nextOffset.",
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "pattern": {
+                    "maxLength": 1000,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -158,15 +201,29 @@
           },
           {
             "function": {
-              "description": "Find regular files using an fd filename regex. Hidden/sensitive paths are excluded. Up to 256 matches.",
+              "description": "Find regular files using an fd filename regex, default 256 results. offset skips results; continue with nextOffset. Hidden/sensitive paths are excluded. Output and scanned candidates are bounded.",
               "name": "find",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "limit": {
+                    "maximum": 2000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "pattern": {
+                    "maxLength": 1000,
                     "type": "string"
                   }
                 },
@@ -179,12 +236,25 @@
           },
           {
             "function": {
-              "description": "List up to 500 directory entries, showing file, directory or symlink type.",
+              "description": "List directory entries in sorted order, default 500 entries, with file/directory/symlink type. Output is byte-bounded. offset skips entries; continue with nextOffset.",
               "name": "ls",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "limit": {
+                    "maximum": 2000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -197,12 +267,15 @@
           },
           {
             "function": {
-              "description": "Ask a concise clarification question and wait for an answer. This is not a permission approval and cannot authorize filesystem/network operations.",
+              "description": "Ask a concise clarification question and wait for an answer. This cannot authorize filesystem or network operations.",
               "name": "ask_clarification",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "options": {
                     "items": {
+                      "maxLength": 500,
+                      "minLength": 1,
                       "type": "string"
                     },
                     "maxItems": 8,
@@ -210,6 +283,7 @@
                   },
                   "question": {
                     "maxLength": 4000,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -222,65 +296,66 @@
           }
         ]
       },
-      "requestHash": "03eba6d3c6c78556f3ab0b57f955b216ee5b095c443a0e844151336d3c0c61d4",
+      "requestHash": "d4368ade2c6061384297832911f0159d3ee41bf7cf88727a6cbae4b20cf3aa02",
       "status": 200,
       "contentType": "text/event-stream; charset=utf-8",
       "chunks": [
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"'ll\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" read\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" the\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" file\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" as\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" requested\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_00_ET_Q9iAWB3xtAIZSBGqDa0b7771\",\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"path\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\": \\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{{TEST_ROOT}}\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"/f\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"i\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"xture\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\".txt\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"}\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"367aa11e-841f-4a13-801b-aa659a267b6b\",\"object\":\"chat.completion.chunk\",\"created\":1794080908,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":1869,\"completion_tokens\":78,\"total_tokens\":1947,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":1869}}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_00_ET_NfgAkS1lg7b3wYBH9vDQ0269\",\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"path\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\": \\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{{TEST_ROOT}}\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"/f\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"i\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"xture\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\".txt\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"}\"}}]},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"8f14028a-c26e-4cc5-ab5b-44ea8b66ef9b\",\"object\":\"chat.completion.chunk\",\"created\":1794118341,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":2537,\"completion_tokens\":80,\"total_tokens\":2617,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":2537}}\n\n",
         "data: [DONE]\n\n"
       ],
-      "responseHash": "7c98cfd8a084994f1d3853884519b2e9a3c6c71ac386cba37bffcf6f9c46d3f4"
+      "responseHash": "6d6896b6c11fca32d36f8277c0647e56e666f9bfc17d2a5eb8b31056dd8ff18a"
     },
     {
       "request": {
@@ -300,7 +375,7 @@
             "role": "user"
           },
           {
-            "content": "I'll read the file as requested.",
+            "content": null,
             "reasoning_content": "",
             "role": "assistant",
             "tool_calls": [
@@ -309,7 +384,7 @@
                   "arguments": "{\"path\":\"{{TEST_ROOT}}/fixture.txt\"}",
                   "name": "read"
                 },
-                "id": "call_00_ET_Q9iAWB3xtAIZSBGqDa0b7771",
+                "id": "call_00_ET_NfgAkS1lg7b3wYBH9vDQ0269",
                 "type": "function"
               }
             ]
@@ -317,7 +392,7 @@
           {
             "content": "Synthetic fixture: North 10, South 20.\n",
             "role": "tool",
-            "tool_call_id": "call_00_ET_Q9iAWB3xtAIZSBGqDa0b7771"
+            "tool_call_id": "call_00_ET_NfgAkS1lg7b3wYBH9vDQ0269"
           }
         ],
         "model": "deepseek-flash",
@@ -332,21 +407,33 @@
         "tools": [
           {
             "function": {
-              "description": "Read a text file. offset is a 1-based line number. Output is bounded; read larger datasets with Python if needed.",
+              "description": "Read UTF-8 text, at most 200 lines by default and 48 KiB. offset is a 1-based line. Continue with the returned byteOffset, including within long lines and large logs. Read larger datasets with Python.",
               "name": "read",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "byteOffset": {
+                    "description": "UTF-8 byte position, starting at zero. Use the nextByteOffset returned by read to continue, including within long lines.",
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "limit": {
+                    "description": "Maximum lines to return, default 200.",
                     "maximum": 2000,
                     "minimum": 1,
                     "type": "integer"
                   },
                   "offset": {
+                    "description": "1-based starting line. Cannot be combined with byteOffset.",
+                    "maximum": 9007199254740991,
                     "minimum": 1,
                     "type": "integer"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -359,16 +446,20 @@
           },
           {
             "function": {
-              "description": "Write UTF-8 text to a file, creating parent directories. Existing contents are replaced. External writes require approval. Write scripts and reports using this tool.",
+              "description": "Write UTF-8 text, at most 256 KiB, creating parent directories and replacing existing contents. External writes require approval.",
               "name": "write",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "content": {
+                    "description": "UTF-8 text, at most 262144 encoded bytes.",
                     "maxLength": 262144,
                     "type": "string"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -381,19 +472,25 @@
           },
           {
             "function": {
-              "description": "Replace exactly one occurrence of oldText in a UTF-8 file with newText. Fails without changes if oldText is absent or ambiguous.",
+              "description": "Replace exactly one occurrence of oldText with newText in a UTF-8 file no larger than 2 MiB. Each text is limited to 256 KiB. Fails without changes for absent or ambiguous matches.",
               "name": "edit",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "newText": {
+                    "description": "UTF-8 text, at most 262144 encoded bytes.",
+                    "maxLength": 262144,
                     "type": "string"
                   },
                   "oldText": {
+                    "maxLength": 262144,
                     "minLength": 1,
                     "type": "string"
                   },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -406,12 +503,14 @@
           },
           {
             "function": {
-              "description": "Execute bash in the current output directory. python/python3, rg and fd use bundled versions. No user shell startup files. No installing dependencies. Common dangerous operations are blocked; external writes, detected networking and dynamic execution request approval. Default timeout 180 seconds.",
+              "description": "Execute bash in the session workspace. python/python3, rg and fd use bundled versions. No user shell startup files or installing dependencies. Dangerous operations are blocked; detected external writes, networking and dynamic execution request approval. Default and maximum timeout 180 seconds. Returns a bounded head/tail preview; output exceeding 2 KiB is saved to a session log, subject to a 10 MiB/run quota. Use read with byteOffset to inspect it.",
               "name": "bash",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "command": {
                     "maxLength": 100000,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "timeout": {
@@ -429,18 +528,37 @@
           },
           {
             "function": {
-              "description": "Search text using ripgrep regex. Output and file count are bounded. Hidden/sensitive files and directory symlinks are excluded from recursive search.",
+              "description": "Search UTF-8 text using ripgrep regex, or literal=true for literal text. Default 100 total matches. offset skips matches; continue with nextOffset. Output and traversal are bounded, and omitted scope/long lines are reported. Hidden/sensitive files and directory symlinks are excluded.",
               "name": "grep",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "ignoreCase": {
                     "type": "boolean"
                   },
+                  "limit": {
+                    "maximum": 1000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "literal": {
+                    "type": "boolean"
+                  },
+                  "offset": {
+                    "description": "Number of matches to skip. Continue with the returned nextOffset.",
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "pattern": {
+                    "maxLength": 1000,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -453,15 +571,29 @@
           },
           {
             "function": {
-              "description": "Find regular files using an fd filename regex. Hidden/sensitive paths are excluded. Up to 256 matches.",
+              "description": "Find regular files using an fd filename regex, default 256 results. offset skips results; continue with nextOffset. Hidden/sensitive paths are excluded. Output and scanned candidates are bounded.",
               "name": "find",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "limit": {
+                    "maximum": 2000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "pattern": {
+                    "maxLength": 1000,
                     "type": "string"
                   }
                 },
@@ -474,12 +606,25 @@
           },
           {
             "function": {
-              "description": "List up to 500 directory entries, showing file, directory or symlink type.",
+              "description": "List directory entries in sorted order, default 500 entries, with file/directory/symlink type. Output is byte-bounded. offset skips entries; continue with nextOffset.",
               "name": "ls",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
+                  "limit": {
+                    "maximum": 2000,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
                   "path": {
-                    "description": "Absolute path or path relative to the current output directory.",
+                    "description": "Absolute path or a path relative to the session workspace.",
+                    "maxLength": 4096,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -492,12 +637,15 @@
           },
           {
             "function": {
-              "description": "Ask a concise clarification question and wait for an answer. This is not a permission approval and cannot authorize filesystem/network operations.",
+              "description": "Ask a concise clarification question and wait for an answer. This cannot authorize filesystem or network operations.",
               "name": "ask_clarification",
               "parameters": {
+                "additionalProperties": false,
                 "properties": {
                   "options": {
                     "items": {
+                      "maxLength": 500,
+                      "minLength": 1,
                       "type": "string"
                     },
                     "maxItems": 8,
@@ -505,6 +653,7 @@
                   },
                   "question": {
                     "maxLength": 4000,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -517,35 +666,34 @@
           }
         ]
       },
-      "requestHash": "61e8ec9da74e14136b3f84a708ee3152f887e66e544cf5abf8b493cb1819024a",
+      "requestHash": "2a60926310563c00858436cba9a35855bc475e8e0214abd2f5cea7b25ca32d58",
       "status": 200,
       "contentType": "text/event-stream; charset=utf-8",
       "chunks": [
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" file\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" contains\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" the\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" single\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" line\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\":\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \\\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"S\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ynthetic\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" fixture\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\":\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" North\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"10\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\",\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" South\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"20\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\\\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
-        "data: {\"id\":\"ad915667-66ce-464c-a15c-4bf4a8b31640\",\"object\":\"chat.completion.chunk\",\"created\":1794080909,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1970,\"completion_tokens\":21,\"total_tokens\":1991,\"prompt_tokens_details\":{\"cached_tokens\":1792},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":1792,\"prompt_cache_miss_tokens\":178}}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" file\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" contains\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" the\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" single\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" line\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \\\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"S\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ynthetic\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" fixture\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\":\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" North\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"10\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\",\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" South\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"20\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\\\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}\n\n",
+        "data: {\"id\":\"27d0b759-7e32-40d9-8032-8651b45ed6c6\",\"object\":\"chat.completion.chunk\",\"created\":1794118342,\"model\":\"deepseek-flash\",\"system_fingerprint\":\"bc19ba97cbe016479903222bb1578db6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":null},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2640,\"completion_tokens\":20,\"total_tokens\":2660,\"prompt_tokens_details\":{\"cached_tokens\":2432},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":2432,\"prompt_cache_miss_tokens\":208}}\n\n",
         "data: [DONE]\n\n"
       ],
-      "responseHash": "75e225d64523787fc1ce8029e4e957377e7a170079b74d833f96a62a4ddb5038"
+      "responseHash": "e9e68faf222e117b9e087f7e56f01e746fe9e9b5359c17d0fc617935fb5ec1e5"
     }
   ]
 }

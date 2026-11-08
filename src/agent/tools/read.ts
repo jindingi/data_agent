@@ -1,23 +1,25 @@
-import { Type } from 'typebox';
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { readText } from '../../node/read-text';
-const parameters = Type.Object({
-  path: Type.String(),
-  offset: Type.Optional(Type.Integer({ minimum: 1 })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 2000 })),
-});
+import { toolParameters } from '../../shared/tools';
+import { toolDeclaration } from './index';
+import { toolLimits } from '../../shared/tool-limits';
 /** Read-only SDK harness path; the desktop routes its tools through Main's policy. */
 export function readTool(
   workspace: string,
   protectedRoots: string[],
-): ToolDefinition<typeof parameters> {
+  resultBytes: () => number = () => toolLimits.resultBytes,
+): ToolDefinition {
   return {
-    name: 'read',
-    label: '读取文件',
-    description: 'Read text files with bounded output and 1-based line offset.',
-    parameters,
+    ...toolDeclaration('read'),
     async execute(_id, params, signal) {
-      const result = await readText(workspace, protectedRoots, params, signal);
+      const result = await readText(
+        workspace,
+        protectedRoots,
+        toolParameters.read.parse(params),
+        signal,
+        undefined,
+        resultBytes(),
+      );
       return { content: [{ type: 'text', text: result.output }], details: result.details };
     },
   };

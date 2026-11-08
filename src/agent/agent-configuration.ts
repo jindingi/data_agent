@@ -72,7 +72,7 @@ export function bindAgentConfiguration(
     )
       throw new AppError(
         'AGENT_CONFIG_UNAVAILABLE',
-        '配置待确认：历史提示词、skill 索引或工具声明与运行时不兼容，已停止以保留上下文。',
+        '配置待确认：历史提示词、skill 索引或工具声明与运行时不兼容，已停止以保留上下文，请新建会话。',
       );
   }
   if (!markers.length)

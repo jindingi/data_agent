@@ -15,8 +15,9 @@ export async function modelFixture() {
       return;
     }
     if (serveModelListing(request, response)) return;
-    let body = '';
-    for await (const chunk of request) body += chunk;
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const body = Buffer.concat(chunks).toString('utf8');
     authorizations.push(request.headers.authorization ?? '');
     const payload = JSON.parse(body);
     requests.push(payload);

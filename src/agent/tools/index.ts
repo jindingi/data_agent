@@ -1,97 +1,91 @@
-import { Type, type TSchema } from 'typebox';
+import type { TSchema } from 'typebox';
+import { z } from 'zod';
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
-import { toolOperationSchema } from '../../shared/tools';
+import { toolOperationSchema, toolParameters } from '../../shared/tools';
+import { toolLimits } from '../../shared/tool-limits';
 import type { ToolExecutor } from '../tool-client';
 
-export function genericTools(client: ToolExecutor, redact: <T>(value: T) => T): ToolDefinition[] {
-  const path = Type.String({
-    description: 'Absolute path or path relative to the current output directory.',
+const descriptions = {
+  read: [
+    '读取文件',
+    `Read UTF-8 text, at most ${toolLimits.readLines} lines by default and ${toolLimits.readBytes / 1024} KiB. offset is a 1-based line. Continue with the returned byteOffset, including within long lines and large logs. Read larger datasets with Python.`,
+  ],
+  write: [
+    '写入文件',
+    `Write UTF-8 text, at most ${toolLimits.textBytes / 1024} KiB, creating parent directories and replacing existing contents. External writes require approval.`,
+  ],
+  edit: [
+    '精确修改',
+    `Replace exactly one occurrence of oldText with newText in a UTF-8 file no larger than ${toolLimits.editFileBytes / 1024 / 1024} MiB. Each text is limited to ${toolLimits.textBytes / 1024} KiB. Fails without changes for absent or ambiguous matches.`,
+  ],
+  bash: [
+    '执行命令',
+    `Execute bash in the session workspace. python/python3, rg and fd use bundled versions. No user shell startup files or installing dependencies. Dangerous operations are blocked; detected external writes, networking and dynamic execution request approval. Default and maximum timeout ${toolLimits.timeoutSeconds} seconds. Returns a bounded head/tail preview; output exceeding ${toolLimits.bashPreviewBytes / 1024} KiB is saved to a session log, subject to a ${toolLimits.runLogBytes / 1024 / 1024} MiB/run quota. Use read with byteOffset to inspect it.`,
+  ],
+  grep: [
+    '搜索内容',
+    `Search UTF-8 text using ripgrep regex, or literal=true for literal text. Default ${toolLimits.searchMatches} total matches. offset skips matches; continue with nextOffset. Output and traversal are bounded, and omitted scope/long lines are reported. Hidden/sensitive files and directory symlinks are excluded.`,
+  ],
+  find: [
+    '查找文件',
+    `Find regular files using an fd filename regex, default ${toolLimits.searchFiles} results. offset skips results; continue with nextOffset. Hidden/sensitive paths are excluded. Output and scanned candidates are bounded.`,
+  ],
+  ls: [
+    '列出目录',
+    `List directory entries in sorted order, default ${toolLimits.directoryEntries} entries, with file/directory/symlink type. Output is byte-bounded. offset skips entries; continue with nextOffset.`,
+  ],
+  ask_clarification: [
+    '询问用户',
+    'Ask a concise clarification question and wait for an answer. This cannot authorize filesystem or network operations.',
+  ],
+} satisfies Record<keyof typeof toolParameters, [string, string]>;
+
+export function toolDeclaration(name: keyof typeof toolParameters) {
+  const parameters = z.toJSONSchema(toolParameters[name], {
+    target: 'draft-7',
   });
-  const definitions: { name: string; label: string; description: string; parameters: TSchema }[] = [
-    {
-      name: 'read',
-      label: '读取文件',
-      description:
-        'Read a text file. offset is a 1-based line number. Output is bounded; read larger datasets with Python if needed.',
-      parameters: Type.Object({
-        path,
-        offset: Type.Optional(Type.Integer({ minimum: 1 })),
-        limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 2000 })),
-      }),
-    },
-    {
-      name: 'write',
-      label: '写入文件',
-      description:
-        'Write UTF-8 text to a file, creating parent directories. Existing contents are replaced. External writes require approval. Write scripts and reports using this tool.',
-      parameters: Type.Object({ path, content: Type.String({ maxLength: 256 * 1024 }) }),
-    },
-    {
-      name: 'edit',
-      label: '精确修改',
-      description:
-        'Replace exactly one occurrence of oldText in a UTF-8 file with newText. Fails without changes if oldText is absent or ambiguous.',
-      parameters: Type.Object({
-        path,
-        oldText: Type.String({ minLength: 1 }),
-        newText: Type.String(),
-      }),
-    },
-    {
-      name: 'bash',
-      label: '执行命令',
-      description:
-        'Execute bash in the current output directory. python/python3, rg and fd use bundled versions. No user shell startup files. No installing dependencies. Common dangerous operations are blocked; external writes, detected networking and dynamic execution request approval. Default timeout 180 seconds.',
-      parameters: Type.Object({
-        command: Type.String({ maxLength: 100_000 }),
-        timeout: Type.Optional(Type.Integer({ minimum: 1, maximum: 180 })),
-      }),
-    },
-    {
-      name: 'grep',
-      label: '搜索内容',
-      description:
-        'Search text using ripgrep regex. Output and file count are bounded. Hidden/sensitive files and directory symlinks are excluded from recursive search.',
-      parameters: Type.Object({
-        pattern: Type.String(),
-        path,
-        ignoreCase: Type.Optional(Type.Boolean()),
-      }),
-    },
-    {
-      name: 'find',
-      label: '查找文件',
-      description:
-        'Find regular files using an fd filename regex. Hidden/sensitive paths are excluded. Up to 256 matches.',
-      parameters: Type.Object({ pattern: Type.String(), path }),
-    },
-    {
-      name: 'ls',
-      label: '列出目录',
-      description: 'List up to 500 directory entries, showing file, directory or symlink type.',
-      parameters: Type.Object({ path }),
-    },
-    {
-      name: 'ask_clarification',
-      label: '询问用户',
-      description:
-        'Ask a concise clarification question and wait for an answer. This is not a permission approval and cannot authorize filesystem/network operations.',
-      parameters: Type.Object({
-        question: Type.String({ maxLength: 4000 }),
-        options: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })),
-      }),
-    },
-  ];
-  return definitions.map((definition) => ({
-    ...definition,
+  delete parameters.$schema;
+  return {
+    name,
+    label: descriptions[name][0],
+    description: descriptions[name][1],
+    parameters: parameters as TSchema,
+  };
+}
+
+/** Allocate result bytes before execution; no previously sent result is rewritten. */
+export class ToolBatchBudget {
+  resultBytes: number = toolLimits.resultBytes;
+  begin(calls: number) {
+    this.resultBytes = Math.min(
+      toolLimits.resultBytes,
+      Math.floor(toolLimits.batchResultBytes / Math.max(1, calls)),
+    );
+  }
+}
+
+export function genericTools(
+  client: ToolExecutor,
+  redact: <T>(value: T) => T,
+  budget = new ToolBatchBudget(),
+): ToolDefinition[] {
+  return (Object.keys(toolParameters) as (keyof typeof toolParameters)[]).map((name) => ({
+    ...toolDeclaration(name),
     async execute(toolCallId, params, signal, onUpdate) {
       if (!params || typeof params !== 'object') throw new Error('工具参数必须是对象');
-      const operation = toolOperationSchema.parse(redact({ ...params, name: definition.name }));
-      const result = await client.execute(toolCallId, operation, signal, (output) =>
-        onUpdate?.({ content: [{ type: 'text', text: output }], details: {} }),
+      const operation = toolOperationSchema.parse(redact({ ...params, name }));
+      const result = await client.execute(
+        toolCallId,
+        operation,
+        signal,
+        (output) => onUpdate?.({ content: [{ type: 'text', text: output }], details: {} }),
+        budget.resultBytes,
       );
-      if (result.isError) throw new Error(result.output);
-      return { content: [{ type: 'text', text: result.output }], details: result.details ?? {} };
+      return {
+        content: [{ type: 'text', text: result.output }],
+        details: result.details ?? {},
+        isError: result.isError,
+      };
     },
   }));
 }

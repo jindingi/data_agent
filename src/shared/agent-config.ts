@@ -1,15 +1,7 @@
 import { z } from 'zod';
+import { toolNames } from './tools';
 
-export const toolIds = [
-  'read',
-  'write',
-  'edit',
-  'bash',
-  'grep',
-  'find',
-  'ls',
-  'ask_clarification',
-] as const;
+export const toolIds = toolNames;
 export type ToolId = (typeof toolIds)[number];
 export const skillIds = ['data-analysis', 'interactive-report'] as const;
 export type SkillId = (typeof skillIds)[number];

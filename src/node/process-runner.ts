@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { RuntimePaths } from './runtime-paths';
 import { ProcessOutput, type ProcessLogBudget } from './process-output';
+import { executionLimits, toolLimits } from '../shared/tool-limits';
 
 export interface ProcessResult {
   output: string;
@@ -12,6 +13,9 @@ export interface ProcessResult {
   peakRss: number;
   truncated: boolean;
   pid: number | null;
+  logPath?: string;
+  logBytes?: number;
+  logComplete?: boolean;
 }
 interface Options {
   sessionId: string;
@@ -25,6 +29,7 @@ interface Options {
   timeoutSeconds?: number;
   onOutput?: (text: string) => void;
   saveOverflowLog?: boolean;
+  captureOutputBytes?: number;
 }
 export class ProcessRunner {
   private children = new Set<ChildProcessWithoutNullStreams>();
@@ -65,14 +70,18 @@ export class ProcessRunner {
     const env = this.environment(options.cwd);
     let log: { path: string; budget: ProcessLogBudget } | undefined;
     if (options.saveOverflowLog) {
-      const budget = this.logBudgets.get(options.runId) ?? { remaining: 10 * 1024 * 1024 };
+      const budget = this.logBudgets.get(options.runId) ?? { remaining: toolLimits.runLogBytes };
       this.logBudgets.set(options.runId, budget);
       log = {
         path: toolLogPath(this.logs, options.sessionId, options.runId, options.toolCallId),
         budget,
       };
     }
-    const output = new ProcessOutput(log);
+    const output = new ProcessOutput({
+      maxBytes: options.captureOutputBytes ?? toolLimits.bashPreviewBytes,
+      mode: options.captureOutputBytes ? 'raw' : 'head-tail',
+      log,
+    });
     return new Promise((resolve, reject) => {
       const child = spawn(
         this.paths.python,
@@ -80,6 +89,7 @@ export class ProcessRunner {
         { env, cwd: options.cwd, detached: true, stdio: ['pipe', 'pipe', 'pipe'] },
       );
       this.children.add(child);
+      let captureLimited = false;
       let protocol = '',
         settled = false;
       let result: ProcessResult = {
@@ -98,7 +108,7 @@ export class ProcessRunner {
       child.stderr.resume();
       child.stdout.on('data', (chunk: Buffer) => {
         protocol += chunk.toString('utf8');
-        if (protocol.length > 512 * 1024) {
+        if (protocol.length > toolLimits.processProtocolBytes) {
           child.stdin.end();
           protocol = '';
           return;
@@ -121,6 +131,10 @@ export class ProcessRunner {
               const wasTruncated = output.truncated;
               const text = output.append(Buffer.from(message.data, 'base64'));
               if (!wasTruncated) options.onOutput?.(text);
+              if (options.captureOutputBytes && output.truncated && !captureLimited) {
+                captureLimited = true;
+                cancel();
+              }
             }
           } catch {
             result.reason = 'supervisor_protocol_error';
@@ -128,13 +142,13 @@ export class ProcessRunner {
           }
         }
       });
-      const finish = () => {
+      const finish = async () => {
         this.children.delete(child);
         options.signal?.removeEventListener('abort', cancel);
         if (settled) return;
         settled = true;
-        result.output = output.finish();
-        result.truncated = output.truncated;
+        Object.assign(result, await output.finish());
+        if (captureLimited) result.reason = 'capture_limit';
         resolve(result);
       };
       child.once('error', () => {
@@ -154,7 +168,11 @@ export class ProcessRunner {
           outputRoot: options.outputRoot,
           mainPid: process.pid,
           hostPid: options.hostPid,
-          timeoutSeconds: Math.min(options.timeoutSeconds ?? 180, 180),
+          timeoutSeconds: Math.min(
+            options.timeoutSeconds ?? toolLimits.timeoutSeconds,
+            toolLimits.timeoutSeconds,
+          ),
+          limits: executionLimits,
         }) + '\n',
       );
       if (options.signal?.aborted) cancel();

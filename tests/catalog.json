@@ -1,5 +1,75 @@
 [
   {
+    "id": "tooling.model-fixture",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/model-fixture.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["tools", "conversation"]
+  },
+  {
+    "id": "tools.output-budgets",
+    "feature": "tools",
+    "level": "e2e",
+    "file": "tests/features/tools/output-budgets.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation", "agent-config"]
+  },
+  {
+    "id": "tools.contracts-unit",
+    "feature": "tools",
+    "level": "unit",
+    "file": "tests/features/tools/contracts.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["agent-config"]
+  },
+  {
+    "id": "tools.process-output-unit",
+    "feature": "tools",
+    "level": "unit",
+    "file": "tests/features/tools/process-output.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "tools.search-pagination",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.log-continuation",
+    "feature": "tools",
+    "level": "integration",
+    "file": "tests/features/tools/tools.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["approvals"]
+  },
+  {
+    "id": "tools.result-bounds-unit",
+    "feature": "tools",
+    "level": "unit",
+    "file": "tests/features/tools/result-bounds.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["approvals", "conversation"]
+  },
+  {
     "id": "conversation.live-cache",
     "feature": "conversation",
     "level": "e2e",
