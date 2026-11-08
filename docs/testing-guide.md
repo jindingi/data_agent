@@ -165,6 +165,7 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 - `agent-config.requests`：旧 skill、新 skill 单独启用、两个 skill 同启用及关闭的最终提供方请求，工具循环/预算变化、steer/follow-up、附件和重启前缀；压缩边界仍由 conversation.retry-compaction 验证。
 - `reports.delivery`：用真实通用 read/write/bash 与内置 Python 读取新 skill/资料、装配自由 HTML、内联锁定库、转义数据、实际筛选；模型响应为 scripted，不代表生成质量。
 - `reports.engine`、`preview.html`：真实隐藏 Electron/CDP，ECharts 筛选/重置、源码/隐藏/弹窗/滚动状态、显式刷新、三尺寸/深浅宿主主题、另存和独立离线 file:// Chromium 打开。宿主截图不含独立原生 view，报告截图单独保留；必须实际检查两者，不能把空白宿主槽位当报告截图。
+- `preview.html-visibility`、`preview.html-visibility-dev`：分别通过隔离构建与真实 `pnpm dev` 完成带用量的对话，再打开合成报告；覆盖保留在 DOM 中的已关闭用量弹层、原生 popover 和设置对话框开关后的报告显示及筛选状态。测试进程通过启动探针读取原生 view 的 getVisible 与尺寸，不新增产品 IPC；仅有 canvas 或 document.visibilityState 不能证明原生报告层已显示。
 - `preview.html-access-unit`、`preview.html-lifecycle-unit`、`preview.html-isolation`：完整读取/上限、串行内存分配/过期请求、跨会话拒绝、无 Node/IPC、CSP/eval、file/HTTP/WebSocket/Worker、权限/导航/弹窗/下载、WebRTC UDP 观测、脚本错误摘要、死循环关闭和删除回收。
 
 `pnpm test -- --case packaging.interactive-reports,performance.interactive-reports` 显式运行打包与性能；前者检查实际 .app 的库/许可哈希、预览/另存/独立离线重开，后者记录固定单图/6 图/近 32 MiB 文档的首次可交互、筛选、整个测试应用进程树采样 RSS 及关闭进程释放。内存采样不是操作系统绝对峰值；32 MiB 不是任意生成代码的性能保证。包移动与最小环境仍由既有 packaging.relocation / packaging.offline 用例覆盖，不用专项结果冒充完整 release。

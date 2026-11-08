@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 import { freePort, until } from './harness.mjs';
 
 /** Exercise the real pnpm dev command without replacing out/ or any user's app/state. */
-export async function startDevApp(root) {
+export async function startDevApp(root, { testModelBaseUrl, nodeOptions } = {}) {
   root = resolve(root);
   mkdirSync(root, { recursive: true });
   const port = await freePort(),
@@ -27,6 +27,8 @@ export async function startDevApp(root) {
     'DATA_AGENT_TEST_MODEL_BASE_URL',
   ])
     delete env[key];
+  if (testModelBaseUrl) env.DATA_AGENT_TEST_MODEL_BASE_URL = testModelBaseUrl;
+  if (nodeOptions) env.NODE_OPTIONS = nodeOptions;
   const fd = openSync(logFile, 'a');
   const child = spawn(
     'pnpm',

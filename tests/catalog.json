@@ -1148,5 +1148,25 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["reports", "sessions"]
+  },
+  {
+    "id": "preview.html-visibility",
+    "feature": "preview",
+    "level": "e2e",
+    "file": "tests/features/preview/html-visibility.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["usage", "reports", "transcript"]
+  },
+  {
+    "id": "preview.html-visibility-dev",
+    "feature": "preview",
+    "level": "e2e",
+    "file": "tests/features/preview/html-visibility.e2e.mjs",
+    "model": "scripted",
+    "environment": "dev",
+    "tags": [],
+    "related": ["usage", "reports", "transcript"]
   }
 ]

@@ -295,7 +295,7 @@ WorkspacePanel 提供文件/预览 tabs、可调宽度、展开阅读、独立�
 
 Main 为每次打开创建独立 WebContentsView 与非持久化 session。`data-report://document/{uuid}` 仅提供该次已验证的内存字节，无文件映射；仅允许精确文档的主 frame GET。无 preload、Node 或业务 IPC；sandbox/contextIsolation/webSecurity 均开启。响应 CSP 只允许内联脚本/样式及 data 图片/字体，禁止 eval、外部脚本、connect、frame/object、worker、base、form。独立 session 拒绝额外请求、设备权限与下载，阻止弹窗和跨文档导航，保留页内锚点。WebRTC 禁用非代理 UDP，并为该 session 设置无绕过的封闭本地代理；不改变主窗口网络配置。错误仅发有界通用摘要并去重，不转发报告原文。
 
-HtmlReport 只计算宿主槽位并发送有界位置；Main 再裁剪到窗口范围。调宽、展开、源码切换及隐藏不重建页面；宿主弹窗/菜单/提示浮层出现时隐藏原生 view，避免遮挡。选中文件/会话变化、会话删除和主窗口关闭销毁 view；显式刷新重新读取并重置交互。目录自动刷新不重载 HTML。关闭视图不停止 Agent。主 Renderer/Markdown 的 CSP 和 raw HTML 禁令保持原样。
+HtmlReport 只计算宿主槽位并发送有界位置；Main 再裁剪到窗口范围。调宽、展开、源码切换及隐藏不重建页面；实际可见的宿主弹窗/菜单/提示浮层出现时隐藏原生 view，避免遮挡。已关闭但保留在 DOM 中的弹层不影响报告显示；原生 popover 的 toggle 事件也触发布局更新，关闭后恢复原 view 和交互状态。选中文件/会话变化、会话删除和主窗口关闭销毁 view；显式刷新重新读取并重置交互。目录自动刷新不重载 HTML。关闭视图不停止 Agent。主 Renderer/Markdown 的 CSP 和 raw HTML 禁令保持原样。
 
 `interactive-report` 的 SKILL.md 与简短 references 随配置快照保存；vendor/echarts.min.js、LICENSE、NOTICE 只记录路径、字节数和 SHA-256。资源集合按路径排序并规范化字段顺序参与 bundleHash；物化先校验再以临时文件提交，不接受链接或篡改字节。新快照仅 promptVersion=2 使用 assets/bundleHash，旧快照不补默认字段，继续原指纹算法。旧缓存保留；缺失 vendor 只从相同哈希的安装资源恢复，否则报配置待确认，不能替换库版本。报告自身已内嵌资源，不受生成资源缺失影响。文件缓存与 SQLite 不是跨介质原子事务，无引用缓存可保留。
 

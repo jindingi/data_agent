@@ -39,6 +39,7 @@ export async function startApp(
     pickDirectory,
     saveFile,
     testModelBaseUrl,
+    nodeOptions,
   } = {},
 ) {
   root = resolve(root);
@@ -92,6 +93,7 @@ export async function startApp(
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.DEEPSEEK_API_KEY;
   delete env.OPENROUTER_API_KEY;
+  if (nodeOptions) env.NODE_OPTIONS = nodeOptions;
   const logFile = join(root, 'electron.log');
   const fd = openSync(logFile, 'a');
   // Test-only OS network denial; the product itself never uses sandbox-exec.

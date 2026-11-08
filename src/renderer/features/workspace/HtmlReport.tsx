@@ -29,8 +29,12 @@ export function HtmlReport({
         const element = host.current;
         if (!active || !loaded || !element) return;
         const rect = element.getBoundingClientRect();
-        const overlay = document.querySelector(
-          '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]',
+        const overlay = Array.from(
+          document.querySelectorAll(
+            '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]',
+          ),
+        ).some((element) =>
+          element.checkVisibility({ visibilityProperty: true, opacityProperty: true }),
         );
         const visible =
           !element.closest('[hidden]') && rect.width > 0 && rect.height > 0 && !overlay;
@@ -55,6 +59,8 @@ export function HtmlReport({
     });
     window.addEventListener('resize', layout);
     window.addEventListener('scroll', layout, true);
+    // Native popover state changes do not mutate DOM attributes observed above.
+    document.addEventListener('toggle', layout, true);
     void request({ type: 'report.open', id, sessionId: entry.sessionId, entryId: entry.id })
       .then((value) => {
         if (!active) return;
@@ -75,6 +81,7 @@ export function HtmlReport({
       mutations.disconnect();
       window.removeEventListener('resize', layout);
       window.removeEventListener('scroll', layout, true);
+      document.removeEventListener('toggle', layout, true);
       void request({ type: 'report.close', id }).catch(() => {});
     };
   }, [entry.id, entry.sessionId, refresh]);
