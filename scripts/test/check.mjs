@@ -12,9 +12,7 @@ for (const file of files('src').filter((f) => /\.[cm]?[jt]sx?$/.test(f)))
 for (const file of [
   'README.md',
   'AGENTS.md',
-  ...files('docs').filter(
-    (p) => p.endsWith('.md') && !p.includes('/research/') && !p.endsWith('validation-report.md'),
-  ),
+  ...files('docs').filter((p) => p.endsWith('.md') && !p.includes('/archived/')),
 ]) {
   const text = readFileSync(file, 'utf8');
   for (const match of text.matchAll(/\]\(([^)]+)\)/g)) {

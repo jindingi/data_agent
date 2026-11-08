@@ -29,7 +29,7 @@ export default tseslint.config(
       '.data_agent/**',
       'validation/**',
       '.husky/**',
-      'docs/research/**',
+      'docs/archived/**',
       'evaluations/results/**',
     ],
   },

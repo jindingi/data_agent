@@ -1,12 +1,6 @@
-# 数据分析客户端：技术设计与验证
+# 数据分析客户端：技术设计
 
-更新日期：2026-11-08。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
-
-当前仅按需保存 bash 超过 2 KiB 的输出，向 Agent 返回受控读取路径，不提供独立日志 UI/IPC。原 [Session 追加日志设计](session-logging-plan.md) 已归为历史候选，当前不实施；实际合同见本文“超阈值工具日志”。
-
-HTML 交互报告已接入独立 skill、内置 ECharts 与隔离查看器；验收范围与未通过项见 [实施计划](interactive-report-plan.md)。不固定报告布局，不定义报告 DSL 或组件生成器。
-
-后续 UI 改动遵循 [设计原则](design-principles.md)；交付后的体验修复及草稿/附件状态调整见 [UX 修复计划](ux-remediation-plan.md)，UX 修复与 R1–R6 重构已完成；历史验收见 Git 与本地 test-results，当前回归入口见 [测试指南](testing-guide.md)；下文描述实际结构与契约。
+更新日期：2026-11-08。产品范围见 [产品说明](product.md)，字段与状态机见 [SQLite 设计](sqlite-design.md)，验收入口见 [测试指南](testing-guide.md)，UI 约束见 [设计原则](design-principles.md)。本文是架构与实现契约的唯一入口；历史计划、报告和研究仅留本地归档，不能作为当前实现或验收的依据。
 
 ## 1. 技术栈与运行边界
 
@@ -24,7 +18,7 @@ Renderer 保持 `nodeIntegration: false`、`contextIsolation: true` 与 sandboxe
 
 运行目标：本机 macOS 15.7.4 / Apple M4 / arm64 / 24 GiB。首版本地 `.app` 验收不要求签名公证、Intel 或历史 macOS 兼容；不将未测平台标为支持。
 
-已实测基线为 Electron 45.2.3（内嵌 Node 24.22.2）、pi 1.5.0、better-sqlite3 13.0.3、Streamdown 2.7.1、standalone CPython 3.12.12；正式工程从该基线开始锁定。完整依赖版本、实际命令、原始结果由 [验证入口与证据说明](../validation/README.md) 和各探针 lockfile 固定。源码依据为本地 pi commit `f9a26365568127461c47a07a37dcb42c140a3ac5`，探针使用的发布包版本须单独记录，不把 checkout 等同于 npm 发布物。
+正式依赖由 package.json/pnpm-lock.yaml 锁定：Electron 45.2.3、pi 1.5.0、better-sqlite3 13.0.3、Streamdown 2.7.1。standalone CPython 3.12.12、rg 15.2.0、fd 10.5.1、字体与分析库由 resources/runtime-lock.json 和 requirements.hashed.lock 锁定；ECharts 6.1.0 及许可字节另由 resources/echarts-lock.json 固定。validation 的独立 lockfile 只属于技术探针，不替代正式依赖。
 
 ## 2. 进程、并发与职责
 
@@ -97,7 +91,8 @@ data_agent/
       agent-configuration.ts / request-budget.ts / request-evidence.ts
     renderer/
       app/ / components/ui/ / lib/ / styles/
-      features/                 # sessions、composer、models、runtime、workspace；各自拥有状态
+      features/                 # sessions、composer、models、agent-config、settings、
+                                # runtime、workspace；artifacts 提供源码/图片/尺寸组件
     shared/contracts/           # Zod schemas + 可序列化命令/事件 DTO
     shared/models.ts / errors.ts
     node/                       # app-paths, runtime-paths, path-policy, read-text,
@@ -110,16 +105,18 @@ data_agent/
   scripts/build/ / scripts/test/ / scripts/eval/
   tests/features/ / support/ / fixtures/ / tooling/     # 按功能维护，catalog.json 注册；phases 仅历史留档
   evaluations/fixtures/ / rubrics/ / results/  # 独立 Judge 效果评测，不接产品运行时
-  validation/                   # 本次已执行的独立技术验证，不作为产品运行入口
+  validation/                   # 可复用独立技术探针，不作为产品运行入口
   test-results/ / out/ / release/
-  docs/mvp-plan.md / technical-design.md / development-plan.md
+  docs/README.md / product.md / usage.md / technical-design.md / sqlite-design.md
+  docs/testing-guide.md / design-principles.md / code-quality.md / repository-workflow.md
+  docs/archived/                # 本地历史计划、报告和研究，Git 忽略
 ```
 
-Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host 通过 shared contracts 通信，不能互相 import 实现；shared 不依赖 Node/Electron/pi；node 是可复用基础设施。TypeScript 不能替代 IPC 运行时校验。Main 仅信任当前窗口的主框架，完整 URL 必须匹配；预期 URL 先用 WHATWG URL 规范化，兼容 Vite 的无末尾斜杠地址与 Chromium 的标准形式，不放宽为同源匹配。依赖方向用 lint 检查。
+Renderer 只依赖 shared/UI；preload 只提供窄 IPC；Main 与 Agent Host 通过 shared contracts 通信，不能互相 import 实现；shared 不依赖 Node/Electron/pi；node 是可复用基础设施。TypeScript 不能替代 IPC 运行时校验。Main 仅信任当前窗口的主框架，完整 URL 必须匹配；预期 URL 先用 WHATWG URL 规范化，兼容 Vite 的无末尾斜杠地址与 Chromium 的标准形式，不放宽为同源匹配。依赖方向由 `pnpm check` 中的 dependency-boundaries 检查。
 
 具体实现将准入/进程路由放在 `main/services/runtime.ts`，进程传输放在 `agent-process.ts`，凭证在 `credentials.ts`；Host 使用 `agent/session-runtime.ts`、`input-identity.ts`、`event-adapter.ts`、`models.ts` 和固定 `resource-loader.ts`。Renderer 的 `features/runtime/` 提供快照订阅与 Streamdown 过程展示；`features/composer/` 拥有草稿，`features/models/` 拥有模型设置。SQLite migrations 集中在 `storage/database.ts`；上面的目录树对应实际工程，没有为规划职责额外创建空模块。
 
-P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可信 `resources/python/inspect_policy.py` 做非执行式检查，`interactions.ts` 负责一次性授权和澄清。Host 的 `tool-client.ts` 只传输工具请求/输出/交互，`tool.interaction` 进入 Host 快照后沿同一 seq 通道更新 UI，避免 Main/Host 各自递增状态序号。取消先由 Host 标记 SDK 中止，再等待 Main 的实际工具进程清理；普通用户停止不误报为模型失败。
+通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可信 `resources/python/inspect_policy.py` 做非执行式检查，`interactions.ts` 负责一次性授权和澄清。Host 的 `tool-client.ts` 只传输工具请求/输出/交互，`tool.interaction` 进入 Host 快照后沿同一 seq 通道更新 UI，避免 Main/Host 各自递增状态序号。取消先由 Host 标记 SDK 中止，再等待 Main 的实际工具进程清理；普通用户停止不误报为模型失败。
 
 `pnpm runtime:prepare` 从已校验缓存准备资源；干净机器显式运行 `pnpm runtime:prepare -- --download` 获取锁定资源，构建机需要 uv。脚本锁定 Python/rg/fd/字体哈希和 Python wheel 哈希，并生成完整运行时清单。`pnpm runtime:verify` 校验版本、每个文件哈希和符号链接；打包将运行时与辅助脚本放入 `Contents/Resources/runtime` 和 `Contents/Resources/python`，不依赖开发机 PATH 或 ASAR 内可执行路径。工具环境只含固定 PATH、工作区 HOME/cache/tmp 和受信字体配置，不继承模型 key。运行中的应用不下载或安装依赖。
 
@@ -134,7 +131,7 @@ P3 的通用工具由 `main/services/tools.ts` 统一执行；`policy.ts` 与可
   workspace/{appSessionId}/
     analysis.py / report.md     # Agent 按任务生成的示例文件，并非强制清单
     figures/*.png / tables/*.csv
-    .cache/ / .tmp/
+    .cache/ / .home/ / .tmp/
   logs/{sessionId}/{sha256(toolCallId)}/{runId}.log
   backups/                     # 升级前一致性 SQLite 备份
   agent-resources/{sha256}/resources/skills/{skillId}/SKILL.md
@@ -156,7 +153,7 @@ sessions.state/error 表示会话可用性；run_id/run_state/run_error 仅保�
 
 input_submissions 按 sequence 保存全部执行的未确认输入；原生记录 ACK 后清空 pending_text/pending_paths，保留投递身份与 SHA256 摘要。未知输入不自动重发。session_sources 不是 UI 文件目录、当前选集或模型上下文；prompt/steer/follow-up 接收时和输入记录同事务追加路径。普通追问不 stat 全部历史来源。
 
-每次添加和提交只校验本次附件的路径、存在性、单文件及合计 ≤100,000,000 bytes，不解析 CSV、不冻结内容。实际读取失败由工具返回。路径不是权限令牌，仍走 PolicyService。
+每次添加和提交最多接受 100 个附件，校验本次附件的真实路径、CSV 扩展名、普通文件、存在性、单文件及合计 ≤100,000,000 bytes；规范路径去重，不解析 CSV、不冻结内容。实际读取失败由工具返回。路径不是权限令牌，仍走 PolicyService。
 
 迁移 11 在一致性备份后单事务合并旧元数据并删除冗余表，目标没有 tool_logs/output_versions/artifacts 及兼容视图。保留全部未确认输入、配置与原文件保护路径，废弃旧删除目标清单。迁移不打开或改写 JSONL，不搬移/删除 workspace 或旧日志。备份使用 VACUUM INTO，包含已提交 WAL，存于受保护 backups/；未知更高 schema 拒绝打开，失败回滚并报错。禁止用旧二进制打开新库；备份回退不等于后续 JSONL 一并回滚。当前完整字段、约束、关系与状态机见 [SQLite 表设计与状态机](sqlite-design.md)。
 
@@ -164,7 +161,7 @@ input_submissions 按 sequence 保存全部执行的未确认输入；原生记�
 
 JSONL 是消息唯一事实源，SQLite 不另建永久完整聊天表。SessionManager 是唯一 JSONL 写者；Main 是唯一 SQLite 写者；二者没有跨介质原子事务。状态使用 creating/draft/persisted/missing 等，启动对账，不把 `message_end` 当落盘 ACK。
 
-`appSessionId` 与 pi header ID 分开；用 `SessionManager.open(exactFile, sessionsDir, cwd)` 保持精确文件布局。草稿没有 JSONL 是正常状态；已有历史却缺失/零字节/损坏时不能静默新建。先只读预检和备份，再使用可能迁移文件的 SDK API。
+`appSessionId` 与 pi header ID 分开；用 `SessionManager.open(exactFile, sessionsDir, cwd)` 保持精确文件布局。草稿没有 JSONL 是正常状态；已有历史却缺失/零字节/损坏时不能静默新建。先用 `inspectSessionFile` 只读检查原生 v3 header、身份、逐行 JSON、树关系和结尾换行；完整文件上限 100 MiB。仅 draft/persisted 才能交给 SDK，其他情况保留原件并拒绝继续。该预检不为每次打开额外复制 JSONL 备份。
 
 删除会话先标记 deleting，阻止新输入、停止该会话并等待 Host/工具写者退出。仅清理固定路径的原生 JSONL 与新布局内部日志，之后删除 sessions（投递/来源记录级联删除）；配置修订保留。workspace 及原 CSV 始终保留，不扫描、不清理空目录，用户自行删除。内部文件清理失败把错误存入 sessions 并允许重启重试；清理必须校验根、路径、链接及与所有 workspace 的重叠。迁移后不执行旧 deletion_files 里的产物删除指令。
 
@@ -187,7 +184,7 @@ IPC 命令携带 requestId/sessionId；输入另带 inputId。当前 Host 通过
 
 Host 内保留可序列化的活动投影；快照 = 当前分支持久化历史 + 活动 partial/tool/interaction/queue + seq 水位。Renderer 重载恢复该快照，再补后续事件；Host 崩溃不承诺恢复尚未落盘的每个 token。
 
-SDK partial 是可变对象，订阅回调立即复制所需字段；以约 30–60 ms 合并 UI 更新，有界日志和结果，避免逐 token 写 SQLite。模型请求在 Host，不把 Renderer Network 面板当模型请求证据。
+SDK partial 是可变对象，订阅回调立即复制所需字段；以 40 ms 定时合并 UI 更新，有界日志和结果，避免逐 token 写 SQLite。模型请求在 Host，不把 Renderer Network 面板当模型请求证据。
 
 ## 6. pi 输入身份与恢复
 
@@ -195,7 +192,7 @@ SDK 原生 steer/followUp 没有应用 inputId 参数；同文本消息不能靠
 
 已运行的方案是应用给每条用户输入添加唯一外层 envelope，由可信 context hook 在模型请求前只剥除最外层，Renderer 同样还原原文；JSONL 保留标准 message/custom entry。SessionManager 的 custom entry 记录 submitted 与 committed(inputId→entryId)，不复制正文。用户自己写的类似标记仍保留为原文，不作为控制信息。
 
-在 turn_end/agent_settled 或命令最终收束后读取实际 JSONL record 确认映射；恢复先加载已有 committed，再幂等补缺失映射，不反复 append 同一 ACK。应用生成 UUID 并校验登记表，只信应用外层标记。本次确认是完整 record 可读，不声称 fsync 级断电耐久性。具体格式、上下文处理、相同文本与恢复结果见 [验证入口与证据说明](../validation/README.md)。应用自带的可信身份 hook 可以显式加载；关闭的是宿主/用户的自动资源发现，不是禁止应用自带适配代码。
+在 turn_end/agent_settled 或命令最终收束后读取实际 JSONL record 确认映射；恢复先加载已有 committed，再幂等补缺失映射，不反复 append 同一 ACK。应用生成 UUID 并校验登记表，只信应用外层标记。此处确认是完整 record 可读，不声称 fsync 级断电耐久性。具体格式、上下文处理、相同文本与恢复结果见 [验证入口与证据说明](../validation/README.md)。应用自带的可信身份 hook 可以显式加载；关闭的是宿主/用户的自动资源发现，不是禁止应用自带适配代码。
 
 确认持久化后才把 input 标 committed；未知结果标 unknown，不能自动重放。abort 后显式清 SDK 队列，未消费输入保留未发送。同一文本的两次用户输入仍是两个 inputId。
 
@@ -230,7 +227,7 @@ ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；Sett
 
 模型 UI 仅开放 DeepSeek/OpenRouter，使用 `/models` 返回 ID 与锁定 pi 聊天模型目录的交集，展示 SDK 能力与验证状态；不伪称每个模型都支持 thinking、视觉或所有工具行为。非视觉模型不发送不支持的 image content；PNG 照样由产品展示。模型、Base URL、key 和思考级别在提交时绑定到 run，排队或运行期间更改设置只影响之后的新任务。可选思考级别直接取锁定 pi 版本的 `getSupportedThinkingLevels`，不支持思考的模型隐藏控件；每个模型独立保存选择。DeepSeek-V41-Flash 标明已验证基本流程，其余模型显示未验证兼容性；这不是分析正确性标识。
 
-模型设置的 `ModelPicker` 将搜索与选择合为一个入口，使用锁定的 Radix Popover 1.1.15 和 cmdk 1.1.1。弹层内搜索当前提供方的缓存列表（名称/ID），未确认前不改变已保存模型；打开聚焦搜索框，支持键盘移动、输入法确认保护、Escape 和选择后的焦点恢复。弹层按视口避让并限制高度，列表独立滚动，沿用现有主题。目录获取、保存与 IPC 合同不变。
+`src/renderer/features/models/ModelPicker.tsx` 将搜索与选择合为一个入口，使用锁定的 Radix Popover 1.1.15 和 cmdk 1.1.1。弹层内搜索当前提供方的缓存列表（名称/ID），未确认前不改变已保存模型；打开聚焦搜索框，支持键盘移动、输入法确认保护、Escape 和选择后的焦点恢复。弹层按视口避让并限制高度，列表独立滚动，沿用现有主题。目录获取、保存与 IPC 合同不变。
 
 SDK 在 Main 调用前生成的参数校验错误可能包含整份 Received arguments，也受相同结果预算约束。Host 在新 toolResult 的 message_end、首次写入原生历史前补做字节限制；不通过 context hook 改写既有结果。只读 SDK 测试入口也在读取前接受批次预算，续读位置不会指向被 Host 再次省略的正文之后。
 
@@ -240,7 +237,7 @@ SDK 在 Main 调用前生成的参数校验错误可能包含整份 Received arg
 
 `composeAgentPrompt` 只组合可编辑行为、固定工作区与输入文件约束、与启用工具一致的环境说明。主提示词不包含具体 skill 名称、选择分支、分析流程或交付格式。适用场景在各 skill 的 description 中声明，SDK 将已启用索引与通用按需读取说明加入 system；方法和交付规则在 SKILL.md 正文中维护。预览与执行使用同一套组装逻辑，不保留提示词协议多版本、旧默认值或旧提示词恢复分支。
 
-`main/services/agent-config.ts` 是 SQLite 唯一写者。agent_config_revisions 保存不可变配置修订，sessions 只引用修订；snapshot 包括配置、skill 正文/描述/路径/哈希和指纹。修订号用于保存冲突检查及会话固定，与提示词协议版本无关。最新修订作为默认值；无实际变化不增修订，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存均在 SQLite 事务内，会话创建事务同时写入绑定，首次输入排队前即固定配置。
+`main/services/agent-config.ts` 是配置修订的唯一 SQLite 写入入口。agent_config_revisions 保存不可变配置修订，sessions 只引用修订；snapshot 包括配置、skill 正文/描述/路径/哈希和指纹。修订号用于保存冲突检查及会话固定，与提示词协议版本无关。最新修订作为默认值；无实际变化不增修订，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存均在 SQLite 事务内，会话创建事务同时写入绑定，首次输入排队前即固定配置。
 
 Main 按清单从可信资源目录加载每个 skill 的 SKILL.md、references 和已锁定的 runtimeAssets，不按 skill ID 分支。无附带资源时用正文哈希，有资源时将排序后的资源描述与正文哈希合成 bundleHash，再物化到 `agent-resources/{hash}/resources/skills/{id}/SKILL.md`。正文与小型 references 随快照保存，大型运行时资源只保存路径、字节数和 SHA-256，并从相同哈希的可信安装资源恢复；符号链接、篡改和资源缺失均拒绝。文件物化后 DB 事务失败产生的孤立缓存不改变默认配置。已保存的 skill 内容保持冻结；应用升级不隐式修改已有会话或配置，明确关闭、保存后重新启用可采用当前资源。
 
@@ -256,15 +253,15 @@ Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Ag
 
 开发服务使用构建配置提供的资源根，避免 Vite `--entry` 使 `app.getAppPath()` 指向构建入口后找不到内置 skill/runtime；真实目录只在 serve 模式注入，生产构建为空字符串并使用应用自身资源路径，不将开发者绝对路径带入 .app。恢复会话时校验完整系统段（含顺序）和工具声明，不删除无法识别的历史段；不兼容时停止并提示配置待确认。
 
-本地真实测试固定：
+真实 DeepSeek 用例使用以下测试配置（不代表所有 live 用例已通过）：
 
-| 配置             | 值                                  |
-| ---------------- | ----------------------------------- |
-| 显示名称         | DeepSeek-V41-Flash                  |
-| provider / model | deepseek / deepseek-flash           |
-| base URL         | https://api.deepseek.com            |
-| key 来源         | `~/.zshrc` 中的 `DEEPSEEK_API_KEY`  |
-| 思考配置         | enabled / high，由实际 SDK 请求验证 |
+| 配置             | 值                                                      |
+| ---------------- | ------------------------------------------------------- |
+| 显示名称         | DeepSeek-V41-Flash                                      |
+| provider / model | deepseek / deepseek-flash                               |
+| base URL         | https://api.deepseek.com                                |
+| key 来源         | 环境变量 `DEEPSEEK_API_KEY`，否则解析 `~/.zshrc` 字面量 |
+| 思考配置         | enabled / high，由实际 SDK 请求验证                     |
 
 `deepseek-flash` 为服务端可更新别名，记录请求/响应模型和日期；thinking+tools 后续请求由 SDK 保留 reasoning_content，不从 UI 重建。[DeepSeek 官方](https://api-docs.deepseek.com/)、[thinking/tools](https://api-docs.deepseek.com/guides/thinking_mode/)
 
@@ -279,7 +276,7 @@ Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Ag
 | 普通外部读、正常内部读                 | allow                                                          |
 | 普通 workspace 内新文件写入            | allow                                                          |
 | 已声明源 CSV 的可识别修改              | ask，即使源文件恰好位于 workspace 内也不默写；默认分析写新产物 |
-| 旧版历史目录产物的可识别修改           | deny；会话共享目录的当前产物允许更新                           |
+| workspace 内已有产物（含旧版历史目录） | 按普通文件处理，允许更新；不再维护已发布版本保护               |
 | state/sessions/凭证配置、敏感路径      | deny 读写                                                      |
 | 检测到 workspace 外写删                | ask                                                            |
 | 已识别 curl/wget/requests/httpx 等联网 | ask；说明可识别的目标和动作                                    |
@@ -303,7 +300,7 @@ WorkspaceFileService 按层异步列目录，每层最多 2,000 条并明确提�
 
 workspace.list/resolve/preview/copy/reveal/saveAs 接口只接受会话及 Main 签发条目 ID；resolve 仅解析选中文件旁的相对链接。Main 检查根身份、会话归属、规范路径及普通文件，拒绝路径逃逸、敏感目录、链接替换及读取中修改。Renderer 不提交任意绝对路径。外部附件只在用户消息中显示路径，不作为目录条目或增加“解除关联”。
 
-文本预览最多 128 KiB / 2,000 行，UTF-8 截断保留完整字符；非 UTF-8、二进制及未知扩展名提示原因。Markdown 小于等于 2 MiB 时安全渲染，超过则有界文本预览；空文件明确提示。SourcePreview 使用 highlight.js 11.11.1 core 和显式语言包，只生成转义标记，最多高亮 32,768 字符，不自动猜语言、不解析 CSV、不执行代码。PNG 限 25 MiB、4,000 万像素并实际解码。深浅主题使用现有 tokens。
+普通文本预览最多 128 KiB / 2,000 行，UTF-8 截断保留完整字符；非 UTF-8、二进制及未知扩展名提示原因。`.md` 小于等于 2 MiB 时完整读取，超出时仅返回上述有界前缀；Renderer 阅读视图仍将返回的前缀交给安全 Markdown 渲染，截断提示在源码视图展示。`.markdown` 只按普通文本预览。空文件明确提示。SourcePreview 使用 highlight.js 11.11.1 core 和显式语言包，只生成转义标记，最多高亮 32,768 字符，不自动猜语言、不解析 CSV、不执行代码。PNG 限 25 MiB、4,000 万像素并实际解码。深浅主题使用现有 tokens。
 
 WorkspacePanel 提供文件/预览 tabs、可调宽度、展开阅读、独立滚动、复制展示内容、Finder 定位和单文件另存。Markdown 可切换源码；WorkspaceReport 禁止 raw HTML、外部自动图片与危险 scheme，相对图片/链接通过同一工作区受控接口解析，HTTP(S) 外链需显式点击。刷新可显示原路径新内容，不再依赖永久 hash 登记。
 
@@ -321,47 +318,49 @@ HtmlReport 只计算宿主槽位并发送有界位置；Main 再裁剪到窗口�
 
 `interactive-report` 的 SKILL.md 与简短 references 随配置快照保存；vendor/echarts.min.js、LICENSE、NOTICE 只记录路径、字节数和 SHA-256。资源集合按路径排序并规范化字段顺序参与 bundleHash；物化先校验再以临时文件提交，不接受链接或篡改字节。附带资源通过唯一快照结构的 assets/bundleHash 冻结。缓存保留；缺失 vendor 只从相同哈希的安装资源恢复，否则报配置待确认，不能替换库版本。报告自身已内嵌资源，不受生成资源缺失影响。文件缓存与 SQLite 不是跨介质原子事务，无引用缓存可保留。
 
-ECharts 6.1.0 锁定为构建依赖，resources/echarts-lock.json 固定浏览器分发与许可哈希。scripts/build/report-runtime.mjs 在构建与正式测试准备阶段从锁定依赖复制到 runtime/report-runtime，已有不一致文件拒绝覆盖；升级时清理这份可重建目录后重新准备，不清理用户 agent-resources。electron-builder 复制到 Contents/Resources/report-runtime，verify-release 检查实际包内字节。运行时无 npm/CDN 下载；库不进入主 Renderer bundle，也不读入模型上下文。Agent 用 Python 装配自由 HTML，局部参考文档不规定报告结构。
+ECharts 6.1.0 锁定为构建依赖，resources/echarts-lock.json 固定浏览器分发与许可哈希。scripts/build/report-runtime.mjs 在构建与正式测试准备阶段从锁定依赖复制到 runtime/report-runtime，已有不一致文件拒绝覆盖；升级时清理这份可重建目录后重新准备，不清理用户 agent-resources。electron-builder 复制到 Contents/Resources/report-runtime，scripts/build/verify-release.mjs 检查实际包内字节。运行时无 npm/CDN 下载；库不进入主 Renderer bundle，也不读入模型上下文。Agent 用 Python 装配自由 HTML，局部参考文档不规定报告结构。
 
 导出是宿主另存单个 HTML，外部浏览器不再受应用内 session 策略管理。32 MiB 是有界读取合同，不是任意脚本性能保证；大数据由 Agent 按意图聚合/抽样。普通源码复制仅复制截断文本，不能充当报告导出。
 
 ## 10. 执行限额与可观察性
 
-产品默认值：单工具执行 180 秒；单 run 活跃执行时间 10 分钟、最多 50 次模型请求；HTTP 暂时性失败最多重试 2 次且计入限额。工作台不判定业务错误或统计“业务自修复次数”；Agent 可在总预算内自行修复代码或解释无法完成的原因。等待用户审批/澄清不计活跃执行计时，但继续占会话名额，可显式停止。截断日志不截断错误状态。
+产品默认值：bash/grep/find 子进程默认及最长 180 秒，bash 可请求更短时限；单 run 活跃执行时间 10 分钟、最多 50 次模型请求；HTTP 暂时性失败最多重试 2 次且计入限额。工作台不判定业务错误或统计“业务自修复次数”；Agent 可在总预算内自行修复代码或解释无法完成的原因。等待用户审批/澄清不计活跃执行计时，但继续占会话名额，可显式停止。截断日志不截断错误状态。
 
 不向模型注入剩余请求次数提示。内置 skill 仅提供通用分析与交付指导；50 次硬上限由请求入口阻断，错误状态不因模型声称完成而改变。
 
-bash 的 stdout/stderr 按 Main 接收顺序合计不超过 2 KiB 时完整返回，不创建日志文件或调用目录；超过后返回 UTF-8 字符边界内的头尾合计最多 2 KiB，加上截断提示与已实际写入的日志绝对路径供 Agent 按需 read。日志包含触发阈值前后的输出字节，每 run 所有 bash 合计最多保留最早 10 MiB，超出部分继续消费但不再写盘；额度不足或写入失败须明示不完整，完全未保存时不给出虚假路径。日志写入失败不改判进程退出状态。grep/find 的原始捕获与模型输出分别有界，完整记录解析后分页，不写进程日志。UI 只显示工具结果，不提供独立日志正文、入口或日志读取 IPC。会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；会话工作区文件总量上限 500 MiB（跨 run 累计）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
+bash 仅在输出超过 2 KiB 后保存有界日志，具体路径、配额和读取例外见“超阈值工具日志”。grep/find 捕获与返回分别有界，不写进程日志。
 
-100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。正式 P6 基准由 `tests/features/performance/large-input-scenario.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数字见本地阶段结果。
+会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；会话工作区文件总量上限 500 MiB（跨 run 累计）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已生成文件，不偷偷改用其他模型或无界重试。
 
-结构化日志含 session/run/tool/input，避免跨会话串联；脱敏 key/header，保留有限错误、退出码、耗时、版本与 artifact hash。指标和审批信息不是 assistant 正文，不伪造为 thinking。
+100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。`performance.large-input` 由 `tests/features/performance/large-input-scenario.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数值记录在该次本地测试结果中，不作为任意 CSV 的性能保证。
+
+运行快照携带 sessionId/runId/seq，工具以 toolCallId 关联；request-evidence 仅投影模型、工具名、消息数量及结果摘要等有限证据，工具 details 返回退出码、结束原因与采样峰值 RSS。原生 JSONL 保留消息和 usage，bash 日志保存有界原始输出；没有通用 session 事件日志或日志索引。凭证经专门脱敏，指标和审批信息不伪造为 assistant 正文或 thinking。
 
 ## 11. 测试与证据的解释
 
 - 程序/规则化验证负责 SDK 接入、真实模型调用链、Electron/CDP、SQLite/打包、内置 Python、文件交付、审批机制与进程回收；不校验分析数值或结论。确定性模型响应覆盖状态和错误分支，live 用例验证真实调用与文件交付。
 - 正式产品开发把这些已验证的机制接入真实界面与生命周期，再运行产品 CDP/E2E。探针通过不是宣称所有 UI 或产品功能已完成。
 - 主 E2E 保留真实 Electron/Main/pi/工具/Python/SQLite/JSONL，只可替换外部 LLM 响应做确定性故障回归；真实 DeepSeek 路径另测。
-- P3 确定性 CDP 用本机 HTTP/SSE 模型夹具，保留真实 pi SDK 与全部副作用链路。仅 `--data-agent-automation` 可接收 `DATA_AGENT_TEST_MODEL_BASE_URL`，Host 再校验其必须为 `http://127.0.0.1`；普通启动忽略该变量。关闭/重开、退出、查询任务 Host PID 的自动化 IPC 同样只在显式测试模式注册处理，不能授予工具权限。
+- 确定性 CDP 用本机 HTTP/SSE 模型夹具，保留真实 pi SDK 与全部副作用链路。仅 `--data-agent-automation` 可接收 `DATA_AGENT_TEST_MODEL_BASE_URL`，Host 再校验其必须为 `http://127.0.0.1`；普通启动忽略该变量。关闭/重开、退出、查询任务 Host PID 的自动化 IPC 同样只在显式测试模式注册处理，不能授予工具权限。
 - 使用独立 userData、业务根、workspace、端口。CDP 仅显式测试模式、loopback，正常启动关闭；真实密钥不进入 Renderer。
 - `connectOverCDP` 能力低于 Playwright 原生协议；本项目以实际连通/操作/截图结果为依据，不承诺所有高级功能。[Playwright](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp)
 - 离线资源测试必须证明外部连接失败仍能运行分析；临时测试环境的网络限制不成为产品执行安全策略，不把只拦 Chromium 请求当作阻断 Python/Node。
 - LLM-as-a-judge 单独读取任务、输入数据、执行记录和产物，评价 Agent 的方法、数据处理、结论依据与解释；当前由开发协作中的 AI Agent 执行，允许独立计算辅助判断。评测分数不写入产品完成状态，也不阻塞文件展示。
 - 旧探针中的 oracle/业务 schema/报告数值断言仅保留为历史实验，不迁移为工作台逻辑或程序验收门禁；已有通过记录也不能冒充已完成 Judge 评测。
 
-本次各项最终状态、命令与限制统一见 [验证入口与证据说明](../validation/README.md)。程序验收和独立 Judge 评测步骤见 [开发计划](development-plan.md)。
+正式用例以 tests/catalog.json 和对应源代码为准；命令与发布门禁见 [测试指南](testing-guide.md)。独立探针的使用边界见 [技术验证说明](../validation/README.md)，Agent 质量评测见 [评测说明](../evaluations/README.md)。历史通过数字不代表当前提交已通过。
 
-## 外观与输入交互
+## 12. Renderer 与交互状态
 
 Renderer 使用统一语义颜色变量，覆盖聊天、设置、审批与文件预览，PNG 不做反色。默认深色；右上角切换 dark/light。主题偏好以 `data-agent.theme` 存在 Electron userData 下的 localStorage，渲染 React 前应用到根节点以减少启动闪烁；它是界面偏好，不写入会话 JSONL 或业务 SQLite。存储不可用时仍允许本次窗口切换。
 
 输入框 Enter 发送、Shift+Enter 换行，兼容 ⌘ Enter。组合输入期间（composition 状态、isComposing 或 keyCode 229）及按键重复不发送；发送按钮与快捷键共享可发送条件，并用同步锁避免重复提交。空白输入不提交。
 
-## 工程重构增量（2026-11-07）
+### IPC 与依赖边界
 
 IPC 入口为 main/ipc/handlers.ts，仅负责来源/命令校验与错误映射；commands.ts 分派业务，dependencies.ts 定义必需的命名依赖。shared/contracts/ipc.ts 的 CommandResponses 将每个命令绑定到返回类型，Renderer 不再提供任意 request<T>。Host RPC 同样校验响应类型。测试 runner 使用 scripts/test/run-context.mjs 独立构建与生产依赖打包，不覆盖共享 out/release；复用构建需要源码指纹一致。
 
-### 草稿与提交接收（UX2，2026-11-07）
+### 草稿与提交接收
 
 Renderer 的 `features/composer` 拥有每个会话及首页的草稿，存于当前 Electron userData 的 localStorage（`composer-drafts-v1`，Zod 校验）；文本、路径元数据、工作区选择可恢复，不含 key、不复制 CSV、不创建正式 sessions。输入框只显示待提交附件。文本 revision 与附件 token 用于接收时精确清除，期间新增内容不丢失。删除会话成功后同时移除该会话的本地未提交草稿，首页及其他会话草稿保留。
 
@@ -383,9 +382,9 @@ pi JSONL 仍用原生 message/custom entry，`data_agent.input_submitted` 增加
 
 ### 后台验收
 
-正式 harness 与真实 pnpm dev 测试默认传 `--data-agent-background`：窗口 show:false、macOS accessory 激活策略、后台渲染不节流；CDP 仍执行真实点击、键盘、滚动和截图。此参数只改变呈现，不开启测试命令、远程调试或自动凭证。普通用户启动维持可见窗口。测试构建与 .app 均位于本次 test-results 上下文，不覆盖正在使用的 out/release。
+正式 harness 与真实 pnpm dev 测试默认传 `--data-agent-background`：窗口 show:false、macOS accessory 激活策略、后台渲染不节流；CDP 仍执行真实点击、键盘、滚动和截图。此参数只改变呈现，不开启测试命令、远程调试或自动凭证。普通用户启动维持可见窗口。测试构建与 .app 使用同一次产物上下文；默认位于本次 test-results，显式 --run-root 可另行指定，不覆盖正在使用的 out/release。
 
-## 每轮模型用量
+## 13. 每轮模型用量
 
 `src/agent/turn-usage.ts` 从原生 `SessionManager.getEntries()` 重建用量，不从当前模型上下文或 Renderer 可见分页累计。assistant 消息的 usage 是每次模型调用原始记录；保留 SDK 原始错误/重试消息，计入 compaction、branch_summary、toolResult 上显式提供的模型 usage，以及独立 usage entry。普通工具文本不额外计算 token。无活动轮次的后台 usage 不强行归属已结束轮次。当前产品没有分支切换/编辑重跑入口，聚合按原始写入顺序；将来增加分支产品能力时须重新定义归属，不能把所有分支消耗当作当前分支回答用量。
 
@@ -397,13 +396,13 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 
 缺失/非法/全零 usage 视为未获取统计，已收到的有效部分保留；没有结束标记的轮次恢复为 interrupted，旧记录无边界时为 legacy，两者标记统计不完整。崩溃若发生在开始标记与用户消息之间，可依据标记归属已经落盘的前置用量；旧记录按原生用户消息边界尽力恢复，未知归属不凭模型文本推断。Agent 异常退出时 Main 将尚为 running 的用量投影转为 interrupted，不新增伪造的 JSONL 结束标记。没有返回或尚未落盘的 usage 无法恢复，不承诺与提供方账单完全一致。删除会话沿用删除原生 JSONL 的流程，无额外用量文件待清理。
 
-`TurnUsage.tsx` 在轮次正文下展示紧凑按钮，详情使用 Chromium 原生 auto popover（Electron 固定版本已通过 CDP），有 dialog 名称、键盘打开/Escape 关闭及焦点返回；无需新增 UI 依赖。点击外部关闭，窗口调整或外层滚动关闭以免弹层脱离入口，内部滚动不关闭。检查三种窗口尺寸和深浅主题。查看用量与查看执行过程一样暂停自动跟随，统计不藏在折叠过程内，不增加费用或耗时展示。
+`TurnUsage.tsx` 在轮次正文下展示紧凑按钮，详情使用 Chromium 原生 auto popover，有 dialog 名称、键盘打开/Escape 关闭及焦点返回；无需新增 UI 依赖。点击外部关闭，窗口调整或外层滚动关闭以免弹层脱离入口，内部滚动不关闭。检查三种窗口尺寸和深浅主题。查看用量与查看执行过程一样暂停自动跟随，统计不藏在折叠过程内，不增加费用或耗时展示。
 
-验收：`tests/features/usage/turn-usage.unit.test.ts` 覆盖求和、重试、压缩、去重、轮次归属、旧记录/崩溃及真实 JSONL 重建；`UX-TURN-USAGE` 覆盖实际 pi 传输归一化、明细、键盘、主题/尺寸、停止与重启；`P5-USAGE-QUEUES` 覆盖实际 steer/follow-up 消费边界；`P5-USAGE-RECOVERY` 覆盖双会话隔离、测试 Host SIGKILL 与重启不重发。正式测试全部使用独立目录和隐藏窗口。
+回归入口：`tests/features/usage/turn-usage.unit.test.ts` 覆盖求和、重试、压缩、去重、轮次归属、旧记录/崩溃及真实 JSONL 重建；`usage.details` 覆盖实际 pi 传输归一化、明细、键盘、主题/尺寸、停止与重启；`usage.queue-boundaries` 覆盖实际 steer/follow-up 消费边界；`usage.concurrent-crash-recovery` 覆盖双会话隔离、测试 Host SIGKILL 与重启不重发。正式测试全部使用独立目录和隐藏窗口。
 
 持续测试的目录、筛选、模型模式及录制/重放规范见 [测试指南](testing-guide.md)。P0–P7 编号仅描述历史阶段，新增测试用功能 ID 注册。
 
-## 模型连接设置（2026-11-07）
+## 14. 模型连接设置
 
 - `ProviderConnection` 按提供方 → Base URL → Key → 获取模型 → 选择模型组织设置，只有 DeepSeek/OpenRouter；其内嵌 `ModelSettings` 搜索当前提供方列表并立即保存模型/思考级别。切换提供方本身不改默认模型；连接编辑未保存时禁止选模型或探测。未获取列表、列表为空、搜索无匹配、刷新失败分别显示；设置固定标题/关闭区域，正文独立滚动。
 - 连接保存是显式操作。`models.connection` 通过 Main 校验 Base URL；只允许 HTTPS 或本机 HTTP，禁止地址内凭证、query 和 fragment。空字符串表示 SDK 内置地址。模型沿用 SDK 对对应提供方的 API 适配，`openai-completions` / `openai-responses` 是协议而非产品中的提供方。
@@ -423,7 +422,7 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 - Main 发现和 UtilityProcess 的探测/正式 SDK 请求使用 Electron `net.fetch`，遵循系统代理，禁用 Cookie 和 HTTP 缓存；生产不读取 shell key/proxy。SDK 的工具、上下文、请求序列化和原生会话格式不变。403 明确提示地区/权限受限，区别于 401 Key 鉴权失败。
 - API 依据：[DeepSeek List Models](https://api-docs.deepseek.com/api/list-models)、[OpenRouter Models](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)、[Electron net](https://www.electronjs.org/docs/latest/api/net)。DeepSeek 的实际 `/models` 响应与 OpenRouter 文档/实测共同验证接口；这些协议资料不代表逐模型产品验收。
 
-## 超阈值工具日志
+## 15. 超阈值工具日志
 
 仅 bash 的累计 stdout/stderr 超过 2 KiB 后按需保存到 `logs/{sessionId}/{sha256(toolCallId)}/{runId}.log`，不建立 SQLite 索引或 sidecar。首次超过阈值时补写此前缓冲，随后按接收顺序追加两个流的原始字节；合计 10 MiB/run 上限继续生效。每个日志使用一个异步文件句柄，待写字节最多 512 KiB；队列满后保留此前前缀并停止接收后续日志，结果明确提示保存不完整，最终结果在写队列收束后返回。工具结果中的位置提示只在文件确已写入时给出；额度用尽、日志被截断或写失败时如实提示，不声称全量可用。
 

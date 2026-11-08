@@ -97,9 +97,15 @@ shared/preload/node/storage、公共 UI、入口、构建/测试基础设施、�
 | none     | 纯逻辑/存储/启动或 SDK 内存 faux provider    | 无外部模型；`none` 表示没有 HTTP 模型请求，并非没有任何替身             |
 | scripted | 本机 HTTP/SSE 固定响应、工具调用、错误或等待 | 真实 pi SDK、IPC、工具、Python、SQLite 和 UI；可重复制造审批/失败/竞态  |
 | replay   | 本机 HTTP 逐条匹配请求，重放审阅过的真实响应 | 验证实际提供方响应在 SDK/工作台中的处理，不验证当下模型质量或服务可用性 |
-| live     | 真实 DeepSeek                                | 模型/提供方当前兼容性、实际缓存/计费 usage、效果评测所需的新输出        |
+| live     | 真实 DeepSeek，另有 OpenRouter 连通专项      | 模型/提供方当前兼容性、实际缓存/计费 usage、效果评测所需的新输出        |
 
 普通自动化实例在未提供模型夹具时使用本机拒绝端点，防止漏配夹具时访问默认提供方；非 live runner 禁止读取真实测试密钥。真实 live 使用 `DEEPSEEK_API_KEY`，读取逻辑仍为环境或 `.zshrc` 的字面量赋值，不 source shell。
+
+DeepSeek 完整对话/分析用例使用 provider `deepseek`、API model `deepseek-flash`（显示名 DeepSeek-V41-Flash），默认地址 `https://api.deepseek.com`；OpenRouter 专项使用 `OPENROUTER_API_KEY`。模型别名可能更新，结果需结合本次请求、响应与日期解释。普通产品 BYOK 始终在设置中填写。
+
+产品执行限额来自 `src/shared/tool-limits.ts`：每 run 最多 50 次模型请求、10 分钟活跃时间、每次输出最多 16,384 tokens；SDK 自动重试最多 2 次并计入请求预算。bash/grep/find 子进程默认及最长 180 秒，审批/澄清等待不计活跃时间。测试自身等待时限由具体用例设置；`scripts/eval/run-scenario.mjs` 普通模式等 5 分钟、审核模式等 15 分钟，runner 没有统一的 30 分钟 live suite 截止机制。
+
+缺凭证、网络失败、缺失交付、skip/todo 都不能算通过。当前 runner 在结果中记录 passed/failed 及错误，不自动生成平台/模型质量分类；交付说明应区分基础设施受阻、工作台流程错误和模型未交付。失败尝试保留，不无限重跑取得一次成功。涉及命令审批时按 [评测说明](../evaluations/README.md) 逐条审核，Judge 评价不改变程序状态。
 
 录制/重放放在 **HTTP 提供方边界**，不直接把最终 UI 文本或 runtime.snapshot 塞进页面。真实模型产生的 tool call 会由当前工具重新执行，实际 tool result 必须匹配下一条录制请求；当前 SDK 仍执行 reasoning/text/tool/usage 归一化、JSONL 落盘和 UI 更新。因此能回归协议和产品链路，也会揭示工具输出或提示词发生变化。
 

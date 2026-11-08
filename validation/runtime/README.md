@@ -27,4 +27,4 @@ validation/runtime/python/cpython-3.12.12-macos-aarch64-none/bin/python3.12 -I -
 
 生成的 artifacts/、relocated/、hash-install-test/ 等不提交。许可材料保存检查不等于法律审查。下载失败、hash 变化或缺少资源必须报错，不能改用未知镜像或默默回退系统运行时。
 
-旧 run.py/probe.py/offline.py/run-offline.sh、销售 fixtures、metrics/manifest schema 与历史性能结果仅保留本地，不是运行上述命令的依赖，也不作为产品分析准确性的门禁。正式产品的性能/断网用例和 Judge 质量评测按开发计划分别实现。
+旧 run.py/probe.py/offline.py/run-offline.sh、销售 fixtures、metrics/manifest schema 与历史性能结果仅保留本地，不是运行上述命令的依赖，也不作为产品分析准确性的门禁。正式产品的性能/断网用例见 [测试指南](../../docs/testing-guide.md)，Judge 质量评测见 [评测说明](../../evaluations/README.md)。

@@ -1,38 +1,36 @@
-# 版本管理与阶段提交规则
+# 版本管理与提交规则
 
 ## 应纳入 Git
 
-- 根 README、产品说明、技术设计、开发/验收计划，以及长期维护的架构决策与工作流程。
-- 根 AGENTS.md、[设计原则](design-principles.md) 与 [UX 修复计划](ux-remediation-plan.md)；外部来源的长期适配结论进入设计原则，一次性研究笔记仍留在忽略目录。
+- 根 README、AGENTS.md、[文档索引](README.md) 及持续维护的产品、技术、存储、使用、设计、测试和工程规范。
 - 正式产品源码、内置 skills、测试源代码、小型合成 fixtures、构建/测试配置和依赖 lockfile；正式源码位于 src/，验收位于 tests/ 和 scripts/test/。
 - `validation/` 中明确保留的可复用源代码：pi 会话/事件/恢复探针，Electron/CDP/打包/进程生命周期 harness，策略机制探针，以及固定运行时和工具下载、哈希验证脚本。
-- 可复用脚本所需的小型静态资源，例如 `resource-probe.txt`。下载资源的地址、版本、hash 与许可获取方式随脚本维护，不提交可重新下载的大型二进制。
+- 可复用脚本所需的小型静态资源。下载地址、版本、hash 与许可获取方式随脚本维护，不提交可重新下载的大型二进制。
 
-## 仅留本地，由 .gitignore 排除
+## 本地归档与生成物
 
-| 内容                   | 路径/示例                                                                                                       | 原因                                                             |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 临时源码调研与当次结论 | `docs/research/`、`docs/validation-report.md`                                                                   | 包含本机 checkout 路径、日期与一次性证据；长期结论已归入技术设计 |
-| 临时旧业务实验         | `validation/pi/verify-analysis.mjs`、`collect-results.mjs`；runtime 的 run/probe/offline、销售 schemas/fixtures | 原先混合业务 oracle 与流程的实验，不作为工作台回归合同           |
-| 验证结果与本机状态     | results/runs/artifacts、results.json、截图、数据库、JSONL、Judge 报告、构建日志                                 | 每次执行生成，可能含本机路径或用户数据                           |
-| 下载、依赖与构建产物   | node_modules、Python、fonts、rg/fd、缓存、relocated、dist/.app、markdown-bundle.js                              | 可按锁定配置重建，体积较大                                       |
-| 本地凭证与环境         | `.env*`（模板除外）、`.data_agent/`、`.local/`                                                                  | 不属于项目源码；真实 key 不得提交                                |
-| 其他一次性材料         | `validation/local-notes/`、临时脚本/历史 README、release API 响应                                               | 仅用于本机回溯                                                   |
+| 内容                                                  | 路径/示例                                                       | 处理方式                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------ |
+| 开发与重构计划、UX 计划、候选设计、测试报告、临时研究 | `docs/archived/`                                                | 仅保留本地；归档前已提交内容可从 Git 历史恢复    |
+| 正式测试与评测证据                                    | `test-results/`、`evaluations/results/`                         | 保留工具生成的原目录，失败记录也不删除；不进 Git |
+| 探针运行结果与本机状态                                | validation 的 results/runs/artifacts、截图、数据库、JSONL、日志 | 按允许清单排除；新检出不依赖旧结果               |
+| 临时旧业务实验                                        | 旧销售 oracle、metrics schema、一次性脚本                       | 只留本地，不作为产品门禁                         |
+| 下载、依赖与构建产物                                  | node_modules、runtime、out、release、dist/.app                  | 按锁定配置重建，不入库                           |
+| 本地凭证与环境                                        | `.env*`（模板除外）、`.data_agent/`、`.local/`                  | 不属于源码，真实 key 不得提交                    |
 
-`validation/` 使用源码允许清单，避免临时生成物被意外加入。新增长期维护脚本时应同时更新允许清单及 README；正式产品 `src/`、`tests/`、`scripts/` 不受该清单限制。不要使用 `git add -f` 绕过排除规则。文件留本地，不因初始化 Git 而删除。
+归档前先把仍有效的长期约束归入正式文档，移除正式入口对历史计划的依赖。`docs/archived/` 整体加入 `.gitignore`，已跟踪文件移入时应在 Git 中删除原路径，不能只加忽略规则而继续跟踪；不得 force-add 归档。正式文档不得链接归档中的本机文件，格式化及文档链接检查跳过归档。
 
-## 每阶段完成后提交
+`validation/` 使用源码允许清单，避免临时生成物被意外加入。新增长期维护脚本时同时更新允许清单及 README；正式 src/tests/scripts 不受该清单限制。不用 `git add -f` 绕过排除规则。归档与忽略不删除本地内容。
 
-所有提交先通过 [代码质量门禁](code-quality.md)：Husky 执行暂存文件的 ESLint/Prettier、全量 lint 和 check；失败即中止。首次安装依赖会自动安装 hook，不允许通过禁用 hook 绕过。格式基线与行为重构分开提交，具体模块调整见 [重构计划](refactoring-plan.md)。
+## 完成验收后提交
 
-P0–P7 的每个阶段必须在规定程序验收通过、对应 Judge 记录按计划完成后创建一次明确的阶段完成 commit。Judge 分数不属于程序门禁，结果与证据仍只留本地。允许在阶段内提交较小的实现 commit，但它们不能代替完成提交。
+所有提交须通过 [代码质量门禁](code-quality.md)：Husky 执行暂存文件的 ESLint/Prettier、全量 lint 和 check；失败即中止。首次安装依赖会安装 hook，不得使用 `--no-verify`、`HUSKY=0` 或改 hooksPath 绕过。
 
-UX0–UX5 同样逐阶段提交，按 UX 计划完成对应程序与视觉验收；数据分析 Judge 是否需要运行取决于受影响范围及原门禁要求，不把视觉评审等同于分析质量评价。单独的规划文档提交不算任何 UX 阶段完成。
+每个完成阶段都应在实现、相关验收和文档同步后创建本地 commit，记录范围、实际命令与结果。允许阶段内小步提交；未完成的必需检查如实标为 WIP。程序回归、UX 视觉评审和数据分析 Judge 分别记录，历史阶段通过记录不代替当前测试；按功能及发布范围选取检查，见 [测试指南](testing-guide.md)。仅文档改动运行静态和链接检查，不启动无关模型或打包测试。
 
-1. 完成该阶段实现、必要测试和文档同步，按阶段清单运行验收。
-2. 检查 `git status --short`、`git diff`、暂存区 diff；仅暂存该阶段应交付的源码/测试/配置/文档，检查凭证与生成物未入库。
-3. 提交前运行 `git diff --cached --check`。失败、blocked 或未运行的必需检查不能描述成阶段完成；可如实提交 WIP，但不推进阶段完成状态。
-4. 创建描述实际完成内容的 commit，例如 `feat(P2): integrate pi sessions and streaming UI`。提交说明记录阶段、已运行命令与结果，Judge 是否完成；不附密钥、本机原始日志或大型报告。
-5. 用 `git log -1` 和 `git status --short` 核对结果，向用户报告 commit ID、阶段及验证结论；不把其他未完成修改混入提交。
+1. 检查 `git status --short` 和工作树 diff，保留用户已有修改。
+2. 仅暂存本次应交付文件，检查暂存 diff；归档、密钥、生成物和他人修改不得混入。
+3. 运行 `git diff --cached --check`，创建描述实际范围与验证结果的 commit。
+4. 用 `git log -1` 和 `git status --short` 核对结果，报告 commit ID、验证范围及剩余限制。
 
-提交到本地仓库即可。配置 remote、push 或公开发布不属于阶段完成的默认要求。初始规划提交不代表 P0 已完成；正式功能完成后仍须按上述规则逐阶段提交。
+提交仅到本地仓库；配置 remote、push 或公开发布需要对应任务授权。

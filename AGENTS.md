@@ -5,10 +5,10 @@
 ## 开始工作前
 
 1. 读相关文档及代码，检查 `git status --short`，保留用户已有修改。
-2. 产品范围见 [产品说明](docs/mvp-plan.md)；架构唯一入口是 [技术设计](docs/technical-design.md)，不要在 architecture.md 另维护一套。SQLite 字段、关系及状态机见 [SQLite 设计](docs/sqlite-design.md)。
-3. UI 工作必须读 [设计原则](docs/design-principles.md)；本次体验改造按 [UX 修复计划](docs/ux-remediation-plan.md)，其中 UX 修复已完成；历史验收可查 Git 和本地 test-results，当前行为以产品与技术文档为准。
-4. 验收与交付见 [开发计划](docs/development-plan.md)、[测试指南](docs/testing-guide.md)、[版本管理规则](docs/repository-workflow.md)。旧阶段通过不代表新缺陷已覆盖。
-5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)。模块拆分依据 [软件工程重构计划](docs/refactoring-plan.md)，R1–R6 已完成，最终完整 P7 为 68/68 通过，不用格式化替代职责重构。
+2. 产品范围见 [产品说明](docs/product.md)；架构唯一入口是 [技术设计](docs/technical-design.md)。SQLite 字段、关系及状态机见 [SQLite 设计](docs/sqlite-design.md)。完整文档入口见 [文档索引](docs/README.md)。
+3. UI 工作必须读 [设计原则](docs/design-principles.md)，当前行为以产品与技术文档为准。
+4. 验收与交付见 [测试指南](docs/testing-guide.md)、[版本管理规则](docs/repository-workflow.md)。历史通过记录不代表新缺陷已覆盖。
+5. 所有代码改动遵循 [代码质量与提交门禁](docs/code-quality.md)，按实际职责拆分模块，不用格式化替代职责重构。过程计划、测试报告及临时研究归入被忽略的 `docs/archived/`，正式文档不得依赖本地归档。
 
 ## 产品边界
 
@@ -97,7 +97,7 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - 正式测试使用合成 fixture、独立 userData/业务目录，通过真实 CDP 点击、键盘、滚动及状态/存储断言；mock 模型可用于确定性分支，不能替代规定的 live 用例。
 - UI 修复要看实际截图和阅读尾部、焦点、滚动行为；按钮存在或截图成功生成不等于体验通过。仅文档改动运行静态/链接检查，不启动无关 live/打包测试。
 - 程序验证看工作台流程与交付（例如 report.md 存在且非空）；分析准确性由独立 LLM-as-a-judge 评价。UX 视觉评审另记，三者不能互相冒充。
-- Live 使用 `DEEPSEEK_API_KEY`、显示模型 DeepSeek-V41-Flash、API model `deepseek-flash`；复用 `scripts/test/live-key.mjs` 读取环境或 `.zshrc` 字面量，禁止 source 整份 shell 文件。OpenRouter 连通性用 `OPENROUTER_API_KEY` 和 `models.live-openrouter` 单独测试；不能拿公共模型列表成功冒充鉴权/模型可用。生产 BYOK 不读取 shell。预算/审批/失败分类见开发计划。
+- Live 使用 `DEEPSEEK_API_KEY`、显示模型 DeepSeek-V41-Flash、API model `deepseek-flash`；复用 `scripts/test/live-key.mjs` 读取环境或 `.zshrc` 字面量，禁止 source 整份 shell 文件。OpenRouter 连通性用 `OPENROUTER_API_KEY` 和 `models.live-openrouter` 单独测试；不能拿公共模型列表成功冒充鉴权/模型可用。生产 BYOK 不读取 shell。预算、审批与结果解释见测试指南及 evaluations/README.md。
 - 缺凭证、网络失败、缺测试、skip/todo 不算通过；报告实际范围和限制，不无限重试直到偶然通过。
 
 ## 文档、Git 与工具

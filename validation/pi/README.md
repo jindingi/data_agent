@@ -29,7 +29,7 @@ python3 run-live.py --audit-only
 - 可信 context hook 仅剥除最外层，用户自己写的类似文本保留。标准 message/custom entry 维持 pi 原生树格式。
 - `message_end` 早于 SDK append，不能当落盘确认；在收束时读取完整 record，幂等补 custom ACK。重开会话后复核，不保证 fsync 级断电持久性。
 - 确定性覆盖相同文本输入、活动 partial、恢复、preflight rejection 和取消后不重放。
-- 生产仍须生成 UUID、检查登记表、接 SQLite/IPC 并关闭不受信任的资源发现；不能直接将此探针等同于产品实现。
+- 正式产品的 UUID/登记表、SQLite/IPC 和受信资源加载分别由 `src/agent/input-identity.ts`、`src/main/services/runtime/` 及 `src/agent/resource-loader.ts` 实现；不能直接将此探针等同于产品实现。
 - `pi-smoke.mjs` 被同级 Electron harness 复用，验证 utilityProcess/MessagePort 与真实 pi SDK 的衔接。
 - 模型不保证每轮返回 thinking；live 只展示和记录实际内容。模型别名也不是不可变权重版本。
 

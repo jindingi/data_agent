@@ -23,9 +23,8 @@ __pycache__/
 *.log
 *.tsbuildinfo
 
-# Machine-specific research and one-off validation conclusions (kept locally)
-/docs/research/
-/docs/validation-report.md
+# Historical plans, reports and research (kept locally; recover older copies from Git)
+/docs/archived/
 
 # Only maintained, reusable validation sources are versioned.
 # Add new helpers explicitly; never force-add dependencies, evidence or secrets.

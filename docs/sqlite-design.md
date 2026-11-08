@@ -1,6 +1,6 @@
 # SQLite 表设计与状态机
 
-本文描述当前实现，更新于 2026-11-08，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)。字段已与迁移源码及隔离测试库的 `sqlite_master` 核对，不是下一阶段计划。
+本文按当前迁移源码描述实现，更新于 2026-11-08，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)，表结构来源为 [database.ts](../src/main/storage/database.ts) 和 [simplify.ts](../src/main/storage/simplify.ts)。
 
 ## 1. 数据边界与身份
 
@@ -61,7 +61,7 @@ flowchart LR
 
 显式索引：`sessions_updated(archived, updated_at DESC)`。workspace、session_file 的 UNIQUE 约束另有 SQLite 自动索引。run_id 没有 UNIQUE 约束，唯一性由应用生成 UUID 保证。
 
-不再保存执行 epoch、开始/结束时间、提供方或模型。对话中显示的模型、用量与本轮耗时从原生记录及运行投影取得，不依赖被删除的字段。
+不再保存执行 epoch、开始/结束时间、提供方或模型。对话中显示的模型与用量从原生记录及运行投影取得，UI 不提供本轮耗时，不依赖被删除的字段。
 
 ### 2.2 input_submissions
 

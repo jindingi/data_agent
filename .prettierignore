@@ -14,8 +14,7 @@ node_modules/
 *.log
 *.tsbuildinfo
 /pnpm-lock.yaml
-/docs/research/
-/docs/validation-report.md
+/docs/archived/
 /evaluations/results/
 # Independent legacy probe packages retain their own baseline and locks.
 /validation/

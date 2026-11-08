@@ -16,7 +16,9 @@ npm run test:packaged
 node check-packaged-resources.cjs
 ```
 
-The exact dependency graph is in `package-lock.json`. Electron 45.2.3 uses embedded Node 24.22.2 / ABI 150. The command-line build runner used Node 22.18.0. The harness pins better-sqlite3 13.0.3, Playwright-core 1.65.0, electron-builder 26.18.0, React/React DOM 19.2.4 and Streamdown 2.7.1. The sibling smoke module uses pi SDK 1.5.0.
+The exact dependency graph is in `package-lock.json`. The harness pins Electron 45.2.3, better-sqlite3 13.0.3, Playwright-core 1.65.0, electron-builder 26.18.0, React/React DOM 19.2.4 and Streamdown 2.7.1. Each run records the actual embedded Node and ABI in `report.versions`; rebuild SQLite for that Electron version. The sibling smoke module uses pi SDK 1.5.0.
+
+This independent legacy harness displays its own window and writes its own `dist/`. For current product regression with hidden windows and isolated build artifacts, use the [testing guide](../../docs/testing-guide.md).
 
 ## Checks
 
@@ -28,7 +30,7 @@ The exact dependency graph is in `package-lock.json`. Electron 45.2.3 uses embed
 4. Two independent utilityProcess hosts stream correctly attributed events; a third task queues.
 5. Stopping A starts C while B keeps writing.
 6. SIGKILL of host C cleans its Python worker process group while B continues.
-7. SIGKILL of Electron Main cleans B's Python worker process group. The final runs observe no further heartbeat writes for **10 seconds** and verify the process group no longer exists.
+7. SIGKILL of Electron Main cleans B's Python worker process group. The runner asserts no further heartbeat writes for **10 seconds** and verifies the process group no longer exists.
 
 `check-packaged-resources.cjs` runs the bundled Python, pandas, NumPy, Matplotlib and Seaborn from a `.app` path containing spaces, produces a Chinese chart using the bundled font with no missing-glyph warning, decodes the PNG, and runs the bundled rg/fd against a Chinese filename. Its `PATH=/nonexistent` excludes fallback to system Python/tools. This is runtime/resource verification, not a network-isolation test.
 

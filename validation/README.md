@@ -1,6 +1,6 @@
 # 可复用技术验证
 
-此目录保留正式开发可参考或复用的脚本，**不是产品代码或已完成的产品验收**。正式工程仍按 [开发计划](../docs/development-plan.md) 实现；程序回归检查流程和文件交付，分析质量另交独立 Judge。
+此目录保留正式开发可参考或复用的脚本，**不是产品代码或已完成的产品验收**。当前实现见 [技术设计](../docs/technical-design.md)，正式回归见 [测试指南](../docs/testing-guide.md)；程序回归检查流程和文件交付，分析质量另交独立 Judge。
 
 | 入口 | 可复用范围 | 运行说明 |
 | --- | --- | --- |
@@ -15,4 +15,4 @@
 
 源码、配置和 lockfile 纳入 Git。运行结果、日志、截图、JSONL/数据库、下载资源与打包产物按 [版本管理规则](../docs/repository-workflow.md) 仅保留本地；新检出仓库应通过命令重新生成，不依赖旧结果文件。
 
-本机历史 `docs/validation-report.md`、`docs/research/`、`validation/local-notes/` 和旧销售分析探针不纳入 Git。旧探针中 oracle/metrics schema/报告数值断言不构成工作台职责或程序门禁；既有通过结果也不是 Judge 评价。正式阶段证据与 Judge 报告分别生成到被忽略的结果目录。
+历史计划、验证报告和研究已归入被忽略的 `docs/archived/`；`validation/local-notes/` 和旧销售分析探针也不纳入 Git。旧探针中 oracle/metrics schema/报告数值断言不构成工作台职责或程序门禁；既有通过结果也不是 Judge 评价。正式测试证据与 Judge 报告分别生成到被忽略的结果目录。
