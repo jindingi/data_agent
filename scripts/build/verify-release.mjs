@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync, lstatSync } from 'node:fs';
-import { resolve, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -18,9 +18,11 @@ function files(root) {
   });
 }
 export function verifyRelease(
-  bundle = resolve(process.env.DATA_AGENT_TEST_BUNDLE ?? 'release/mac-arm64/Data Agent.app'),
-  buildDir = resolve(process.env.DATA_AGENT_TEST_BUILD_DIR ?? 'out'),
+  bundle,
+  buildDir,
+  sourceRoot = fileURLToPath(new URL('../../', import.meta.url)),
 ) {
+  if (!bundle || !buildDir) throw new Error('Explicit bundle and build paths are required');
   const resources = join(bundle, 'Contents/Resources'),
     archive = join(resources, 'app.asar');
   assert(existsSync(archive), 'Build the actual .app first');
@@ -36,7 +38,7 @@ export function verifyRelease(
       bytes = asar.extractFile(archive, path);
     assert.equal(hash(bytes), hash(readFileSync(file)), `Stale packaged application code: ${path}`);
     assert(
-      !bytes.includes(resolve('.')) && !bytes.includes('/Users/ding/'),
+      !bytes.includes(sourceRoot) && !bytes.includes('/Users/ding/'),
       'Application code includes a developer absolute path',
     );
     checked.push({ path, sha256: hash(bytes) });
@@ -45,15 +47,17 @@ export function verifyRelease(
     ['resources/python', 'python'],
     ['resources/skills', 'skills'],
   ])
-    for (const file of files(source).filter(
+    for (const file of files(join(sourceRoot, source)).filter(
       (f) => !f.includes('__pycache__') && !f.endsWith('.pyc'),
     )) {
-      const path = join(target, relative(source, file)),
+      const path = join(target, relative(join(sourceRoot, source), file)),
         bytes = readFileSync(join(resources, path));
       assert.equal(hash(bytes), hash(readFileSync(file)), `Stale bundled resource ${path}`);
       checked.push({ path, sha256: hash(bytes) });
     }
-  const reportLock = JSON.parse(readFileSync('resources/echarts-lock.json', 'utf8'));
+  const reportLock = JSON.parse(
+    readFileSync(join(sourceRoot, 'resources/echarts-lock.json'), 'utf8'),
+  );
   for (const [name, item] of Object.entries(reportLock.files)) {
     const bytes = readFileSync(join(resources, 'report-runtime', name));
     assert.equal(hash(bytes), item.sha256, `Stale bundled report runtime ${name}`);
@@ -88,7 +92,10 @@ export function verifyRelease(
     }).includes('arm64'),
   );
   const metadata = JSON.parse(asar.extractFile(archive, 'package.json'));
-  assert.equal(metadata.version, JSON.parse(readFileSync('package.json')).version);
+  assert.equal(
+    metadata.version,
+    JSON.parse(readFileSync(join(sourceRoot, 'package.json'))).version,
+  );
   return {
     bundle,
     version: metadata.version,
@@ -102,7 +109,3 @@ export function verifyRelease(
       'Static packaged code/resource/hash/license checks; actual UI, ABI and live checks are P7 phase cases.',
   };
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  console.log(
-    JSON.stringify(verifyRelease(process.argv[2] ? resolve(process.argv[2]) : undefined), null, 2),
-  );

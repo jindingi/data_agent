@@ -16,6 +16,10 @@ HTML 交互报告已接入独立 skill、内置 ECharts 与隔离查看器；验
 
 electron-vite 构建 main/agent 两个 Node 入口，以及 preload/renderer；electron-builder 生成本机 `.app`。Python 可执行文件、标准库、扩展和字体放入真实资源目录，不塞进 ASAR。产品不要求用户安装 Node、Python、pip 或 Homebrew。
 
+构建产物由 `scripts/build/artifacts.mjs` 统一拥有来源、输出目录、准备、复用与验证。正式测试、build/package CLI、开发/CDP 和效果评测共用该入口；CLI 默认创建系统临时目录，可显式指定独立 run-root，禁止与源码及共享 out/release 重叠。源码指纹在仓库根计算，构建完成后核对来源未变并保存输出文件哈希；失败不生成成功记录。复用与启动检查同一上下文、指纹、完整产物和资源链接，缺失或过期即失败，不回退到进程环境或共享目录。
+
+内存执行上下文使用 AsyncLocalStorage，支持并发及嵌套隔离，不通过全局环境变量选择应用/构建/包。Vite 热更新使用新输出位置，不冒充可复用静态构建。打包先将已验证构建复制到独立 package-app，在其中离线准备生产依赖并保留匹配 Electron ABI 的 SQLite 字节；不替换 built 应用的依赖链接。electron-builder 仍以源码仓库为 projectDir，仅 app/output 指向产物目录；验证显式传入同一 buildDir/bundlePath。release 残留审计同时检查测试结果根与产物根。
+
 Renderer 保持 `nodeIntegration: false`、`contextIsolation: true` 与 sandboxed preload，只暴露有类型和参数校验的 IPC 能力。“不使用沙箱”指 Agent 工具执行策略，不意味着关闭 Electron 的渲染进程安全隔离。
 
 运行目标：本机 macOS 15.7.4 / Apple M4 / arm64 / 24 GiB。首版本地 `.app` 验收不要求签名公证、Intel 或历史 macOS 兼容；不将未测平台标为支持。

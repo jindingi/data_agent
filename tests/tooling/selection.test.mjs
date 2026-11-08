@@ -29,6 +29,10 @@ test('feature, level, exact cases and legacy aliases select only named coverage'
   assert.throws(() => select('P7'), /retired/);
   assert.throws(() => select('--surprise'), /Unknown/);
   assert.throws(() => select('--feature'), /Missing/);
+  assert.deepEqual(parseArgs(['--run-root', '/tmp/artifacts', '--results-root', '/tmp/results']), {
+    'run-root': '/tmp/artifacts',
+    'results-root': '/tmp/results',
+  });
 });
 test('list exposes live costs; default live selection excludes recording; release contains packaged/performance', () => {
   assert(select('--list').tests.some((t) => t.model === 'live'));

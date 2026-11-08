@@ -1,74 +1,24 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { spawnSync, execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createHash } from 'node:crypto';
-import { createRunContext, setRunContext, preparePackageDependencies } from './run-context.mjs';
-import { verifyRelease } from '../build/verify-release.mjs';
-import { prepareReportRuntime } from '../build/report-runtime.mjs';
+import { prepareArtifacts } from '../build/artifacts.mjs';
 
-export function sourceFingerprint() {
-  const hash = createHash('sha256');
-  const files = execFileSync(
-    'git',
-    ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
-    { encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean);
-  for (const file of [...new Set(files)].sort())
-    if (existsSync(file)) hash.update(file).update('\0').update(readFileSync(file)).update('\0');
-  return hash.digest('hex');
-}
 function command(file, args, output, env = process.env) {
   const result = spawnSync(file, args, { encoding: 'utf8', env, maxBuffer: 20 * 1024 * 1024 });
   writeFileSync(output, (result.stdout ?? '') + (result.stderr ?? ''));
   return result;
 }
 export function prepare(plan, options, dir) {
-  // Unit/native tests also consume frozen skills on a clean checkout. No network or Python needed.
-  prepareReportRuntime();
-  const context = createRunContext(options['run-root'] ?? dir);
-  setRunContext(context);
-  const fingerprint = sourceFingerprint(),
-    stamp = join(context.appDir, 'build-source.sha256');
-  const run = (id, args) => {
-    const result = command('pnpm', args, join(dir, `${id}.log`));
-    if (result.status !== 0) throw new Error(`${id} failed; see ${id}.log`);
-  };
-  if (plan.requirements.build) {
-    if (options['no-build']) {
-      if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== fingerprint)
-        throw new Error('Missing or stale isolated build');
-    } else {
-      run('build', ['exec', 'electron-vite', 'build', '--outDir', context.buildDir]);
-      writeFileSync(stamp, fingerprint);
-    }
-  }
-  if (plan.requirements.packaged) {
-    const packageStamp = join(context.releaseDir, 'package-source.sha256');
-    if (options['no-package']) {
-      if (!existsSync(packageStamp) || readFileSync(packageStamp, 'utf8') !== fingerprint)
-        throw new Error('Missing or stale isolated package');
-      verifyRelease();
-    } else {
-      run('runtime', ['runtime:verify']);
-      preparePackageDependencies(context, run);
-      run('package', [
-        'exec',
-        'electron-builder',
-        '--mac',
-        'dir',
-        '--arm64',
-        `--config.directories.app=${context.appDir}`,
-        `--config.directories.output=${context.releaseDir}`,
-      ]);
-      verifyRelease();
-      writeFileSync(packageStamp, fingerprint);
-    }
-  }
-  return { context, fingerprint };
+  const context = prepareArtifacts({
+    root: options['run-root'] ?? dir,
+    build: plan.requirements.build,
+    packaged: plan.requirements.packaged,
+    reuseBuild: options['no-build'],
+    reusePackage: options['no-package'],
+  });
+  return { context, fingerprint: context.fingerprint };
 }
 const escaped = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export async function execute(plan, dir, onResult) {

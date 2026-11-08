@@ -6,6 +6,7 @@ import { parseArgs, selectTests } from './selection.mjs';
 import { prepare, execute } from './execution.mjs';
 import { auditRelease } from './release-audit.mjs';
 import { saveReport } from './report.mjs';
+import { withRunContext } from './run-context.mjs';
 
 let dir, report;
 try {
@@ -17,7 +18,10 @@ try {
       throw new Error(
         'Live model calls require explicit --live. Use --dry-run to inspect costs first.',
       );
-    dir = resolve('test-results', new Date().toISOString().replaceAll(':', '-'));
+    dir = resolve(
+      options['results-root'] ?? 'test-results',
+      new Date().toISOString().replaceAll(':', '-'),
+    );
     mkdirSync(dir, { recursive: true });
     report = {
       status: 'running',
@@ -54,13 +58,15 @@ try {
       const { context, fingerprint } = prepare(plan, options, dir);
       report.context = context;
       report.sourceTreeHash = fingerprint;
-      await execute(plan, dir, (result) => {
-        report.cases.push(result);
-        saveReport(dir, report);
-        console.log(`${result.id}: ${result.status}`);
-      });
+      await withRunContext(context, () =>
+        execute(plan, dir, (result) => {
+          report.cases.push(result);
+          saveReport(dir, report);
+          console.log(`${result.id}: ${result.status}`);
+        }),
+      );
     }
-    if (options.suite === 'release') report.releaseAudit = auditRelease(dir);
+    if (options.suite === 'release') report.releaseAudit = auditRelease(dir, report.context);
     report.status =
       report.cases.length === plan.tests.length &&
       report.cases.every((item) => item.status === 'passed')

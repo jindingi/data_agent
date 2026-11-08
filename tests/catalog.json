@@ -1258,5 +1258,15 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["reports"]
+  },
+  {
+    "id": "application.artifact-cli",
+    "feature": "application",
+    "level": "e2e",
+    "file": "tests/features/application/artifact-cli.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": ["packaging"]
   }
 ]

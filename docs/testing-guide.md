@@ -123,6 +123,12 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 ## 执行环境、结果与交付
 
+构建与启动统一使用 `scripts/build/artifacts.mjs` 的产物上下文。build、package、dev、dev:cdp 和 eval:prepare CLI 默认在系统临时目录生成新上下文，并输出实际路径；`--run-root <目录>` 可指定独立位置。正式 runner 的 `--run-root` 指定产物位置，报告默认保存在本次 test-results；`--results-root <目录>` 可将报告、截图与测试数据迁到另一磁盘，产物和结果路径分别记录。不再读取 DATA_AGENT_TEST_APP_DIR/BUILD_DIR/BUNDLE，也不回退共享 out/release；未绑定执行上下文的测试启动明确失败。
+
+`pnpm start -- --run-root <目录>` 启动指定静态构建；`pnpm verify:release -- --run-root <目录>` 校验指定包。`--no-build` / `--no-package` 只复用带 artifacts.json 校验记录的匹配产物；校验源码指纹、实际构建字节和资源链接，包另做资源/代码比对。已有产物目录不会被默认重建或覆盖，失败输出保留作诊断，使用新目录重试。开发热更新不接受静态产物复用。产物未自动清理，确认不再使用后可自行删除整个产物根。
+
+`tooling.run-context` 通过真实临时目录与受控命令 adapter 验证共享目录不变、离线打包不改 built 依赖、源码/锁文件/资源变化拒绝复用、失败无成功记录、缺失/篡改/链接重定向以及并发作用域。`application.artifact-cli` 运行真实 build 与 dev:cdp CLI；`application.dev` 保留真实 pnpm dev/完整 URL 信任验收；`packaging.resources` 同时验证 package CLI 复用与显式 verify:release，不用路径字符串断言冒充真实启动。
+
 - unit 使用 Node/Vitest；native integration 使用 Electron 自带 Node/Vitest，保持 SQLite ABI。每层只启动一批 Vitest，按文件和 ID 筛选；未执行/skip/todo 不算选中用例通过。
 - E2E 使用真实 Electron + CDP，默认后台隐藏窗口。隔离 userData、业务目录、构建和 package；不触碰 `~/.data_agent`、在用 out 或 release。`--no-build/--no-package` 必须配合 `--run-root` 和匹配源码指纹的历史隔离产物；过期产物失败。
 - 每次执行生成 `test-results/<时间>/summary.json`、`junit.xml`、`report.md`，包括选择计划、源码指纹、每项状态与日志；截图/DOM/SQLite/JSONL 不进 Git。纯筛选不产生这些目录。

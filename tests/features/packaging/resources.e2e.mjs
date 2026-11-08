@@ -1,4 +1,5 @@
-import { testBuildDir } from '../../../scripts/test/run-context.mjs';
+import { testBuildDir, runContext } from '../../../scripts/test/run-context.mjs';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,6 +12,18 @@ async function info(page) {
 }
 export const cases = {
   async 'packaging.resources'({ dir }) {
+    const reused = execFileSync(
+      'pnpm',
+      ['package:dir', '--run-root', runContext().root, '--no-build', '--no-package'],
+      { encoding: 'utf8' },
+    );
+    const context = JSON.parse(reused.split('\n').find((line) => line.startsWith('{')));
+    assert.equal(context.root, runContext().root);
+    const verified = execFileSync('pnpm', ['verify:release', '--run-root', context.root], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    assert(verified.includes(context.bundlePath));
     assert.ok(existsSync(join(testBuildDir(), 'main/index.js')));
     assert.ok(existsSync(join(testBuildDir(), 'main/agent.js')));
     const app = await startApp(join(dir, 'packaged'), { packaged: true });
@@ -25,7 +38,7 @@ export const cases = {
       assert.equal(system.architecture, 'arm64');
       assert.ok(system.sqliteVersion);
       await app.page.getByRole('tab', { name: 'Agent 配置', exact: true }).click();
-      await app.page.getByRole('textbox', { name: '系统提示词', exact: true }).waitFor();
+      await app.page.getByRole('textbox', { name: '行为指令', exact: true }).waitFor();
       assert(
         await app.page.getByRole('switch', { name: '启用 data-analysis', exact: true }).isChecked(),
       );

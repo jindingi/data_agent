@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { startApp, until } from '../test/harness.mjs';
 import { liveKey } from '../test/live-key.mjs';
+import { runContext } from '../test/run-context.mjs';
 import { configure, rpc } from '../../tests/support/desktop.mjs';
 import { scenarios } from '../../evaluations/fixtures/scenarios.mjs';
 
@@ -40,18 +41,8 @@ export async function runScenario(id, root, { packaged = false } = {}) {
       .digest('hex'),
     inputPaths: paths,
   };
-  const sourceHash = createHash('sha256');
-  for (const file of execFileSync(
-    'git',
-    ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
-    { encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean)
-    .sort())
-    if (existsSync(file))
-      sourceHash.update(file).update('\0').update(readFileSync(file)).update('\0');
-  evidence.sourceTreeHash = sourceHash.digest('hex');
+  evidence.sourceTreeHash = runContext().fingerprint;
+  evidence.artifactsContext = runContext();
   writeFileSync(join(root, 'evaluation.json'), JSON.stringify(evidence, null, 2));
   try {
     app = await startApp(join(root, 'application'), { packaged, pickFiles: paths });

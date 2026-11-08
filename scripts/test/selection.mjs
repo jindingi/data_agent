@@ -4,7 +4,16 @@ import { dirname, resolve, relative } from 'node:path';
 import ts from 'typescript';
 import { catalog, resolveCase, requirementsFor } from './case-registry.mjs';
 
-const values = new Set(['case', 'feature', 'level', 'model', 'suite', 'base', 'run-root']);
+const values = new Set([
+  'case',
+  'feature',
+  'level',
+  'model',
+  'suite',
+  'base',
+  'run-root',
+  'results-root',
+]);
 const flags = new Set([
   'list',
   'dry-run',

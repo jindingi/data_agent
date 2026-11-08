@@ -4,13 +4,15 @@ import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
 import { freePort, until } from './harness.mjs';
+import { runContext } from './run-context.mjs';
+import { randomUUID } from 'node:crypto';
 
 /** Exercise the real pnpm dev command without replacing out/ or any user's app/state. */
 export async function startDevApp(root, { testModelBaseUrl, nodeOptions } = {}) {
   root = resolve(root);
   mkdirSync(root, { recursive: true });
+  const artifactsRoot = join(runContext().root, `dev-${randomUUID()}`);
   const port = await freePort(),
-    out = join(root, 'out'),
     logFile = join(root, 'dev.log');
   const env = {
     ...process.env,
@@ -34,17 +36,19 @@ export async function startDevApp(root, { testModelBaseUrl, nodeOptions } = {}) 
     'pnpm',
     [
       'dev',
-      '--outDir',
-      out,
-      '--entry',
-      join(out, 'main/index.js'),
-      '--remoteDebuggingPort',
+      '--run-root',
+      artifactsRoot,
+      '--cdp-port',
       String(port),
-      '--',
-      '--data-agent-automation',
-      '--data-agent-background',
+      '--automation',
+      '--background',
     ],
-    { env, detached: true, stdio: ['ignore', fd, fd] },
+    {
+      cwd: runContext().sourceRoot,
+      env,
+      detached: true,
+      stdio: ['ignore', fd, fd],
+    },
   );
   closeSync(fd);
   let exited = false,

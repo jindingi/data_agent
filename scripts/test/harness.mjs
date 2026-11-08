@@ -7,7 +7,8 @@ import { mkdirSync, openSync, closeSync, readFileSync, existsSync, writeFileSync
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
-import { testAppDir, testBundle } from './run-context.mjs';
+import { runContext } from './run-context.mjs';
+import { validateArtifacts } from '../build/artifacts.mjs';
 const require = createRequire(import.meta.url);
 export async function until(fn, label, timeout = 15_000) {
   const deadline = Date.now() + timeout;
@@ -28,6 +29,7 @@ export async function freePort() {
 export async function startApp(
   root,
   {
+    artifacts = runContext(),
     packaged = false,
     packagedPath,
     offline = false,
@@ -42,11 +44,12 @@ export async function startApp(
     nodeOptions,
   } = {},
 ) {
+  artifacts = validateArtifacts(artifacts, { packaged, packagedPath });
   root = resolve(root);
   mkdirSync(root, { recursive: true });
   const port = selectedPort ?? (await freePort());
   const executable = packaged
-    ? join(resolve(packagedPath ?? testBundle()), 'Contents/MacOS/Data Agent')
+    ? join(resolve(packagedPath ?? artifacts.bundlePath), 'Contents/MacOS/Data Agent')
     : require('electron');
   if (!existsSync(executable)) throw new Error(`Missing executable: ${executable}`);
   // A missing fixture must never accidentally use the real provider in ordinary regression.
@@ -61,7 +64,7 @@ export async function startApp(
     testModelBaseUrl = `http://127.0.0.1:${deniedModel.address().port}/v1`;
   }
   const args = [
-    ...(packaged ? [] : [testAppDir()]),
+    ...(packaged ? [] : [artifacts.appDir]),
     ...(automation ? ['--data-agent-automation'] : []),
     ...(background ? ['--data-agent-background'] : []),
     ...(offline ? ['--no-sandbox'] : []),

@@ -1,4 +1,4 @@
-import { testBundle } from '../../../scripts/test/run-context.mjs';
+import { testBundle, testBuildDir } from '../../../scripts/test/run-context.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -11,7 +11,7 @@ import { verifyRelease } from '../../../scripts/build/verify-release.mjs';
 const taskTool = (name, args) => ({ tool: { name, args } });
 export const cases = {
   async 'packaging.relocation'({ dir }) {
-    const inventory = verifyRelease();
+    const inventory = verifyRelease(testBundle(), testBuildDir());
     const relocated = join(resolve(dir), 'relocated', 'Data Agent.app');
     mkdirSync(join(resolve(dir), 'relocated'), { recursive: true });
     execFileSync('/usr/bin/ditto', [testBundle(), relocated]);
