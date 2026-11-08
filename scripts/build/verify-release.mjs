@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync, lstatSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
+import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -38,7 +39,7 @@ export function verifyRelease(
       bytes = asar.extractFile(archive, path);
     assert.equal(hash(bytes), hash(readFileSync(file)), `Stale packaged application code: ${path}`);
     assert(
-      !bytes.includes(sourceRoot) && !bytes.includes('/Users/ding/'),
+      !bytes.includes(sourceRoot) && !bytes.includes(homedir() + sep),
       'Application code includes a developer absolute path',
     );
     checked.push({ path, sha256: hash(bytes) });

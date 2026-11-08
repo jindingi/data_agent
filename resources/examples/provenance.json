@@ -10,10 +10,12 @@
       "generatedAt": "2026-11-08T13:48:19.023Z",
       "commit": "5e58ce22edc3e0cfe0669ce0ce58d9c0511fdbe8",
       "sourceTreeHash": "2578cda88c5dd592ee8ff989862c765a05a31ce6016bd231313658f94762619b",
-      "skillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "skillFingerprint": "d42254b7425b1edee6ce33584601687ce546a8579a309832170985a353f43743",
       "originalSessionSha256": "61c0e2ec007dfa6281c342d6e61a27f275f972a6ddeb17ee5132cb749212494f",
       "reportSha256": "519d63dce9453de40f5116f68fe2e19358434b1d80de363ffb6a0a87450711dc",
-      "hadNetworkInterruption": true
+      "hadNetworkInterruption": true,
+      "originalSkillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "publishedSessionSha256": "ce68e21d095740a7f6e341a32ee0ece0f35d733957150ab425bc3141dd5ec1ee"
     },
     {
       "id": "12fc90fe-0039-4962-a17d-6e3fa2c3c59d",
@@ -22,10 +24,16 @@
       "generatedAt": "2026-11-08T13:59:15.349Z",
       "commit": "5e58ce22edc3e0cfe0669ce0ce58d9c0511fdbe8",
       "sourceTreeHash": "2578cda88c5dd592ee8ff989862c765a05a31ce6016bd231313658f94762619b",
-      "skillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "skillFingerprint": "d42254b7425b1edee6ce33584601687ce546a8579a309832170985a353f43743",
       "originalSessionSha256": "aa8b9259d7c4f8bbf83c2747a800af09ccb7155c444b34d74d45b4ebb6fbe1bb",
       "reportSha256": "f234669d5c4ec65bf4bb9590c37a83504db3e0ec826263d69d86162f0776fe9c",
-      "hadNetworkInterruption": false
+      "hadNetworkInterruption": false,
+      "originalSkillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "publishedSessionSha256": "a135b2b980dd6e8c023cd2df52a73912c984000dcc6c04eab38737cb9338bd51"
     }
-  ]
+  ],
+  "publication": {
+    "pathNormalization": "authoring-root-and-system-tmp-v1",
+    "publicRoot": "/__data_agent_examples__"
+  }
 }

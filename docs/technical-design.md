@@ -432,7 +432,9 @@ Renderer 不再获取日志清单或分页正文；旧 `logs.list/page` IPC、Lo
 
 ## 内置会话与目录迁移
 
-`resources/examples/catalog.json` 枚举两份真实原生会话、不可变配置及全部发行文件的字节数与 SHA-256。Main 的 ExampleService 仅在全新数据库的 `examples.initialization` 为 pending 时初始化；资源均校验并复制到普通可写 workspace，JSONL 字节不改写。app_metadata 的完成标记独立于会话是否存在，避免删除后重建。已有数据库登记 skipped。
+`resources/examples/catalog.json` 枚举两份真实原生会话、不可变配置及全部发行文件的字节数与 SHA-256。导出公开副本时，仅将制作目录及系统临时目录统一替换为固定的虚构命名空间 `/__data_agent_examples__`，同步配置绑定及指纹；provenance 分别记录原始与发行会话哈希、配置指纹和归一化规则，原始制作记录仅留本地。未知本机路径或疑似凭证阻止导出，不静默删改。此操作只用于发行前的副本制作，不用于运行中或已安装的会话。
+
+Main 的 ExampleService 仅在全新数据库的 `examples.initialization` 为 pending 时初始化；资源均校验并复制到普通可写 workspace，发行 JSONL 字节不改写。app_metadata 的完成标记独立于会话是否存在，避免删除后重建。已有数据库登记 skipped。
 
 安装在发布文件前保留 pending 意图；已发布文件必须逐字节匹配才可恢复登记，不覆盖不同内容或符号链接。SQLite 一次事务写入历史修订、普通会话/已提交输入/本机来源和完成标记；失败时回滚 DB，已发布的相同文件可供下一次恢复。历史修订保留原编号，随后创建本机默认修订，避免示例配置成为新会话默认值。
 

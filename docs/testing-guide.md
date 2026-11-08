@@ -200,6 +200,8 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 ## 内置示例验收
 
+`tooling.examples-publication` 验证发行副本归一化制作与临时路径、同步配置指纹、保留原始证据及非路径内容，并逐文件检查实际发行资源、清单和来源哈希。未知机器路径及疑似凭证必须拒绝导出。
+
 `examples.installation` 使用合成原生历史验证无新增业务表的首次初始化、崩溃恢复、默认修订保留、目标冲突与删除后不补回；普通 harness 默认禁用示例导入，显式 examples:true 才执行真实发行资源初始化，避免影响既有 fixture 的会话计数。此测试开关仅对 automation 启动有效。
 
 `agent-config.requests` 使用实际 SDK 最终 HTTP 请求比较跨目录迁移与重启、工具循环、steer/followup、新附件的历史前缀，并验证迁移说明仅追加一次及精确 skill 资源映射。示例真实制作使用 scripts/examples/generate.mjs 和隔离后台 Electron；凭证沿用 live-key，审批沿用评测审核机制，原始证据留在忽略目录。发行会话和普通 HTTP 合成录制分别管理。

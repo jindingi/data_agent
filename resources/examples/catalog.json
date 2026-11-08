@@ -2,12 +2,12 @@
   "version": 1,
   "files": {
     "netflix-markdown/session.jsonl": {
-      "bytes": 316638,
-      "sha256": "61c0e2ec007dfa6281c342d6e61a27f275f972a6ddeb17ee5132cb749212494f"
+      "bytes": 315732,
+      "sha256": "ce68e21d095740a7f6e341a32ee0ece0f35d733957150ab425bc3141dd5ec1ee"
     },
     "netflix-markdown/agent-binding.json": {
-      "bytes": 13143,
-      "sha256": "373d26cb6e2a7d6cf0e6abe39a5e58b5de167bd521ca495a9ccb4b4ea229a53c"
+      "bytes": 13111,
+      "sha256": "595810016a127b0d057adb20737c56deb078073b9823a302aea3c02a048dc1ec"
     },
     "netflix-markdown/workspace/analysis.py": {
       "bytes": 29819,
@@ -114,12 +114,12 @@
       "sha256": "df1f4ad2027a5a14c3a33932ef0d4054565ff88adf92b7f263601b70fdc6f3f3"
     },
     "netflix-interactive/session.jsonl": {
-      "bytes": 442197,
-      "sha256": "aa8b9259d7c4f8bbf83c2747a800af09ccb7155c444b34d74d45b4ebb6fbe1bb"
+      "bytes": 441361,
+      "sha256": "a135b2b980dd6e8c023cd2df52a73912c984000dcc6c04eab38737cb9338bd51"
     },
     "netflix-interactive/agent-binding.json": {
-      "bytes": 13143,
-      "sha256": "373d26cb6e2a7d6cf0e6abe39a5e58b5de167bd521ca495a9ccb4b4ea229a53c"
+      "bytes": 13111,
+      "sha256": "595810016a127b0d057adb20737c56deb078073b9823a302aea3c02a048dc1ec"
     },
     "netflix-interactive/workspace/README.md": {
       "bytes": 4555,
@@ -170,8 +170,8 @@
       "sha256": "a9f6a30b9067aadbe3ff43173b006d4cd894c7e432690bab1e19cc1ee459489d"
     },
     "provenance.json": {
-      "bytes": 1436,
-      "sha256": "df32082e86210b54e9429e06a65f86cc775500335cc105a4880425bab4e114cb"
+      "bytes": 1970,
+      "sha256": "b0c7cc9559dcf7c1799e558c669556dd22e988b3b19b3d472f5cfd64d33f4442"
     }
   },
   "examples": [

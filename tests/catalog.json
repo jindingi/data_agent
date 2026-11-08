@@ -1280,6 +1280,16 @@
     "related": ["packaging"]
   },
   {
+    "id": "tooling.examples-publication",
+    "feature": "tooling",
+    "level": "tooling",
+    "file": "tests/tooling/examples-publication.test.mjs",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["examples", "packaging"]
+  },
+  {
     "id": "examples.installation",
     "feature": "examples",
     "level": "integration",

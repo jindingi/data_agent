@@ -9,6 +9,11 @@ import {
 import { join, resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
+import {
+  assertPublicExampleFile,
+  publicExampleRoot,
+  publicExampleSnapshot,
+} from './public-snapshot.mjs';
 
 // Run with Electron's Node ABI. Select only public example metadata, never app_metadata credentials.
 const args = process.argv.slice(2);
@@ -22,11 +27,7 @@ const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const files = {};
 const put = (relative, bytes) => {
   if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
-  if (
-    !relative.endsWith('.png') &&
-    /\/Users\/|\/Volumes\/|sk-[A-Za-z0-9_-]{20,}/.test(bytes.toString('utf8'))
-  )
-    throw new Error(`Private path or possible credential in ${relative}`);
+  assertPublicExampleFile(relative, bytes);
   const target = join(output, relative);
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, bytes);
@@ -61,8 +62,9 @@ try {
         "SELECT input_id AS inputId,run_id AS runId,kind,entry_id AS entryId,digest FROM input_submissions WHERE session_id=? AND state='committed' ORDER BY sequence",
       )
       .all(session.id);
-    put(`${task.id}/session.jsonl`, native);
-    put(`${task.id}/agent-binding.json`, JSON.stringify(binding, null, 2) + '\n');
+    const published = publicExampleSnapshot(native, binding, root);
+    put(`${task.id}/session.jsonl`, published.native);
+    put(`${task.id}/agent-binding.json`, JSON.stringify(published.binding, null, 2) + '\n');
     const walk = (dir, relative = '') => {
       for (const name of readdirSync(dir)) {
         if (
@@ -103,8 +105,10 @@ try {
       generatedAt: evidence.startedAt,
       commit: evidence.commit,
       sourceTreeHash: evidence.artifactsContext.fingerprint,
-      skillFingerprint: binding.fingerprint,
+      originalSkillFingerprint: binding.fingerprint,
+      skillFingerprint: published.binding.fingerprint,
       originalSessionSha256: hash(native),
+      publishedSessionSha256: hash(published.native),
       reportSha256: files[`${task.id}/workspace/${task.report}`].sha256,
       hadNetworkInterruption: entries.some(
         (e) => e.message?.errorMessage === 'net::ERR_NETWORK_CHANGED',
@@ -122,6 +126,10 @@ try {
         version: 1,
         source: 'https://www.kaggle.com/datasets/shivamb/netflix-shows/data',
         license: 'CC0-1.0',
+        publication: {
+          pathNormalization: 'authoring-root-and-system-tmp-v1',
+          publicRoot: publicExampleRoot,
+        },
         examples: provenance,
       },
       null,
