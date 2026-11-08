@@ -1,6 +1,6 @@
 ---
 name: interactive-report
-description: Analyze local data and deliver an offline interactive HTML report when the user requests HTML, interactive exploration, filtering or linked charts. Choose the report structure to fit the analytical intent.
+description: 用户要求 HTML、交互探索、筛选或图表联动时，分析本地数据并生成离线交互 HTML 报告；根据分析意图自由设计报告结构。
 ---
 
 # Interactive reports

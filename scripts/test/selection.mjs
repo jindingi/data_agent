@@ -58,7 +58,7 @@ export function changedFiles(base) {
 }
 const relatedPaths = [
   [
-    /^src\/agent\/(session-runtime|runtime-context|input-identity|event-adapter|resource-loader|history|models)/,
+    /^src\/agent\/(session-runtime|agent-configuration|prompt-preview|workbench-session|input-identity|event-adapter|resource-loader|history|models)/,
     [
       'conversation',
       'usage',

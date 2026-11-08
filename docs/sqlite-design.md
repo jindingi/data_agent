@@ -101,11 +101,11 @@ flowchart LR
 | revision | INTEGER PRIMARY KEY AUTOINCREMENT | UI 的 vN 修订号             |
 | snapshot | TEXT NOT NULL                     | 完整 AgentBinding JSON 快照 |
 
-snapshot 包含 revision、fingerprint、createdAt、config（行为提示词、工具/skill 开关）、skills（正文、描述、hash、快照路径）、promptVersion，以及可选 legacyPreamble。skill 正文持久化在快照中，运行时还会按 hash 物化到 `agent-resources/`。
+snapshot 只使用一种结构，包含 revision、fingerprint、createdAt、config（行为指令、工具/skill 开关）、skills（正文、描述、hash、快照路径及可选 bundleHash/assets）。不保存提示词协议版本或旧提示词覆盖，不自动迁移旧结构；现有 SQL 字段 agent_config_override 为停用遗留字段，产品不再读取或写入。旧格式不兼容时保留原记录并拒绝继续，不删除数据。
 
-交互报告没有增加 SQL 表或字段。JSON promptVersion=2 支持 skill 的可选 bundleHash/assets：小型 reference 含正文、路径、字节数和 SHA-256；ECharts 与许可证仅含路径、字节数和哈希，字节存于不可变缓存。规范化、排序后计算集合摘要；旧 promptVersion=1 快照不补字段、不重新签发路径，沿用原指纹。无实际配置变化的保存/预览保留原修订和协议。
+内置 skill 清单统一声明附带资源；小型 reference 含正文、路径、字节数和 SHA-256，大型锁定运行时资源仅含路径、字节数和哈希，字节存于不可变缓存。资源集合按路径排序并规范化字段顺序参与 bundleHash；无附带资源的 skill 按正文哈希物化。
 
-创建新版资源先完成校验与原子文件物化，再提交不可变修订；DB 事务失败留下的孤立缓存不改变当前默认值。缺失文本从快照恢复，大型资源仅从相同哈希可信安装字节恢复；不同版本、篡改、符号链接均拒绝。已有绑定不因应用升级重写。旧应用不能保证读取带新 skill/协议的快照；降级须恢复匹配版本的数据库、JSONL 与资源缓存备份，禁止删除新修订伪造兼容。
+创建修订前先校验和物化资源，再提交不可变快照；DB 事务失败留下的孤立缓存不改变默认值。缺失文本从快照恢复，大型资源仅从相同哈希可信安装字节恢复；篡改、符号链接和缺失资源均拒绝。会话绑定不会因修改默认值而重写，数据库与文件系统不被视为原子提交。
 
 当前默认配置为 revision 最大的记录，不另存默认修订指针。保存有变化的配置才新建修订；创建修订的事务内回填生成的 revision，提交后不原地编辑旧修订。恢复默认提示词后保存，若内容发生变化，同样新建修订。新会话绑定当时默认值，旧会话与排队任务不会跟随默认值变化。删除会话不删除修订。
 

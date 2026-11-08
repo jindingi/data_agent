@@ -22,9 +22,7 @@ export function configuredSkills(binding: AgentBinding): Skill[] {
 }
 export function configurationResources(binding: AgentBinding, workspace: string) {
   return {
-    prompt:
-      binding.legacyPreamble ??
-      composeAgentPrompt(workspace, binding.config, binding.promptVersion),
+    prompt: composeAgentPrompt(workspace, binding.config),
     skills: configuredSkills(binding),
   };
 }

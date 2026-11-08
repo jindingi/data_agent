@@ -26,16 +26,16 @@
 
 ## 3. 实施前基线与改动位置
 
-| 当前依据                                                                                                | 所需改动                                                            |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [data-analysis](../resources/skills/data-analysis/SKILL.md) 默认 report.md，通用工具已支持文件和 Python | 新增独立交付 skill，保留原 skill 的职责                             |
-| [共享配置](../src/shared/agent-config.ts) 仅允许 data-analysis，提示词固定要求先读取它                  | 扩展 skill 类型、设置和新提示词版本中的选择说明，保持旧版本组装逻辑 |
-| [配置服务](../src/main/services/agent-config.ts) 硬编码读取一个 skill                                   | 改为可信内置清单加载，不开放用户路径/动态第三方 skill               |
-| [资源物化](../src/node/agent-config-resources.ts) 只快照 SKILL.md                                       | 版本化保存示例、可选脚本及 ECharts 资源引用，设计缺失恢复           |
-| [打包配置](../electron-builder.yml)、[运行时路径](../src/node/runtime-paths.ts) 无 JS 报告资源          | 构建时准备并校验 ECharts 浏览器分发，开发与 .app 使用一致的资源解析 |
-| [工作区服务](../src/main/services/workspace.ts) 通过条目 ID 读文件，一般文本有截断                      | 增加有界完整 HTML 读取供专用查看器，不复用截断源码正文              |
-| [WorkspacePanel](../src/renderer/features/workspace/WorkspacePanel.tsx) 只处理现有预览类型              | 增加 HTML 交互/源码切换，接入独立查看器生命周期与阅读状态           |
-| [WorkspaceReport](../src/renderer/features/workspace/WorkspaceReport.tsx) 禁止 Markdown 中执行 HTML     | 保持此边界，不借新功能放开 Markdown raw HTML                        |
+| 当前依据                                                                                                | 所需改动                                                               |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [data-analysis](../resources/skills/data-analysis/SKILL.md) 默认 report.md，通用工具已支持文件和 Python | 新增独立交付 skill，保留原 skill 的职责                                |
+| [共享配置](../src/shared/agent-config.ts) 仅允许 data-analysis，提示词固定要求先读取它                  | 由统一内置清单登记资源与显示名，适用场景由 skill 自身 description 声明 |
+| [配置服务](../src/main/services/agent-config.ts) 硬编码读取一个 skill                                   | 改为可信内置清单加载，不开放用户路径/动态第三方 skill                  |
+| [资源物化](../src/node/agent-config-resources.ts) 只快照 SKILL.md                                       | 版本化保存示例、可选脚本及 ECharts 资源引用，设计缺失恢复              |
+| [打包配置](../electron-builder.yml)、[运行时路径](../src/node/runtime-paths.ts) 无 JS 报告资源          | 构建时准备并校验 ECharts 浏览器分发，开发与 .app 使用一致的资源解析    |
+| [工作区服务](../src/main/services/workspace.ts) 通过条目 ID 读文件，一般文本有截断                      | 增加有界完整 HTML 读取供专用查看器，不复用截断源码正文                 |
+| [WorkspacePanel](../src/renderer/features/workspace/WorkspacePanel.tsx) 只处理现有预览类型              | 增加 HTML 交互/源码切换，接入独立查看器生命周期与阅读状态              |
+| [WorkspaceReport](../src/renderer/features/workspace/WorkspaceReport.tsx) 禁止 Markdown 中执行 HTML     | 保持此边界，不借新功能放开 Markdown raw HTML                           |
 
 Main 管资源和查看器生命周期；Agent 仍只使用通用工具；Renderer 管工作区面板交互；shared 仅新增可序列化合同。Main 与 Agent 不互相导入实现。
 
@@ -78,7 +78,7 @@ resources/skills/interactive-report/
 - 普通分析仍默认 Markdown + PNG；明确要求 HTML、可交互、筛选或联动时选择 interactive-report；同时要求两种格式时才交付两种。分析意图与交付格式存在重要歧义时使用已有澄清工具。
 - interactive-report 自含必要的分析方法与口径提醒，不依赖先执行 data-analysis；禁用旧 skill 后仍能独立完成交互报告。禁用新 skill 时不宣称相关内置指导仍启用；skill 开关不作为禁止 bash 生成 HTML 的安全权限。
 - 新安装的默认配置启用两项 skill，但一般任务仍走原格式；已有安装不静默修改已保存默认修订，新 skill 在设置中显式启用并保存后用于新会话。已有、运行中、排队会话不热插入 skill。
-- 新会话的提示词选择说明使用新 promptVersion；旧 promptVersion 保留字节一致的组装/恢复行为。新资源路径、skill 描述及声明顺序在会话创建时固定，不在每次请求前更新。
+- 提示词只保留一套通用组装逻辑，不为具体 skill 添加选择分支，也不兼容旧提示词协议。资源路径、skill 描述及声明顺序在会话创建时固定，不在每次请求前更新。
 - 技术资料由 Agent 按需 read，结果正常追加并持久化；不把整套文档注入系统提示词，不反复删除/替换已读资料，不注入动态资源状态或预算。
 - 直接检查提供方最终序列化请求：工具循环、预算变化、steer/follow-up、跨轮共享 workspace、新附件、重启恢复。压缩单独标识允许的前缀重建边界；录制不兼容要重新审阅，不能放宽 replay 匹配。
 

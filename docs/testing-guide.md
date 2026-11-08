@@ -151,11 +151,13 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 ## Agent 配置回归
 
-`pnpm test -- --feature agent-config` 执行配置 schema 与真实 SDK 请求测试、SQLite 版本/历史恢复、并发排队绑定与 Main 工具检查、后台 CDP 设置交互。`agent-config.requests` 比较实际序列化请求，覆盖 skill 开关、全部工具关闭、工具循环、steer/follow-up、新附件和重启；普通全量中的 `conversation.retry-compaction` 继续覆盖明确的压缩边界。`agent-config.settings` 覆盖三尺寸/深浅主题、未保存关闭确认、保存冲突保留草稿、只读版本详情与新会话不提前创建。
+`pnpm test -- --feature agent-config` 执行配置 schema 与真实 SDK 请求测试、SQLite 配置冻结与不支持格式拒绝、并发排队绑定与 Main 工具检查、后台 CDP 设置交互。`agent-config.requests` 比较实际序列化请求，覆盖 skill 开关、全部工具关闭、工具循环、steer/follow-up、新附件和重启；普通全量中的 `conversation.retry-compaction` 继续覆盖明确的压缩边界。`agent-config.settings` 覆盖三尺寸/深浅主题、未保存关闭确认、保存冲突保留草稿、只读版本详情与新会话不提前创建。
 
 重放场景把 APP_ROOT 路径绑定到当前 skill 快照根，并在请求前核对快照正文与内置正文相同；只是可移植路径发生变化，完整请求匹配、原响应与 usage 样本保持不变。没有删除提示词或工具字段的匹配，也没有 live 回退。
 
-`agent-config.requests` 同时比较预览与最终 HTTP 请求中的 system 文本，覆盖启用/关闭 skill 和全工具关闭；历史预览必须等于原生记录且 JSONL 字节不变。`agent-config.settings` 验证展开加载、草稿更新、真实 XML 标签与顺序、工具/skill 关闭后的预览、会话详情与实际请求逐字一致，并检查预览不增加模型调用或会话数量。
+`agent-config.skill-catalog-unit` 将两个合成 skill 注册到同一个清单，验证独立 references、无资源 skill、白名单与真实 SDK 预览，不修改加载器或主提示词。`agent-config.binding` 拒绝缺失、不支持格式和不一致的绑定且保持 JSONL 不变。`agent-config.resources` 验证明确关闭并重新启用才采纳新 skill 正文。
+
+`agent-config.requests` 同时比较预览与最终 HTTP 请求中的 system 文本，并断言启停 skill 不改变应用 preamble，覆盖启用/关闭 skill 和全工具关闭；历史预览必须等于原生记录且 JSONL 字节不变。`agent-config.settings` 验证展开加载、草稿更新、真实 XML 标签与顺序、工具/skill 关闭后的预览、会话详情与实际请求逐字一致，并检查预览不增加模型调用或会话数量。
 
 存储简化回归：sessions.storage-migration 使用旧 schema 10 的 WAL fixture，覆盖六表迁移、完整输入顺序、配置引用/覆盖、事务失败回滚、旧删除清单废弃、备份与未知高版本拒绝。普通测试不读取真实用户库。工作区用例验证实际目录，不再等待产物登记或 output_versions 发布。
 
@@ -165,8 +167,8 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 `pnpm test -- --feature reports,preview,agent-config` 默认使用 none/scripted，不调用真实模型。正式 runner 的 prepare 从锁定 npm 字节准备 ECharts 资源，unit-only 与干净 CI 不依赖事先启动应用，不下载库。
 
-- `agent-config.report-resources-unit`、`agent-config.report-migration`、`agent-config.storage`：旧 JSON 指纹、缺失恢复/拒绝、链接/篡改、升级默认不变、数据库事务失败、旧会话绑定；`agent-config.admission` 检查 Main 实际读取完整资源包路径。
-- `agent-config.requests`：旧 skill、新 skill 单独启用、两个 skill 同启用及关闭的最终提供方请求，工具循环/预算变化、steer/follow-up、附件和重启前缀；压缩边界仍由 conversation.retry-compaction 验证。
+- `agent-config.report-resources-unit`、`agent-config.revisions`、`agent-config.storage`：唯一快照结构、旧协议字段拒绝、缺失资源恢复/拒绝、链接/篡改、配置冻结、数据库事务失败、会话绑定；`agent-config.admission` 检查 Main 实际读取完整资源包路径。
+- `agent-config.requests`：两个 skill 单独启用、两个 skill 同启用及关闭的最终提供方请求，工具循环/预算变化、steer/follow-up、附件和重启前缀；压缩边界仍由 conversation.retry-compaction 验证。
 - `reports.delivery`：用真实通用 read/write/bash 与内置 Python 读取新 skill/资料、装配自由 HTML、内联锁定库、转义数据、实际筛选；模型响应为 scripted，不代表生成质量。
 - `reports.engine`、`preview.html`：真实隐藏 Electron/CDP，ECharts 筛选/重置、源码/隐藏/弹窗/滚动状态、显式刷新、三尺寸/深浅宿主主题、另存和独立离线 file:// Chromium 打开。宿主截图不含独立原生 view，报告截图单独保留；必须实际检查两者，不能把空白宿主槽位当报告截图。
 - `preview.html-visibility`、`preview.html-visibility-dev`：分别通过隔离构建与真实 `pnpm dev` 完成带用量的对话，再打开合成报告；覆盖保留在 DOM 中的已关闭用量弹层、原生 popover 和设置对话框开关后的报告显示及筛选状态。测试进程通过启动探针读取原生 view 的 getVisible 与尺寸，不新增产品 IPC；仅有 canvas 或 document.visibilityState 不能证明原生报告层已显示。
@@ -176,7 +178,7 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 `DATA_AGENT_EVAL_REVIEW=1 pnpm test -- --case reports.live-interactive --live` 生成趋势叙事、分布比较和多图联动报告；使用合成 CSV、真实 DeepSeek 与既有预算，遇到审批写 pending-interactions.json，须逐条审核后通过真实 UI 作答，不自动批准未知命令。检查实际控件/数值变化、重置和离线重开；程序结果与分析准确性 Judge 分开。失败/超时不记通过，生成失败不由测试替写报告。
 
-promptVersion=2 与双 skill 改变了系统提示词，因此 read-tool.deepseek.json 已重新真实录制并审阅；REPORT_SKILL_ROOT 仅归一化第二个冻结资源根路径，完整 prompt/tools/history 匹配不变。录制包含历史 usage，不代表回放计费。Safari 尚无通过记录，不宣称已兼容。
+主提示词与 skill 描述改变时必须重新真实录制并审阅 read-tool.deepseek.json，不改写历史请求或放宽匹配；REPORT_SKILL_ROOT 仅归一化第二个冻结资源根路径，完整 prompt/tools/history 匹配不变。录制包含历史 usage，不代表回放计费。Safari 尚无通过记录，不宣称已兼容。
 
 ## bash 输出与日志
 

@@ -1,0 +1,12 @@
+{
+  "data-analysis": {
+    "label": "数据分析",
+    "references": [],
+    "runtimeAssets": []
+  },
+  "interactive-report": {
+    "label": "交互报告",
+    "references": ["echarts.md", "offline-html.md"],
+    "runtimeAssets": ["echarts.min.js", "LICENSE", "NOTICE"]
+  }
+}

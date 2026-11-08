@@ -1030,7 +1030,7 @@
     "related": []
   },
   {
-    "id": "agent-config.legacy",
+    "id": "agent-config.binding",
     "feature": "agent-config",
     "level": "integration",
     "file": "tests/features/agent-config/storage.integration.test.ts",
@@ -1210,7 +1210,7 @@
     "related": ["reports", "lifecycle"]
   },
   {
-    "id": "agent-config.report-migration",
+    "id": "agent-config.revisions",
     "feature": "agent-config",
     "level": "integration",
     "file": "tests/features/agent-config/storage.integration.test.ts",
@@ -1238,5 +1238,25 @@
     "environment": "dev",
     "tags": [],
     "related": ["usage", "reports", "transcript"]
+  },
+  {
+    "id": "agent-config.skill-catalog-unit",
+    "feature": "agent-config",
+    "level": "unit",
+    "file": "tests/features/agent-config/skill-catalog.unit.test.ts",
+    "model": "none",
+    "environment": "node",
+    "tags": [],
+    "related": ["reports"]
+  },
+  {
+    "id": "agent-config.resources",
+    "feature": "agent-config",
+    "level": "integration",
+    "file": "tests/features/agent-config/storage.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["reports"]
   }
 ]

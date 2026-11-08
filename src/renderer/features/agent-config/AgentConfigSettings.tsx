@@ -2,7 +2,6 @@ import {
   agentConfigSchema,
   normalizeAgentConfig,
   toolIds,
-  skillIds,
   toolLabels,
 } from '../../../shared/agent-config';
 import { Button } from '../../components/ui/button';
@@ -28,7 +27,7 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
       <header className="settings-section">
         <h3>Agent 配置</h3>
         <p className="config-version">版本 v{settings.current.revision} · 用于新会话</p>
-        <p>已有会话保持创建时的配置。编辑行为指令；工作区与执行策略由应用管理。</p>
+        <p>已有会话保持创建时的配置。</p>
       </header>
       {error && (
         <p role="alert" className="maintenance-error">
@@ -45,9 +44,13 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
       )}
       {notice && <p role="status">{notice}</p>}
       <section className="settings-section">
-        <label htmlFor="agent-system-prompt">系统提示词</label>
+        <label htmlFor="agent-system-prompt">行为指令</label>
+        <p id="agent-prompt-description">
+          编辑 Agent 的通用行为。完整提示词还包含应用环境说明、已启用的 Skills 索引和工作目录。
+        </p>
         <textarea
           id="agent-system-prompt"
+          aria-describedby="agent-prompt-description"
           className="agent-prompt-editor"
           value={draft.systemPrompt}
           disabled={busy}
@@ -62,7 +65,7 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
             disabled={busy || draft.systemPrompt === settings.defaults.systemPrompt}
             onClick={() => setDraft({ ...draft, systemPrompt: settings.defaults.systemPrompt })}
           >
-            恢复默认提示词
+            恢复默认行为指令
           </Button>
           <span>{draft.systemPrompt.length.toLocaleString()} / 32,000 字符</span>
         </div>
@@ -104,14 +107,9 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
             <label className="config-toggle-row">
               <span>
                 <strong>
-                  {skill.id === 'interactive-report' ? '交互报告' : '数据分析'}{' '}
-                  <code>{skill.id}</code>
+                  {skill.label} <code>{skill.name}</code>
                 </strong>
-                <small>
-                  {skill.id === 'interactive-report'
-                    ? '自由编写离线 HTML，使用内置 ECharts 生成交互图表。'
-                    : '使用 Python 分析本地数据，生成图表与 Markdown 报告。'}
-                </small>
+                <small>{skill.description}</small>
               </span>
               <input
                 type="checkbox"
@@ -122,9 +120,11 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
                 onChange={(event) =>
                   setDraft({
                     ...draft,
-                    enabledSkills: skillIds.filter((id) =>
-                      id === skill.id ? event.target.checked : draft.enabledSkills.includes(id),
-                    ),
+                    enabledSkills: settings.availableSkills
+                      .map((s) => s.id)
+                      .filter((id) =>
+                        id === skill.id ? event.target.checked : draft.enabledSkills.includes(id),
+                      ),
                   })
                 }
               />
@@ -152,10 +152,6 @@ export function AgentConfigSettings({ controller }: { controller: AgentConfigCon
             </Button>
           </p>
         )}
-        {!!draft.enabledSkills.length &&
-          (!draft.enabledTools.includes('bash') || !draft.enabledTools.includes('write')) && (
-            <p>数据分析通常需要 bash 和 write；当前工具配置可能限制执行或交付能力。</p>
-          )}
       </section>
     </div>
   );

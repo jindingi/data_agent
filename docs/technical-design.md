@@ -89,7 +89,7 @@ data_agent/
       input-identity.ts / event-adapter.ts / history.ts
       models.ts / resource-loader.ts / redact.ts
       tools/ / tool-client.ts
-      runtime-context.ts / request-budget.ts / request-evidence.ts
+      agent-configuration.ts / request-budget.ts / request-evidence.ts
     renderer/
       app/ / components/ui/ / lib/ / styles/
       features/                 # sessions、composer、models、runtime、workspace；各自拥有状态
@@ -231,17 +231,17 @@ SDK 在 Main 调用前生成的参数校验错误可能包含整份 Received arg
 
 ### Agent 配置与会话固定版本
 
-`shared/agent-config.ts` 定义 schemaVersion=1、行为提示词（最多 32,000 字符）、固定工具 ID 与内置 skill ID。只接受白名单并按固定顺序归一化；skill 开启要求 read，纯聊天允许工具与 skills 均为空。`composeAgentPrompt` 将可编辑行为、只读工作区约束及与启用能力一致的说明组合；关闭 data-analysis 时不再留下固定读取指令。promptVersion=1 保留此前完整提示词字节；新保存的配置使用 promptVersion=2，根据交付意图选择两个 skill，新安装默认同时启用。已有默认修订与会话不自动升级。
+`shared/agent-config.ts` 定义唯一的配置与快照结构：行为指令（最多 32,000 字符）、固定工具 ID 和内置 skill 开关。`resources/skills/catalog.json` 是内置 skill 唯一登记清单，按登记顺序提供 ID、显示名称、references 文件和锁定运行时资源名称；只接受清单内的 ID，skill 开启要求 read。新增 skill 只需增加清单条目及其文件，不修改提示词、加载器或设置页的分支；仍不加载用户目录或第三方扩展。
 
-`main/services/agent-config.ts` 是 SQLite 唯一写者。agent_config_revisions 保存修订，sessions 保存修订引用或特殊历史覆盖；snapshot 包括配置、提示词协议版本、skill 正文/描述/路径/哈希和指纹。最新修订作为默认配置，不为旧会话覆盖绑定；无实际变化不增版本，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存修订均在 SQLite 事务内。会话创建事务同时写入绑定，故首次输入排队前已固定；未接收的首页草稿仍不创建会话。配置与 skill 正文是配置数据，不是第二份聊天记录。
+`composeAgentPrompt` 只组合可编辑行为、固定工作区与输入文件约束、与启用工具一致的环境说明。主提示词不包含具体 skill 名称、选择分支、分析流程或交付格式。适用场景在各 skill 的 description 中声明，SDK 将已启用索引与通用按需读取说明加入 system；方法和交付规则在 SKILL.md 正文中维护。预览与执行使用同一套组装逻辑，不保留提示词协议多版本、旧默认值或旧提示词恢复分支。
 
-Main 从可信打包目录取内置 skill，将旧 skill 正文按内容哈希、新 skill 完整资源集合按 bundleHash 物化到 `agent-resources/{sha256}/resources/skills/{id}/SKILL.md`，拒绝缓存路径符号链接及正文哈希不符。文件缺失可从 SQLite 快照恢复；创建缓存后数据库事务失败产生的孤立缓存不影响绑定，不自动清理仍可能被引用的版本。已保存的启用 skill 保持原内容，应用升级不隐式更新旧默认配置；新的未启用资源可在明确启用并保存时纳入修订。配置资源允许读取，但可检测写入/删除被策略拒绝。这仍是尽力规则检查，不宣称文件系统不可绕过。
+`main/services/agent-config.ts` 是 SQLite 唯一写者。agent_config_revisions 保存不可变配置修订，sessions 只引用修订；snapshot 包括配置、skill 正文/描述/路径/哈希和指纹。修订号用于保存冲突检查及会话固定，与提示词协议版本无关。最新修订作为默认值；无实际变化不增修订，保存使用 expectedRevision 拒绝过期覆盖。初始化和保存均在 SQLite 事务内，会话创建事务同时写入绑定，首次输入排队前即固定配置。
 
-Host 接收 `agentConfig` 快照，通过现有 `createAgentSession` 初始化：只声明/注册启用工具；ResourceLoader 只返回启用 skill 的元数据，正文继续按需 read。Main 使用 Task 绑定再次检查工具名，拒绝被禁用工具，不能只隐藏模型声明。普通产品 Host 始终带配置与工具代理；未带配置的低层测试入口保留兼容，不作为产品选项。
+Main 按清单从可信资源目录加载每个 skill 的 SKILL.md、references 和已锁定的 runtimeAssets，不按 skill ID 分支。无附带资源时用正文哈希，有资源时将排序后的资源描述与正文哈希合成 bundleHash，再物化到 `agent-resources/{hash}/resources/skills/{id}/SKILL.md`。正文与小型 references 随快照保存，大型运行时资源只保存路径、字节数和 SHA-256，并从相同哈希的可信安装资源恢复；符号链接、篡改和资源缺失均拒绝。文件物化后 DB 事务失败产生的孤立缓存不改变默认配置。已保存的 skill 内容保持冻结；应用升级不隐式修改已有会话或配置，明确关闭、保存后重新启用可采用当前资源。
 
-原生 JSONL 用 custom entry `data_agent.agent_config` 记录修订与指纹，不注入模型上下文。DB 绑定先提交，Host 启动时补齐缺失标记；已有标记不匹配则停止，不改写历史。恢复前还比较原生当前 preamble、skill 索引及完整工具声明（含顺序），避免 SDK 自动重建导致前缀变化。不另造会话内容格式。后续 SDK/工具接口升级不兼容时必须显式迁移，不能忽略此检查。
+Host 接收配置快照，只声明/注册启用工具；ResourceLoader 只返回启用 skill 的元数据，正文继续按需 read。Main 使用会话绑定再次检查工具名。普通产品 Host 始终带配置与工具代理；低层测试的无配置入口也复用同一个 composeAgentPrompt，不再维护另一套默认提示词。
 
-历史无绑定会话仅在原生历史格式正常、活动分支的提示词/工具集合能核对旧默认值、原 skill 路径内容与可信内置资源一致时恢复，显示“历史配置”而非任意 vN。保留原 skill 声明路径与系统前缀；Main 将该 skill 的 read 定向到内容快照。若历史已含配置标记但 SQLite 绑定丢失、历史 skill 不可确认或格式未知，则返回“配置待确认”，保留记录且停止新任务，提示恢复备份或新建会话。无模型历史的空草稿可以绑定当前默认值。
+原生 JSONL 的 custom entry `data_agent.agent_config` 只记录修订与指纹，不进入模型上下文。启动时校验 SQLite 绑定、快照和原生标记，再比较已发送的完整系统段与工具声明顺序。不支持的旧快照、缺失绑定或已发送前缀不匹配时停止并保留记录，不恢复、改写或升级旧提示词；存储层遗留的 agent_config_override 字段不再读取或写入。只保留当前快照结构，不自动迁移旧状态目录。会话内工具循环、预算变化、steer/follow-up、新附件与重启均不得改写既有请求前缀，压缩是唯一允许重建的场景。
 
 Renderer 的通用设置壳位于 `features/settings/`，分模型与连接、Agent 配置、本地与诊断；Agent 编辑与只读会话详情位于 `features/agent-config/`。IPC 为 `agentConfig.get/save` 和 `sessions.agentConfig`，Renderer 不提供文件路径。编辑页保留跨分类草稿，关闭时确认未保存修改，统一保存/撤销；默认版本与会话实际版本分别显示，旧版本不视为故障。
 
@@ -314,7 +314,7 @@ Main 为每次打开创建独立 WebContentsView 与非持久化 session。`data
 
 HtmlReport 只计算宿主槽位并发送有界位置；Main 再裁剪到窗口范围。调宽、展开、源码切换及隐藏不重建页面；实际可见的宿主弹窗/菜单/提示浮层出现时隐藏原生 view，避免遮挡。已关闭但保留在 DOM 中的弹层不影响报告显示；原生 popover 的 toggle 事件也触发布局更新，关闭后恢复原 view 和交互状态。选中文件/会话变化、会话删除和主窗口关闭销毁 view；显式刷新重新读取并重置交互。目录自动刷新不重载 HTML。关闭视图不停止 Agent。主 Renderer/Markdown 的 CSP 和 raw HTML 禁令保持原样。
 
-`interactive-report` 的 SKILL.md 与简短 references 随配置快照保存；vendor/echarts.min.js、LICENSE、NOTICE 只记录路径、字节数和 SHA-256。资源集合按路径排序并规范化字段顺序参与 bundleHash；物化先校验再以临时文件提交，不接受链接或篡改字节。新快照仅 promptVersion=2 使用 assets/bundleHash，旧快照不补默认字段，继续原指纹算法。旧缓存保留；缺失 vendor 只从相同哈希的安装资源恢复，否则报配置待确认，不能替换库版本。报告自身已内嵌资源，不受生成资源缺失影响。文件缓存与 SQLite 不是跨介质原子事务，无引用缓存可保留。
+`interactive-report` 的 SKILL.md 与简短 references 随配置快照保存；vendor/echarts.min.js、LICENSE、NOTICE 只记录路径、字节数和 SHA-256。资源集合按路径排序并规范化字段顺序参与 bundleHash；物化先校验再以临时文件提交，不接受链接或篡改字节。附带资源通过唯一快照结构的 assets/bundleHash 冻结。缓存保留；缺失 vendor 只从相同哈希的安装资源恢复，否则报配置待确认，不能替换库版本。报告自身已内嵌资源，不受生成资源缺失影响。文件缓存与 SQLite 不是跨介质原子事务，无引用缓存可保留。
 
 ECharts 6.1.0 锁定为构建依赖，resources/echarts-lock.json 固定浏览器分发与许可哈希。scripts/build/report-runtime.mjs 在构建与正式测试准备阶段从锁定依赖复制到 runtime/report-runtime，已有不一致文件拒绝覆盖；升级时清理这份可重建目录后重新准备，不清理用户 agent-resources。electron-builder 复制到 Contents/Resources/report-runtime，verify-release 检查实际包内字节。运行时无 npm/CDN 下载；库不进入主 Renderer bundle，也不读入模型上下文。Agent 用 Python 装配自由 HTML，局部参考文档不规定报告结构。
 

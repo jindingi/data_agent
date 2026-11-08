@@ -17,13 +17,8 @@ export function configDigest(value: unknown): string {
 }
 export function verifyBinding(value: unknown): AgentBinding {
   const binding = agentBindingSchema.parse(value);
-  const { fingerprint, config, skills, promptVersion, legacyPreamble } = binding;
-  const contents = {
-    config,
-    skills,
-    promptVersion,
-    ...(legacyPreamble === undefined ? {} : { legacyPreamble }),
-  };
+  const { fingerprint, config, skills } = binding;
+  const contents = { config, skills };
   if (
     configDigest(contents) !== fingerprint ||
     binding.skills.some(
@@ -31,8 +26,7 @@ export function verifyBinding(value: unknown): AgentBinding {
         configDigest(s.content) !== s.sha256 ||
         !!s.assets !== !!s.bundleHash ||
         (s.assets &&
-          (binding.promptVersion !== 2 ||
-            configDigest({ sha256: s.sha256, assets: s.assets }) !== s.bundleHash ||
+          (configDigest({ sha256: s.sha256, assets: s.assets }) !== s.bundleHash ||
             new Set(s.assets.map((a) => a.path)).size !== s.assets.length ||
             s.assets.some(
               (a) =>

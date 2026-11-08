@@ -1,10 +1,14 @@
-import type { AgentBinding } from '../shared/agent-config';
+import {
+  composeAgentPrompt,
+  defaultAgentConfig,
+  type AgentBinding,
+  type ToolId,
+} from '../shared/agent-config';
 import { bindAgentConfiguration } from './agent-configuration';
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai';
 import { RequestBudget } from './request-budget';
 import { TurnUsageLedger } from './turn-usage';
 import { requestEvidence } from './request-evidence';
-import { systemPrompt } from './runtime-context';
 import { dirname } from 'node:path';
 import {
   createExtensionRuntime,
@@ -188,7 +192,11 @@ export class SessionRuntime {
       systemPrompt:
         configured?.prompt ??
         priorSystem?.sections?.preamble ??
-        systemPrompt(config.workspace, Boolean(dependencies?.tools)),
+        composeAgentPrompt(config.workspace, {
+          ...defaultAgentConfig,
+          enabledTools: registeredTools.map((tool) => tool.name as ToolId),
+          enabledSkills: [],
+        }),
       skills:
         configured?.skills ??
         (config.skillsDirectory

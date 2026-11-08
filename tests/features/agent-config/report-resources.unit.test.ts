@@ -8,11 +8,7 @@ import {
   materializeSkills,
   verifyBinding,
 } from '../../../src/node/agent-config-resources';
-import {
-  currentDefaultAgentConfig,
-  defaultAgentConfig,
-  type AgentBinding,
-} from '../../../src/shared/agent-config';
+import { defaultAgentConfig, type AgentBinding } from '../../../src/shared/agent-config';
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 function fixture() {
@@ -24,9 +20,8 @@ function fixture() {
     resolve('runtime/report-runtime'),
   );
   const contents = {
-    config: currentDefaultAgentConfig,
+    config: defaultAgentConfig,
     skills: bundle.skills,
-    promptVersion: 2 as const,
   };
   const binding: AgentBinding = {
     ...contents,
@@ -36,30 +31,10 @@ function fixture() {
   };
   return { root, bundle, binding };
 }
-it('preserves legacy snapshot bytes and freezes every new resource across recovery', () => {
+it('freezes skill resources across recovery without prompt protocol versions', () => {
   const { root, bundle, binding } = fixture();
-  const legacyContents = {
-    config: defaultAgentConfig,
-    skills: [bundle.skills[0]],
-    promptVersion: 1 as const,
-  };
-  const legacy = {
-    ...legacyContents,
-    revision: 1,
-    createdAt: 'fixture',
-    fingerprint: configDigest(legacyContents),
-  };
-  expect(JSON.stringify(verifyBinding(legacy))).toBe(
-    JSON.stringify({
-      revision: legacy.revision,
-      fingerprint: legacy.fingerprint,
-      createdAt: legacy.createdAt,
-      config: legacy.config,
-      skills: legacy.skills,
-      promptVersion: 1,
-    }),
-  );
-  expect(verifyBinding(legacy).fingerprint).toBe(legacy.fingerprint);
+  expect(() => verifyBinding({ ...binding, promptVersion: 1 })).toThrow();
+  expect(() => verifyBinding({ ...binding, legacyPreamble: 'Old prompt' })).toThrow();
   verifyBinding(binding);
   materializeSkills(root, binding, bundle.binarySources);
   const skill = binding.skills[1];

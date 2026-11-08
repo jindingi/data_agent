@@ -1,17 +1,15 @@
 import { loadBundledSkills } from '../../node/bundled-skills';
 import type Database from 'better-sqlite3';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppPaths } from '../../node/app-paths';
 import { inspectSessionFile } from '../../node/session-integrity';
 import { configDigest, materializeSkills, verifyBinding } from '../../node/agent-config-resources';
 import { AppError } from '../../shared/errors';
 import {
-  composeAgentPrompt,
+  bundledSkillCatalog,
   defaultAgentConfig,
-  currentDefaultAgentConfig,
   normalizeAgentConfig,
-  toolIds,
   type AgentConfig,
   type AgentBinding,
   type AgentConfigSettings,
@@ -34,14 +32,15 @@ export class AgentConfigService {
     this.bundled = bundle.skills;
     this.binarySources = bundle.binarySources;
     if (!this.db.prepare('SELECT revision FROM agent_config_revisions LIMIT 1').get())
-      this.db.transaction(() => this.insert(currentDefaultAgentConfig))();
+      this.db.transaction(() => this.insert(defaultAgentConfig))();
   }
   settings(): AgentConfigSettings {
     return {
       current: this.current(),
-      defaults: structuredClone(currentDefaultAgentConfig),
+      defaults: structuredClone(defaultAgentConfig),
       availableSkills: this.editableSkills().map(({ id, name, description, content }) => ({
         id,
+        label: bundledSkillCatalog[id].label,
         name,
         description,
         content,
@@ -88,13 +87,10 @@ export class AgentConfigService {
   private build(
     config: AgentConfig,
     skills = this.bundled.filter((s) => config.enabledSkills.includes(s.id)),
-    legacyPreamble?: string,
   ): AgentBinding {
     const contents = {
       config: normalizeAgentConfig(config),
       skills,
-      promptVersion: legacyPreamble ? (1 as const) : (2 as const),
-      ...(legacyPreamble === undefined ? {} : { legacyPreamble }),
     };
     return {
       ...contents,
@@ -117,7 +113,7 @@ export class AgentConfigService {
   /** Called inside the session creation transaction, before any first input can queue. */
   bindNew(sessionId: string) {
     this.db
-      .prepare('UPDATE sessions SET agent_config_revision=?,agent_config_override=NULL WHERE id=?')
+      .prepare('UPDATE sessions SET agent_config_revision=? WHERE id=?')
       .run(this.current().revision, sessionId);
   }
   details(sessionId: string): SessionAgentConfig {
@@ -164,7 +160,7 @@ export class AgentConfigService {
     const session = this.session(id);
     const row = this.db
       .prepare(
-        'SELECT COALESCE(s.agent_config_override,r.snapshot) AS snapshot FROM sessions s LEFT JOIN agent_config_revisions r ON r.revision=s.agent_config_revision WHERE s.id=?',
+        'SELECT r.snapshot FROM sessions s LEFT JOIN agent_config_revisions r ON r.revision=s.agent_config_revision WHERE s.id=?',
       )
       .get(id) as { snapshot: string | null } | undefined;
     if (row && row.snapshot !== null) {
@@ -194,67 +190,6 @@ export class AgentConfigService {
       }
       return binding;
     }
-    const integrity = inspectSessionFile(session.file, session.piSessionId, Boolean(session.known));
-    if (!['draft', 'persisted'].includes(integrity.state))
-      throw new Error(integrity.error ?? '历史无法读取');
-    // A draft without model context has no historical behavior to preserve.
-    if (integrity.state === 'draft') {
-      this.bindNew(id);
-      return this.current();
-    }
-    const binding = this.recoverLegacy(session.file);
-    materializeSkills(this.resourcesRoot, binding, this.binarySources);
-    this.db
-      .prepare('UPDATE sessions SET agent_config_override=? WHERE id=?')
-      .run(JSON.stringify(binding), id);
-    return binding;
-  }
-  private recoverLegacy(file: string): AgentBinding {
-    const entries = readFileSync(file, 'utf8')
-      .trim()
-      .split('\n')
-      .slice(1)
-      .map((line) => JSON.parse(line));
-    if (
-      entries.some(
-        (entry) => entry.type === 'custom' && entry.customType === 'data_agent.agent_config',
-      )
-    )
-      throw new Error('会话配置绑定缺失，请恢复 SQLite 备份');
-    const byId = new Map(entries.map((entry) => [entry.id, entry]));
-    const branch = [];
-    for (let entry = entries.at(-1); entry; entry = byId.get(entry.parentId)) branch.unshift(entry);
-    const sections: Record<string, string> = {};
-    const names = new Set<string>();
-    for (const entry of branch)
-      if (entry.type === 'message' && entry.message.role === 'system') {
-        if (entry.message.content) throw new Error('历史使用了无法识别的系统提示词格式');
-        Object.assign(sections, entry.message.sections);
-        for (const tool of entry.message.toolsAdded ?? []) names.add(tool.name);
-        for (const name of entry.message.toolsRemoved ?? []) names.delete(name);
-      }
-    const cwd = sections.cwd?.match(/^<cwd>\n([\s\S]*)\n<\/cwd>$/)?.[1];
-    if (
-      !cwd ||
-      sections.preamble !== composeAgentPrompt(cwd, defaultAgentConfig) ||
-      JSON.stringify([...names]) !== JSON.stringify(toolIds)
-    )
-      throw new Error('无法确认历史提示词或工具集合，未套用当前默认配置');
-    const location = sections.skills
-      ?.match(/<location>(.*?)<\/location>/)?.[1]
-      ?.replace(/&apos;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&');
-    const skill = this.bundled[0];
-    if (
-      !location ||
-      !existsSync(location) ||
-      configDigest(readFileSync(location, 'utf8')) !== skill.sha256 ||
-      (sections.skills.match(/<skill>/g)?.length ?? 0) !== 1
-    )
-      throw new Error('无法确认历史内置 skill 内容，请保留历史并新建会话');
-    return this.build(defaultAgentConfig, [{ ...skill, filePath: location }], sections.preamble);
+    throw new Error('会话配置绑定缺失，请新建会话');
   }
 }

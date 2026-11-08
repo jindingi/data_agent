@@ -7,7 +7,7 @@ import { openDatabase } from '../../../src/main/storage/database';
 import { AgentConfigService } from '../../../src/main/services/agent-config';
 import { SessionService } from '../../../src/main/services/sessions';
 import { ensureAppPaths, getAppPaths } from '../../../src/node/app-paths';
-import { defaultAgentConfig, composeAgentPrompt, toolIds } from '../../../src/shared/agent-config';
+import { defaultAgentConfig, composeAgentPrompt } from '../../../src/shared/agent-config';
 import { genericTools } from '../../../src/agent/tools';
 import { configuredSkills, bindAgentConfiguration } from '../../../src/agent/agent-configuration';
 import { formatSkillsForPrompt } from '@earendil-works/pi-coding-agent';
@@ -37,38 +37,27 @@ const tools = genericTools(
   { execute: async () => ({ output: 'ok', isError: false }), subscribe: () => () => {} },
   (value) => value,
 );
-it('agent-config.report-migration preserves installed protocol-1 defaults and rolls back failed resource revisions', () => {
+it('agent-config.revisions pins saved defaults and rolls back failed resource revisions', () => {
   const { db, paths, configs, sessions } = fixture();
   const current = configs.current();
   expect(current.config.enabledSkills).toEqual(['data-analysis', 'interactive-report']);
-  const contents = {
-    config: defaultAgentConfig,
-    skills: [current.skills[0]],
-    promptVersion: 1 as const,
-  };
-  const old = { ...current, ...contents, fingerprint: configDigest(contents) };
-  db.prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=1').run(
-    JSON.stringify(old),
-  );
+  const limited = configs.save({ ...current.config, enabledSkills: ['data-analysis'] }, 1).current;
   const installed = new AgentConfigService(db, paths, resolve('resources/skills'));
-  const oldSession = sessions.create();
-  expect(installed.current()).toEqual(old);
-  expect(installed.settings().availableSkills.map((s) => s.id)).toEqual([
-    'data-analysis',
-    'interactive-report',
-  ]);
-  expect(installed.preview(old.config, 1)).toEqual(old);
-  expect(installed.save(old.config, 1).current).toEqual(old);
+  const firstSession = sessions.create();
+  expect(installed.current()).toEqual(limited);
+  expect(installed.preview(limited.config, 2)).toEqual(limited);
+  expect(installed.save(limited.config, 2).current).toEqual(limited);
   db.exec(
     "CREATE TRIGGER reject_revision BEFORE INSERT ON agent_config_revisions BEGIN SELECT RAISE(ABORT,'fixture-failure'); END;",
   );
-  expect(() => installed.save(current.config, 1)).toThrow('fixture-failure');
-  expect(installed.current()).toEqual(old);
+  expect(() => installed.save(current.config, 2)).toThrow('fixture-failure');
+  expect(installed.current()).toEqual(limited);
   db.exec('DROP TRIGGER reject_revision');
-  const next = installed.save(current.config, 1).current;
-  expect(next.promptVersion).toBe(2);
-  expect(next.revision).toBe(2);
-  expect(installed.require(oldSession.id)).toEqual(old);
+  const next = installed.save(current.config, 2).current;
+  expect(next).not.toHaveProperty('promptVersion');
+  expect(next).not.toHaveProperty('legacyPreamble');
+  expect(next.revision).toBe(3);
+  expect(installed.require(firstSession.id)).toEqual(limited);
   expect(installed.require(sessions.create().id)).toEqual(next);
 });
 it('agent-config.storage pins immutable versions, rolls back creation and restores missing resources', async () => {
@@ -123,22 +112,23 @@ it('agent-config.storage pins immutable versions, rolls back creation and restor
       .decision,
   ).toBe('deny');
 });
-it('agent-config.legacy restores verified historical state and blocks missing or conflicting bindings', () => {
+it('agent-config.binding rejects missing, outdated and conflicting bindings without changing history', () => {
   const { db, configs, sessions, root } = fixture();
+  const draft = sessions.create();
+  db.prepare('UPDATE sessions SET agent_config_revision=NULL WHERE id=?').run(draft.id);
+  expect(configs.details(draft.id).error).toContain('绑定缺失');
+  expect(
+    db.prepare('SELECT agent_config_revision AS revision FROM sessions WHERE id=?').get(draft.id),
+  ).toEqual({ revision: null });
   const session = sessions.create();
   const initial = configs.require(session.id);
   const manager = SessionManager.open(session.sessionFile, root, session.workspace);
-  const legacySkill = {
-    ...initial.skills[0],
-    filePath: resolve('resources/skills/data-analysis/SKILL.md'),
-  };
-  const skills = configuredSkills({ ...initial, skills: [legacySkill] });
   manager.appendMessage({
     role: 'system',
     content: '',
     sections: {
-      preamble: composeAgentPrompt(session.workspace, defaultAgentConfig),
-      skills: `<skills>\n${formatSkillsForPrompt(skills).trim()}\n</skills>`,
+      preamble: composeAgentPrompt(session.workspace, initial.config),
+      skills: `<skills>\n${formatSkillsForPrompt(configuredSkills(initial)).trim()}\n</skills>`,
       cwd: `<cwd>\n${session.workspace}\n</cwd>`,
     },
     toolsAdded: tools.map(({ name, description, parameters }) => ({
@@ -148,65 +138,51 @@ it('agent-config.legacy restores verified historical state and blocks missing or
     })),
     timestamp: Date.now(),
   });
+  bindAgentConfiguration(manager, initial, session.workspace, tools);
   manager.appendMessage({ role: 'user', content: 'History', timestamp: Date.now() });
-  db.prepare(
-    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
-  ).run(session.id);
-  configs.save(
-    { ...defaultAgentConfig, systemPrompt: 'New default', enabledTools: [], enabledSkills: [] },
-    1,
-  );
-  const legacy = configs.require(session.id);
-  expect(legacy.revision).toBeNull();
-  expect(legacy.config.enabledTools).toEqual(toolIds);
-  expect(legacy.legacyPreamble).toBe(composeAgentPrompt(session.workspace, defaultAgentConfig));
   const before = readFileSync(session.sessionFile, 'utf8');
-  bindAgentConfiguration(manager, legacy, session.workspace, tools);
-  expect(() => bindAgentConfiguration(manager, configs.current(), session.workspace, [])).toThrow(
-    '不一致',
-  );
-  const stored = JSON.stringify(legacy);
-  const altered = { ...legacy, revision: 99 };
-  db.prepare(
-    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=? WHERE id=?',
-  ).run(JSON.stringify(altered), session.id);
-  expect(configs.details(session.id).error).toContain('不一致');
-  db.prepare(
-    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=? WHERE id=?',
-  ).run(stored, session.id);
-  // Missing DB binding with an existing JSONL identity must not silently migrate or adopt defaults.
-  db.prepare(
-    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
-  ).run(session.id);
+  const snapshot = db
+    .prepare('SELECT snapshot FROM agent_config_revisions WHERE revision=1')
+    .get() as { snapshot: string };
+  db.prepare('UPDATE sessions SET agent_config_revision=NULL WHERE id=?').run(session.id);
   expect(configs.details(session.id).error).toContain('绑定缺失');
   expect(() => configs.require(session.id)).toThrow('配置待确认');
-  expect(readFileSync(session.sessionFile, 'utf8').startsWith(before)).toBe(true);
-  const unknown = sessions.create();
-  db.prepare(
-    'UPDATE sessions SET agent_config_revision=NULL,agent_config_override=NULL WHERE id=?',
-  ).run(unknown.id);
-  const damaged = SessionManager.open(unknown.sessionFile, root, unknown.workspace);
-  damaged.appendMessage({
-    role: 'system',
-    content: '',
-    sections: { preamble: 'unknown' },
-    timestamp: Date.now(),
-  });
-  damaged.appendMessage({ role: 'user', content: 'Historical prompt', timestamp: Date.now() });
-  expect(configs.details(unknown.id).binding).toBeNull();
-  expect(configs.details(unknown.id).error).toContain('无法确认');
-  // A changed bundled resource becomes a new revision only when explicitly saved.
-  const bundle = join(root, 'changed-skills');
-  mkdirSync(join(bundle, 'data-analysis'), { recursive: true });
-  cpSync('resources/skills/interactive-report', join(bundle, 'interactive-report'), {
-    recursive: true,
-  });
-  writeFileSync(join(bundle, 'data-analysis/SKILL.md'), legacySkill.content + '\nNew guidance.\n');
-  const upgraded = new AgentConfigService(
-    db,
-    { home: join(root, 'data'), workspace: '', sessions: '', logs: '', database: '' },
-    bundle,
-    resolve('runtime/report-runtime'),
+  db.prepare('UPDATE sessions SET agent_config_revision=1 WHERE id=?').run(session.id);
+  const contents = {
+    config: { ...initial.config, systemPrompt: 'Changed' },
+    skills: initial.skills,
+  };
+  db.prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=1').run(
+    JSON.stringify({ ...initial, ...contents, fingerprint: configDigest(contents) }),
   );
-  expect(upgraded.current().revision).toBe(2);
+  expect(configs.details(session.id).error).toContain('不一致');
+  db.prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=1').run(
+    JSON.stringify({ ...initial, promptVersion: 2 }),
+  );
+  expect(() => configs.require(session.id)).toThrow('配置待确认');
+  db.prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=1').run(
+    snapshot.snapshot,
+  );
+  expect(configs.require(session.id)).toEqual(initial);
+  expect(readFileSync(session.sessionFile, 'utf8')).toBe(before);
+});
+it('agent-config.resources keeps frozen skill bodies until an explicit disable and re-enable', () => {
+  const { db, paths, configs, sessions, root } = fixture();
+  const first = sessions.create();
+  const initial = configs.require(first.id);
+  const bundle = join(root, 'changed-skills');
+  mkdirSync(bundle, { recursive: true });
+  cpSync('resources/skills', bundle, { recursive: true });
+  const changed = initial.skills[0].content + '\nNew guidance.\n';
+  writeFileSync(join(bundle, 'data-analysis/SKILL.md'), changed);
+  const upgraded = new AgentConfigService(db, paths, bundle, resolve('runtime/report-runtime'));
+  expect(upgraded.current()).toEqual(initial);
+  expect(upgraded.require(first.id)).toEqual(initial);
+  const disabled = upgraded.save(
+    { ...initial.config, enabledSkills: ['interactive-report'] },
+    1,
+  ).current;
+  const enabled = upgraded.save(initial.config, disabled.revision!).current;
+  expect(enabled.skills[0].content).toBe(changed);
+  expect(upgraded.require(first.id)).toEqual(initial);
 });

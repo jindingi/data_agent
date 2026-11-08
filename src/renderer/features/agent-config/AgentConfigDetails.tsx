@@ -10,7 +10,7 @@ export function AgentConfigDetails({
   return (
     <div className="agent-config-details">
       <p className="config-version">
-        {binding.revision === null ? '历史配置 · 从会话记录恢复' : `版本 v${binding.revision}`} ·{' '}
+        {binding.revision === null ? '未保存配置' : `版本 v${binding.revision}`} ·{' '}
         {new Date(binding.createdAt).toLocaleString()}
       </p>
       <details>

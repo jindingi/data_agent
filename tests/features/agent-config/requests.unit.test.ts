@@ -13,7 +13,6 @@ import {
 } from '../../../src/shared/agent-config';
 import { configDigest } from '../../../src/node/agent-config-resources';
 import type { RuntimeSnapshot } from '../../../src/shared/runtime';
-import { systemPrompt } from '../../../src/agent/runtime-context';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { bindAgentConfiguration } from '../../../src/agent/agent-configuration';
 import { previewAgentPrompt } from '../../../src/agent/prompt-preview';
@@ -25,32 +24,12 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 function binding(config = defaultAgentConfig): AgentBinding {
-  const content = readFileSync('resources/skills/data-analysis/SKILL.md', 'utf8');
-  const skills: AgentBinding['skills'] = config.enabledSkills.length
-    ? [
-        {
-          id: 'data-analysis',
-          name: 'data-analysis',
-          description: content.match(/^description: (.*)$/m)![1],
-          content,
-          sha256: configDigest(content),
-          filePath: resolve('resources/skills/data-analysis/SKILL.md'),
-        },
-      ]
-    : [];
-  const interactive = config.enabledSkills.includes('interactive-report');
-  const selected = interactive
-    ? loadBundledSkills(
-        resolve('test-results/request-resources'),
-        resolve('resources/skills'),
-        resolve('runtime/report-runtime'),
-      ).skills.filter((s) => config.enabledSkills.includes(s.id))
-    : skills;
-  const contents = {
-    config: normalizeAgentConfig(config),
-    skills: selected,
-    promptVersion: interactive ? (2 as const) : (1 as const),
-  };
+  const skills = loadBundledSkills(
+    resolve('test-results/request-resources'),
+    resolve('resources/skills'),
+    resolve('runtime/report-runtime'),
+  ).skills.filter((s) => config.enabledSkills.includes(s.id));
+  const contents = { config: normalizeAgentConfig(config), skills };
   return {
     ...contents,
     revision: 1,
@@ -58,10 +37,15 @@ function binding(config = defaultAgentConfig): AgentBinding {
     createdAt: new Date().toISOString(),
   };
 }
-it('keeps the default prompt compatible, rejects conflicting skills and normalizes tool order', () => {
-  expect(composeAgentPrompt('/workspace', defaultAgentConfig)).toBe(
-    systemPrompt('/workspace', true),
-  );
+it('keeps skill routing and delivery rules out of the application preamble', () => {
+  const withSkills = composeAgentPrompt('/workspace', defaultAgentConfig);
+  const withoutSkills = composeAgentPrompt('/workspace', {
+    ...defaultAgentConfig,
+    enabledSkills: [],
+  });
+  expect(withSkills).toBe(withoutSkills);
+  expect(withSkills).not.toMatch(/data-analysis|interactive-report|Markdown|HTML/);
+  expect(withSkills).toContain(defaultAgentConfig.systemPrompt);
   expect(() => normalizeAgentConfig({ ...defaultAgentConfig, enabledTools: [] })).toThrow('read');
   expect(
     normalizeAgentConfig({ ...defaultAgentConfig, enabledTools: ['bash', 'read'] }).enabledTools,

@@ -46,15 +46,14 @@ export function SessionAgentConfigDialog({
               <AgentConfigDetails binding={value.binding} prompt={value.prompt} />
             ) : (
               <p role="alert" className="maintenance-error">
-                配置待确认：{value.error}。原会话已保留，继续运行前需要恢复配置记录。
+                配置待确认：{value.error}。原会话已保留，可使用最新配置新建会话。
               </p>
             )}
             <p>
               当前默认配置为 v{value.defaultRevision}。
-              {value.binding &&
-                (value.binding.revision === null
-                  ? '此会话继续使用历史配置。'
-                  : `此会话继续使用 v${value.binding.revision}。`)}
+              {value.binding?.revision !== null &&
+                value.binding &&
+                `此会话继续使用 v${value.binding.revision}。`}
             </p>
             <Button
               variant="outline"

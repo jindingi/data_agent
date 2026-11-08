@@ -28,7 +28,7 @@ export const cases = {
       );
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByRole('tab', { name: 'Agent 配置', exact: true }).click();
-      const prompt = page.getByRole('textbox', { name: '系统提示词', exact: true });
+      const prompt = page.getByRole('textbox', { name: '行为指令', exact: true });
       const beforePreview = (await rpc(page, { type: 'sessions.list' })).length;
       const requestsBeforePreview = fixture.requests.length;
       await page.getByText('查看完整系统提示词预览', { exact: true }).click();
@@ -39,6 +39,23 @@ export const cases = {
       );
       const previewText = await preview.innerText();
       assert(previewText.includes('<skills>'));
+      assert(!previewText.includes('普通数据分析默认读取'));
+      assert(
+        await page
+          .getByText(
+            '编辑 Agent 的通用行为。完整提示词还包含应用环境说明、已启用的 Skills 索引和工作目录。',
+            { exact: true },
+          )
+          .isVisible(),
+      );
+      const skillSettings = await rpc(page, { type: 'agentConfig.get' });
+      for (const skill of skillSettings.availableSkills) {
+        const row = page
+          .locator('.config-toggle-row')
+          .filter({ has: page.getByRole('switch', { name: `启用 ${skill.id}`, exact: true }) });
+        assert((await row.innerText()).includes(skill.label));
+        assert((await row.innerText()).includes(skill.description));
+      }
       assert(previewText.includes('<location>'));
       assert(previewText.includes('<cwd>\n/〈新会话工作区〉\n</cwd>'));
       await preview.hover();
