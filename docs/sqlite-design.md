@@ -1,6 +1,6 @@
 # SQLite 表设计与状态机
 
-本文描述当前实现，更新于 2026-11-07，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)。字段已与迁移源码及隔离测试库的 `sqlite_master` 核对，不是下一阶段计划。
+本文描述当前实现，更新于 2026-11-08，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)。字段已与迁移源码及隔离测试库的 `sqlite_master` 核对，不是下一阶段计划。
 
 ## 1. 数据边界与身份
 
@@ -57,7 +57,7 @@ flowchart LR
 | run_state             | TEXT，可空                                          | 当前或最近一次执行状态                                                                 |
 | run_error             | TEXT，可空                                          | 当前或最近一次执行错误；新 run 接收时清空                                              |
 | agent_config_revision | INTEGER，可空，FK → agent_config_revisions.revision | 新会话绑定的不可变配置修订                                                             |
-| agent_config_override | TEXT，可空                                          | 特殊历史绑定的完整 JSON 快照，不能引用现有修订时使用                                   |
+| agent_config_override | TEXT，可空                                          | 停用的遗留字段；保留已有字节，产品不再读取或写入                                       |
 
 显式索引：`sessions_updated(archived, updated_at DESC)`。workspace、session_file 的 UNIQUE 约束另有 SQLite 自动索引。run_id 没有 UNIQUE 约束，唯一性由应用生成 UUID 保证。
 
@@ -109,7 +109,7 @@ snapshot 只使用一种结构，包含 revision、fingerprint、createdAt、con
 
 当前默认配置为 revision 最大的记录，不另存默认修订指针。保存有变化的配置才新建修订；创建修订的事务内回填生成的 revision，提交后不原地编辑旧修订。恢复默认提示词后保存，若内容发生变化，同样新建修订。新会话绑定当时默认值，旧会话与排队任务不会跟随默认值变化。删除会话不删除修订。
 
-SQL 允许配置引用/覆盖均为空；应用负责识别历史绑定、校验快照并拒绝无法可靠恢复的会话，不静默套用最新默认值。FK 没有级联删除修订的规则。
+SQL 允许配置引用与遗留覆盖字段均为空；应用只通过 agent_config_revision 读取当前合同的快照，不从 agent_config_override 恢复绑定。引用缺失或快照不兼容时保留记录并拒绝继续，不静默套用最新默认值。FK 没有级联删除修订的规则。
 
 ### 2.5 app_metadata
 

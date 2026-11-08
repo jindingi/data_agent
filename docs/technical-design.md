@@ -2,7 +2,7 @@
 
 更新日期：2026-11-08。产品范围以 [产品说明](mvp-plan.md) 为准，交付阶段见 [开发计划](development-plan.md)。本文是唯一技术决策入口；原 architecture.md 仅保留跳转。`validation/` 中是可重跑的技术验证，不是已经完成的产品代码。
 
-每会话单个追加式事件文件的后续设计见 [Session 追加日志设计](session-logging-plan.md)，目前待实施；本文其他章节仍描述已实现行为。
+当前仅按需保存 bash 超过 2 KiB 的输出，向 Agent 返回受控读取路径，不提供独立日志 UI/IPC。原 [Session 追加日志设计](session-logging-plan.md) 已归为历史候选，当前不实施；实际合同见本文“超阈值工具日志”。
 
 HTML 交互报告已接入独立 skill、内置 ECharts 与隔离查看器；验收范围与未通过项见 [实施计划](interactive-report-plan.md)。不固定报告布局，不定义报告 DSL 或组件生成器。
 
@@ -79,7 +79,8 @@ data_agent/
       ipc/handlers.ts / commands.ts / dependencies.ts
       services/                 # sessions, runtime, agent-process, interactions,
                                 # credentials, file-picker, workspace, tools,
-                                # policy, deletion, logs
+                                # policy, deletion, agent-config, html-reports,
+                                # html-report-view, file-tools, search-tools
       services/runtime/         # admission、run-ledger、lifecycle
       services/workspace.ts / tool-operations.ts
       storage/database.ts       # schema、migration 和 SQLite 连接
@@ -147,7 +148,7 @@ SQLite 仅保留 6 张应用表：
 | input_submissions      | 输入身份、接收顺序、执行 ID、ACK/entry ID/摘要及尚未落盘的正文/附件 |
 | session_sources        | 按会话去重的历史来源路径，仅用于保护原文件                          |
 
-sessions.state/error 表示会话可用性；run_id/run_state/run_error 仅保存当前或最近一次执行的身份、状态和错误。每次新执行生成唯一 runId，不另设 epoch；状态写入匹配 sessionId/runId，重启把未结束执行设为 interrupted，不重放任务。配置完全匹配修订时保存 agent_config_revision 引用；特殊旧绑定原样保存 agent_config_override，不能套用当前默认值。
+sessions.state/error 表示会话可用性；run_id/run_state/run_error 仅保存当前或最近一次执行的身份、状态和错误。每次新执行生成唯一 runId，不另设 epoch；状态写入匹配 sessionId/runId，重启把未结束执行设为 interrupted，不重放任务。会话通过 agent_config_revision 引用不可变配置；agent_config_override 仅作为遗留 SQL 字段保留，产品不再读取或写入。配置引用缺失或快照不兼容时保留记录并拒绝继续，不套用当前默认值。
 
 input_submissions 按 sequence 保存全部执行的未确认输入；原生记录 ACK 后清空 pending_text/pending_paths，保留投递身份与 SHA256 摘要。未知输入不自动重发。session_sources 不是 UI 文件目录、当前选集或模型上下文；prompt/steer/follow-up 接收时和输入记录同事务追加路径。普通追问不 stat 全部历史来源。
 
