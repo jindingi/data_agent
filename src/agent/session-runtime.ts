@@ -219,7 +219,7 @@ export class SessionRuntime {
       }
     });
     // Extension hooks report errors rather than enforcing transport cancellation. Gate the
-    // public stream entry instead, so request 21 never reaches the provider (including retries).
+    // public stream entry instead, so over-budget requests never reach the provider (including retries).
     const stream = session.agent.streamFunction;
     session.agent.streamFunction = (...args) => {
       try {

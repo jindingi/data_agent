@@ -321,11 +321,11 @@ it('conversation.input-identity duplicate input text keeps distinct IDs and only
   ).toHaveLength(1);
 });
 
-it('conversation.request-limit request 21 never reaches the provider', async () => {
+it('conversation.request-limit request 51 never reaches the provider', async () => {
   const h = await harness();
   writeFileSync(join(root, 'workspace/limit.txt'), 'small bounded fixture');
   h.faux.setResponses(
-    Array.from({ length: 25 }, (_, index) =>
+    Array.from({ length: 55 }, (_, index) =>
       fauxAssistantMessage(fauxToolCall('read', { path: 'limit.txt' }, { id: `budget-${index}` }), {
         stopReason: 'toolUse',
       }),
@@ -337,7 +337,7 @@ it('conversation.request-limit request 21 never reaches the provider', async () 
     text: 'exercise bounded model calls',
   });
   await h.finished();
-  expect(h.faux.state.callCount).toBe(20);
+  expect(h.faux.state.callCount).toBe(50);
   expect(h.snapshots.at(-1)?.state).toBe('failed');
-  expect(h.snapshots.at(-1)?.error).toContain('20 次模型请求上限');
+  expect(h.snapshots.at(-1)?.error).toContain('50 次模型请求上限');
 });

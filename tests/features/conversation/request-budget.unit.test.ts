@@ -1,6 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { RequestBudget } from '../../../src/agent/request-budget';
 afterEach(() => vi.useRealTimers());
+it('admits 50 requests by default and rejects request 51 without increasing the count', () => {
+  const budget = new RequestBudget();
+  for (let i = 0; i < 50; i++) budget.consume();
+  expect(budget.requests).toBe(50);
+  expect(() => budget.consume()).toThrow('50 次模型请求上限');
+  expect(budget.requests).toBe(50);
+});
 it('counts actual request admission including retries and pauses active time during human input', () => {
   vi.useFakeTimers();
   const expired = vi.fn(),

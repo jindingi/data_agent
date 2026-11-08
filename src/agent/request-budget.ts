@@ -5,7 +5,7 @@ export class RequestBudget {
   private remaining: number;
   private count = 0;
   constructor(
-    private requestLimit = 20,
+    private requestLimit = 50,
     milliseconds = 10 * 60_000,
   ) {
     this.remaining = milliseconds;

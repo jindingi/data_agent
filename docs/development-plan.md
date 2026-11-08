@@ -66,7 +66,7 @@ pnpm test:live -- --case models.live-conversation
 
 ### 请求限额与失败处理
 
-- live 用例串行运行；单用例默认 10 分钟、至多 20 次模型请求，每次输出上限 16,384 tokens；整个指定 live suite 默认 30 分钟，达到任一上限失败并取消执行。这是初始验收配置，不是已测性能。
+- live 用例串行运行；单用例默认 10 分钟、至多 50 次模型请求，每次输出上限 16,384 tokens；整个指定 live suite 默认 30 分钟，达到任一上限失败并取消执行。这是验收配置，不是已测性能。
 - SDK/HTTP 层暂时性连接错误、429、5xx 最多重试 2 次，计入原请求与时间上限；记录每次失败。401/403/模型不存在不重试，不切换模型。
 - 文件交付等程序断言失败不自动重跑整场直到通过。网络问题归 blocked/infra_failed，工作台流程错误归 platform_failed，模型未交付指定文件归 task_incomplete；都不能把本次程序用例计为 passed，但 task_incomplete 不直接认定为工作台代码缺陷。分析准确性问题只记录在 Judge 报告，不混入程序验收通过率。
 - 不承诺温度设为 0 就可复现真实模型。按调用、文件交付与执行事实断言，不比较整段自然语言或完整 thinking 内容。
@@ -182,7 +182,7 @@ SQLite 断言使用兼容的只读检查器（可用随包 Python sqlite3），�
 | P2-LIVE-THINKING | 使用已验证可产生思考的多步工具任务，核验实际非空 thinking 及工具续传的 reasoning_content；简单任务无 thinking 不伪造、不误报 SDK 失败                                                 |
 | P2-CDP-LIVE      | 从真实窗口提问并看到流式结果、展开 read 工具卡；重启后显示相同历史；live 证据包含实际请求与用量                                                                                       |
 
-补充回归 `P2-PREFLIGHT` 验证主进程错误释放、双会话准入和排队凭证绑定；`P2-READ-BOUNDS` 验证读取上限/敏感符号链接；`P2-REQUEST-LIMIT` 验证第 21 次请求未进入提供方。四个 live Case ID 复用同一次有独立结果的真实窗口多轮场景，分别检查工具续传、上下文、thinking 与 CDP；不会为每个 ID 重复采样模型答案。
+补充回归 `P2-PREFLIGHT` 验证主进程错误释放、双会话准入和排队凭证绑定；`P2-READ-BOUNDS` 验证读取上限/敏感符号链接；`P2-REQUEST-LIMIT`（当前 `conversation.request-limit`）验证第 51 次请求未进入提供方。四个 live Case ID 复用同一次有独立结果的真实窗口多轮场景，分别检查工具续传、上下文、thinking 与 CDP；不会为每个 ID 重复采样模型答案。
 
 **门禁：** `pnpm test:live -- --case models.live-conversation`，必须执行 P2-LIVE-READ/CONTEXT/CDP-LIVE，不可仅用 HTTP ping 或 curl 成功代替 SDK/Electron 集成。
 
