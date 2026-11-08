@@ -215,7 +215,7 @@ export class SessionRuntime {
         cacheWarming: 'off',
       }),
       resources,
-      registeredTools: configured?.tools ?? registeredTools,
+      registeredTools,
     });
     instance.session = session;
     instance.unsubscribeTools = dependencies?.tools?.subscribe((interactions) => {

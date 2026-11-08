@@ -17,6 +17,7 @@ import { systemPrompt } from '../../../src/agent/runtime-context';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { bindAgentConfiguration } from '../../../src/agent/agent-configuration';
 import { previewAgentPrompt } from '../../../src/agent/prompt-preview';
+import { genericTools } from '../../../src/agent/tools';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -85,6 +86,52 @@ it('refuses to silently remove an unknown historical system section', () => {
   );
   expect(manager.getEntries()).toEqual(before);
 });
+it.each(['description', 'parameters', 'order'] as const)(
+  'rejects incompatible historical tool %s without changing history',
+  (changed) => {
+    const agentConfig = binding({
+      ...defaultAgentConfig,
+      enabledTools: ['read', 'write'],
+      enabledSkills: [],
+    });
+    const tools = genericTools(
+      {
+        execute: vi.fn(),
+        subscribe: () => () => {},
+      },
+      (value) => value,
+    ).filter((tool) => tool.name === 'read' || tool.name === 'write');
+    const declarations = tools.map(({ name, description, parameters }) => ({
+      name,
+      description,
+      parameters,
+    }));
+    if (changed === 'description') declarations[0].description = 'Historical description';
+    if (changed === 'parameters')
+      declarations[0].parameters = {
+        type: 'object',
+        properties: { path: { type: 'number' } },
+        required: ['path'],
+      };
+    if (changed === 'order') declarations.reverse();
+    const manager = SessionManager.inMemory('/workspace');
+    manager.appendMessage({
+      role: 'system',
+      content: '',
+      sections: {
+        preamble: composeAgentPrompt('/workspace', agentConfig.config),
+        cwd: '<cwd>\n/workspace\n</cwd>',
+      },
+      toolsAdded: declarations,
+      timestamp: Date.now(),
+    });
+    const before = structuredClone(manager.getEntries());
+    expect(() => bindAgentConfiguration(manager, agentConfig, '/workspace', tools)).toThrow(
+      '工具声明与运行时不兼容',
+    );
+    expect(manager.getEntries()).toEqual(before);
+  },
+);
 it.each([true, false, 'interactive', 'both'] as const)(
   'preserves provider prefixes across tools, steering, follow-up and restart (skills=%s)',
   async (withSkill) => {

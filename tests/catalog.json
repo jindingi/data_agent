@@ -1,15 +1,5 @@
 [
   {
-    "id": "tools.history-unit",
-    "feature": "tools",
-    "level": "unit",
-    "file": "tests/features/tools/history.unit.test.ts",
-    "model": "scripted",
-    "environment": "node",
-    "tags": [],
-    "related": ["agent-config", "conversation"]
-  },
-  {
     "id": "tooling.model-fixture",
     "feature": "tooling",
     "level": "tooling",

@@ -4,7 +4,7 @@
 
 ## 目录与职责
 
-`tools.history-unit` 验证已知旧工具声明通过真实 SDK 请求原样恢复；未知声明不放行。`tools.output-budgets` 还覆盖 SDK 大参数校验错误和过大批次在副作用执行前被拒绝。合成 HTTP 夹具按完整字节流解码请求，`tooling.model-fixture` 固定覆盖汉字跨网络 chunk 的情形，避免测试自身引入乱码或假的前缀变化。
+`agent-config.requests` 验证历史工具的描述、参数或顺序不匹配时拒绝继续运行且不改写历史。`tools.output-budgets` 还覆盖 SDK 大参数校验错误和过大批次在副作用执行前被拒绝。合成 HTTP 夹具按完整字节流解码请求，`tooling.model-fixture` 固定覆盖汉字跨网络 chunk 的情形，避免测试自身引入乱码或假的前缀变化。
 
 工具边界回归通过 `pnpm test -- --feature tools` 运行：contracts-unit 用真实 SDK 校验参数并核对 Main 字节检查，result-bounds-unit 覆盖长 UTF-8 行与大文件字节定位，process-output-unit 覆盖阈值/头尾/原始记录/有界写队列。search-pagination 与 log-continuation 使用真实 rg/fd 和受控会话日志。output-budgets 在后台 Electron/CDP 检查实际 HTTP 工具正文、每批次预算、精确续读与重启前缀；agent-config.requests 和 conversation.cache-prefix-unit 继续覆盖 steer/follow-up、新附件与共享目录，retry-compaction 标识允许的压缩边界。
 

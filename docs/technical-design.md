@@ -219,7 +219,7 @@ tools 使用明确名称白名单，customTools 提供受控实现；`tools: []`
 
 批次预算仅控制新增工具正文，不等于模型 token 上限；调用参数与历史仍占上下文。继续使用 pi 原生工具轮次间压缩和溢出恢复，显式配置 reserveTokens=16,384、keepRecentTokens=20,000。预算不作为动态提示词注入，不删改已发送结果。最终 HTTP 请求回归覆盖预算变化、工具循环、steer/follow-up、共享目录、新附件和重启；压缩才允许重建前缀。
 
-工具执行按职责分为 ToolService 的策略/审批/取消、ToolOperations 的穷尽分派、file-tools 的写入/精确编辑、search-tools 的完整记录解析及分页，以及 node 的读取/输出捕获。`agent/tools/declarations-v1.json` 是从既有版本冻结的声明，仅供原生历史恢复；仅当历史与已知 v1 声明精确相等时沿用其 description/parameters，执行仍受当前 Main 硬上限约束。新会话使用新契约；未知历史声明继续阻止运行，不改写 system/tools/history，不新增 SQLite 表或会话格式。
+工具执行按职责分为 ToolService 的策略/审批/取消、ToolOperations 的穷尽分派、file-tools 的写入/精确编辑、search-tools 的完整记录解析及分页，以及 node 的读取/输出捕获。新会话使用当前工具契约；历史会话的工具声明必须与当前契约及顺序完全一致才能继续运行，不提供旧版声明兼容。声明不一致时保留历史并停止新任务，提示新建会话，不改写 system/tools/history，不新增 SQLite 表或会话格式。
 
 ResourceLoader 只返回固定 skills/system prompt 和应用自带 hooks；SettingsManager、模型配置、agentDir、session 文件均显式指定，避免读取 workspace/global `.pi` 的任意扩展与配置。分析 skills 指导 Agent 自主写脚本，而不是把业务步骤固定为工具 API。
 

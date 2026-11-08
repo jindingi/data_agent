@@ -9,7 +9,6 @@ import {
 import { dirname } from 'node:path';
 import { verifyBinding } from '../node/agent-config-resources';
 import { composeAgentPrompt, type AgentBinding } from '../shared/agent-config';
-import { restoreToolDeclarations } from './tools/history';
 
 export function configuredSkills(binding: AgentBinding): Skill[] {
   return binding.skills.map((s) => ({
@@ -65,7 +64,6 @@ export function bindAgentConfiguration(
       cwd: `<cwd>\n${workspace.replace(/\\/g, '/')}\n</cwd>`,
     };
     const previousTools = getCurrentTools(messages);
-    tools = restoreToolDeclarations(tools, previousTools);
     if (
       !!previous.content ||
       JSON.stringify(previous.sections) !== JSON.stringify(expectedSections) ||
@@ -74,7 +72,7 @@ export function bindAgentConfiguration(
     )
       throw new AppError(
         'AGENT_CONFIG_UNAVAILABLE',
-        '配置待确认：历史提示词、skill 索引或工具声明与运行时不兼容，已停止以保留上下文。',
+        '配置待确认：历史提示词、skill 索引或工具声明与运行时不兼容，已停止以保留上下文，请新建会话。',
       );
   }
   if (!markers.length)
@@ -82,5 +80,5 @@ export function bindAgentConfiguration(
       fingerprint: binding.fingerprint,
       revision: binding.revision,
     });
-  return { prompt, skills, tools };
+  return { prompt, skills };
 }
