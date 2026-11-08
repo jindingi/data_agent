@@ -180,6 +180,8 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 
 主提示词与 skill 描述改变时必须重新真实录制并审阅 read-tool.deepseek.json，不改写历史请求或放宽匹配；REPORT_SKILL_ROOT 仅归一化第二个冻结资源根路径，完整 prompt/tools/history 匹配不变。录制包含历史 usage，不代表回放计费。Safari 尚无通过记录，不宣称已兼容。
 
+当前正式夹具覆盖通用主提示词和 skill 自声明的适用场景索引；两次提供方请求之间只执行一次合成文本 read，验证工具续传时既有消息前缀与工具声明保持一致。真实录制及在新隔离路径中的严格重放均验证重启后 JSONL 字节不变，凭证与响应头不进入夹具。
+
 ## bash 输出与日志
 
 `pnpm test -- --case tools.log-storage,tools.log-limit,tools.output-logs` 验证真实工具与隐藏 Electron：输出不超过 2048 bytes（含等于）不落盘；超阈值时补写此前内容与 stderr、保留 UTF-8 预览边界，工具结果携带实际日志路径；Agent 用通用 read 读取同会话日志，跨会话/链接重定向/写入拒绝，后续 run 仍可读取已有日志。10 MiB 是同 run 合计额度，部分保存与完全耗尽均如实提示。UI 不存在日志入口或正文，旧 logs IPC 不可用；实际提供方请求追加工具结果且已有前缀保持不变。旧 tools.log-viewer / P6-LOG-UI 别名指向新的 tools.output-logs，不能用历史分页验收宣称当前行为通过。
