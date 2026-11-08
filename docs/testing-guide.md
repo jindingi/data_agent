@@ -197,3 +197,9 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 ## bash 输出与日志
 
 `pnpm test -- --case tools.log-storage,tools.log-limit,tools.output-logs` 验证真实工具与隐藏 Electron：输出不超过 2048 bytes（含等于）不落盘；超阈值时补写此前内容与 stderr、保留 UTF-8 预览边界，工具结果携带实际日志路径；Agent 用通用 read 读取同会话日志，跨会话/链接重定向/写入拒绝，后续 run 仍可读取已有日志。10 MiB 是同 run 合计额度，部分保存与完全耗尽均如实提示。UI 不存在日志入口或正文，旧 logs IPC 不可用；实际提供方请求追加工具结果且已有前缀保持不变。旧 tools.log-viewer / P6-LOG-UI 别名指向新的 tools.output-logs，不能用历史分页验收宣称当前行为通过。
+
+## 内置示例验收
+
+`examples.installation` 使用合成原生历史验证无新增业务表的首次初始化、崩溃恢复、默认修订保留、目标冲突与删除后不补回；普通 harness 默认禁用示例导入，显式 examples:true 才执行真实发行资源初始化，避免影响既有 fixture 的会话计数。此测试开关仅对 automation 启动有效。
+
+`agent-config.requests` 使用实际 SDK 最终 HTTP 请求比较跨目录迁移与重启、工具循环、steer/followup、新附件的历史前缀，并验证迁移说明仅追加一次及精确 skill 资源映射。示例真实制作使用 scripts/examples/generate.mjs 和隔离后台 Electron；凭证沿用 live-key，审批沿用评测审核机制，原始证据留在忽略目录。发行会话和普通 HTTP 合成录制分别管理。

@@ -14,6 +14,7 @@ function success<K extends keyof CommandResponses>(
 export async function dispatchCommand(
   command: Command,
   {
+    examples,
     reports,
     agentConfigs,
     info,
@@ -32,6 +33,13 @@ export async function dispatchCommand(
   }: HandlerDependencies,
 ) {
   switch (command.type) {
+    case 'examples.status':
+      return success(command.type, examples.status());
+    case 'examples.install': {
+      const value = examples.install();
+      changed();
+      return success(command.type, value);
+    }
     case 'report.open':
       return success(
         command.type,

@@ -1278,5 +1278,85 @@
     "environment": "built",
     "tags": ["smoke"],
     "related": ["packaging"]
+  },
+  {
+    "id": "examples.installation",
+    "feature": "examples",
+    "level": "integration",
+    "file": "tests/features/examples/installation.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["sessions", "agent-config"]
+  },
+  {
+    "id": "examples.workbench",
+    "feature": "examples",
+    "level": "e2e",
+    "file": "tests/features/examples/workbench.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["sessions", "agent-config", "preview", "reports"]
+  },
+  {
+    "id": "examples.packaged",
+    "feature": "examples",
+    "level": "e2e",
+    "file": "tests/features/examples/workbench.e2e.mjs",
+    "model": "scripted",
+    "environment": "packaged",
+    "tags": [],
+    "related": ["sessions", "agent-config", "preview", "reports"]
+  },
+  {
+    "id": "examples.live-continuation",
+    "feature": "examples",
+    "level": "e2e",
+    "file": "tests/features/examples/live-continuation.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": ["live"],
+    "related": ["sessions", "conversation", "agent-config"]
+  },
+  {
+    "id": "examples.recovery",
+    "feature": "examples",
+    "level": "integration",
+    "file": "tests/features/examples/installation.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["sessions", "agent-config"]
+  },
+  {
+    "id": "examples.resource-safety",
+    "feature": "examples",
+    "level": "integration",
+    "file": "tests/features/examples/installation.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["sessions", "agent-config"]
+  },
+  {
+    "id": "examples.existing-install",
+    "feature": "examples",
+    "level": "integration",
+    "file": "tests/features/examples/installation.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["sessions", "agent-config"]
+  },
+  {
+    "id": "examples.reproduction",
+    "feature": "examples",
+    "level": "integration",
+    "file": "tests/features/examples/reproduction.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["reports", "tools"]
   }
 ]

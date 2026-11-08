@@ -11,6 +11,7 @@ import type { RuntimeService } from '../services/runtime';
 import type { DeletionService } from '../services/deletion';
 import type { InteractionBroker } from '../services/interactions';
 export interface HandlerDependencies {
+  examples: import('../services/examples').ExampleService;
   reports: HtmlReportService;
   agentConfigs: AgentConfigService;
   trusted: (event: IpcMainInvokeEvent) => boolean;

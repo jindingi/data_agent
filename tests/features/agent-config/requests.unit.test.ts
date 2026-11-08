@@ -12,6 +12,7 @@ import {
   type AgentBinding,
 } from '../../../src/shared/agent-config';
 import { configDigest } from '../../../src/node/agent-config-resources';
+import { skillResourcePath } from '../../../src/node/skill-resource-path';
 import type { RuntimeSnapshot } from '../../../src/shared/runtime';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { bindAgentConfiguration } from '../../../src/agent/agent-configuration';
@@ -117,7 +118,7 @@ it.each(['description', 'parameters', 'order'] as const)(
   },
 );
 it.each([true, false, 'interactive', 'both'] as const)(
-  'preserves provider prefixes across tools, steering, follow-up and restart (skills=%s)',
+  'preserves provider prefixes across tools, steering, follow-up, relocation and restart (skills=%s)',
   async (withSkill) => {
     const root = mkdtempSync(join(tmpdir(), 'agent-config-wire-'));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
@@ -227,6 +228,10 @@ it.each([true, false, 'interactive', 'both'] as const)(
     expect(historyPreview).toEqual({ text: preview.text, source: 'history' });
     expect(readFileSync(config.file, 'utf8')).toBe(beforePreview);
     await runtime.dispose();
+    rmSync(config.workspace, { recursive: true });
+    config.workspace = join(root, 'relocated-workspace');
+    config.skillResourcesRoot = join(root, 'relocated-resources');
+    mkdirSync(config.workspace);
     snapshot = undefined;
     runtime = await SessionRuntime.create(
       { ...config, piSessionId: records[0].id, runId: randomUUID() },
@@ -249,6 +254,58 @@ it.each([true, false, 'interactive', 'both'] as const)(
       expect(payloads[i].tools).toEqual(payloads[0].tools);
     }
     expect(JSON.stringify(payloads.at(-1)!.messages.at(-1))).toContain('new.csv');
+    const migrated = readFileSync(config.file, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(migrated.filter((e) => e.customType === 'data_agent.resource_locations')).toHaveLength(
+      1,
+    );
+    expect(migrated.slice(0, records.length)).toEqual(records);
+    for (const skill of agentConfig.skills) {
+      expect(
+        skillResourcePath(
+          agentConfig,
+          config.skillResourcesRoot!,
+          skill.filePath,
+          config.workspace,
+        ),
+      ).toContain(config.skillResourcesRoot);
+      for (const asset of skill.assets ?? []) {
+        const original = join(skill.filePath, '..', asset.path);
+        expect(
+          skillResourcePath(agentConfig, config.skillResourcesRoot!, original, config.workspace),
+        ).toContain(asset.path);
+      }
+    }
+    expect(
+      skillResourcePath(
+        agentConfig,
+        config.skillResourcesRoot!,
+        '/untrusted/SKILL.md',
+        config.workspace,
+      ),
+    ).toBeUndefined();
+    await runtime.dispose();
+    runtime = await SessionRuntime.create(
+      { ...config, piSessionId: records[0].id, runId: randomUUID() },
+      (value) => {
+        snapshot = value;
+      },
+      dependencies,
+    );
+    await runtime.submit({
+      inputId: randomUUID(),
+      kind: 'prompt',
+      text: 'Continue after relocation restart.',
+    });
+    await vi.waitFor(() => expect(snapshot?.state).toBe('completed'), { timeout: 8000 });
+    expect(
+      readFileSync(config.file, 'utf8').split('"customType":"data_agent.resource_locations"'),
+    ).toHaveLength(2);
+    expect(payloads.at(-1)!.messages.slice(0, payloads.at(-2)!.messages.length)).toEqual(
+      payloads.at(-2)!.messages,
+    );
     await runtime.dispose();
     await expect(
       SessionRuntime.create(

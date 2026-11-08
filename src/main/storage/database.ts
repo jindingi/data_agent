@@ -213,7 +213,13 @@ export function openDatabase(file: string) {
       db.prepare('VACUUM INTO ?').run(backup);
       chmodSync(backup, 0o600);
     }
-    migrate(db);
+    db.transaction(() => {
+      migrate(db);
+      db.prepare('INSERT OR IGNORE INTO app_metadata VALUES (?, ?)').run(
+        'examples.initialization',
+        JSON.stringify({ state: version === 0 ? 'pending' : 'skipped' }),
+      );
+    })();
     db.prepare(
       'INSERT INTO app_metadata VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
     ).run('last_started_at', new Date().toISOString());

@@ -1,3 +1,4 @@
+import { useExamples } from '../features/examples/use-examples';
 import { SessionAgentConfigDialog } from '../features/agent-config/SessionAgentConfigDialog';
 import { SettingsDialog } from '../features/settings/SettingsDialog';
 import { RunControls } from '../features/runtime/RunControls';
@@ -43,10 +44,24 @@ export function App() {
   const [renaming, setRenaming] = useState(false);
   const [configSession, setConfigSession] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const examples = useExamples();
+  const [initialReport, setInitialReport] = useState<string>();
+  const welcomed = useRef(false);
   const activity = useActivity(setError);
   const modelSettings = useModelSettings();
   const [dragging, setDragging] = useState(false);
   const sessions = useSessions(search, archived, setError);
+  useEffect(() => {
+    if (welcomed.current || !examples.initialSessionId) return;
+    welcomed.current = true;
+    if (localStorage.getItem('selected-session')) return;
+    const example = examples.sessions.find((s) => s.id === examples.initialSessionId);
+    if (example) {
+      sessions.select(example.id);
+      setInitialReport(example.report);
+      setPanel(true);
+    }
+  }, [examples.initialSessionId, examples.sessions, sessions]);
   const selection = useRef(sessions.selected);
   useEffect(() => {
     selection.current = sessions.selected;
@@ -80,6 +95,7 @@ export function App() {
     setArchived(false);
     setSearch('');
     setPanel(false);
+    setInitialReport(undefined);
   }
   async function send(kind: 'prompt' | 'steer' | 'followUp') {
     if (!canSend) return;
@@ -224,6 +240,35 @@ export function App() {
                 onError={setError}
               />
             </div>
+            {history.length === 0 && !current && examples.error && (
+              <div role="alert" className="maintenance-error">
+                示例初始化失败：{examples.error}
+                <Button variant="ghost" onClick={() => act(examples.retry())}>
+                  重试初始化示例
+                </Button>
+              </div>
+            )}
+            {history.length === 0 && !current && examples.sessions.length > 0 && (
+              <div className="idea-grid" aria-label="打开真实分析示例">
+                {examples.sessions.map((example) => (
+                  <button
+                    className="idea-card"
+                    key={example.id}
+                    onClick={() => {
+                      setInitialReport(example.report);
+                      sessions.select(example.id);
+                      setPanel(true);
+                    }}
+                  >
+                    <div>
+                      <FileChartColumn size={17} />
+                      <strong>{example.title}</strong>
+                    </div>
+                    <p>查看真实分析过程和报告，无需配置 AI</p>
+                  </button>
+                ))}
+              </div>
+            )}
             {history.length === 0 && (
               <div className="idea-grid">
                 {ideas.map(({ icon: Icon, title, prompt }) => (
@@ -242,6 +287,7 @@ export function App() {
         <WorkspacePanel
           key={sessions.selected ?? 'home'}
           hidden={!panel}
+          initialReport={initialReport}
           sessionId={current?.id ?? null}
           close={() => {
             setPanel(false);

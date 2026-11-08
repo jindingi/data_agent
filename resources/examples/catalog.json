@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "files": {
+    "netflix-markdown/session.jsonl": {
+      "bytes": 316638,
+      "sha256": "61c0e2ec007dfa6281c342d6e61a27f275f972a6ddeb17ee5132cb749212494f"
+    },
+    "netflix-markdown/agent-binding.json": {
+      "bytes": 13143,
+      "sha256": "373d26cb6e2a7d6cf0e6abe39a5e58b5de167bd521ca495a9ccb4b4ea229a53c"
+    },
+    "netflix-markdown/workspace/analysis.py": {
+      "bytes": 29819,
+      "sha256": "2127606a84d98daa2486a6c22b489aa999fd8623edc3d3fe74e4c44066270a42"
+    },
+    "netflix-markdown/workspace/figures/fig1_type_overview.png": {
+      "bytes": 35121,
+      "sha256": "963ecd6d5bfb03d7ed94882ce901b2c59e5b24e1367a5d8c236e3c708a382ccb"
+    },
+    "netflix-markdown/workspace/figures/fig2_added_by_year.png": {
+      "bytes": 56536,
+      "sha256": "bc30eb5a6da685a0f810b5aad4145253c4e278a6e8288c7715837201b12ce41f"
+    },
+    "netflix-markdown/workspace/figures/fig3_structure_trend.png": {
+      "bytes": 70746,
+      "sha256": "c8e2e49cd03d734c78decddb7d331acb8201579258e65335697cb57369bdd8c7"
+    },
+    "netflix-markdown/workspace/figures/fig4_top_countries.png": {
+      "bytes": 73055,
+      "sha256": "767a945d8de843b4ac00562ed639b8d45c66f8e4e1203ad0fe6c571bd396a4d5"
+    },
+    "netflix-markdown/workspace/figures/fig5_genres.png": {
+      "bytes": 109143,
+      "sha256": "2e57fb0c427af8fc6174642092bf3e37a4241de631a72fddf6c46627b31686bb"
+    },
+    "netflix-markdown/workspace/figures/fig6_ratings.png": {
+      "bytes": 67301,
+      "sha256": "cef0488e69882b9e7667c5a04015e7b6751e7f5840cd19dd2e34268ff6ad3cdc"
+    },
+    "netflix-markdown/workspace/figures/fig7_movie_duration.png": {
+      "bytes": 36540,
+      "sha256": "0bf3a03d242c06bcddc2c52f2565170066ed263cd17893b61ff6c2ffb5e82661"
+    },
+    "netflix-markdown/workspace/figures/fig8_tv_seasons.png": {
+      "bytes": 36662,
+      "sha256": "0b83686ab0f6e5a5adcc04efa593f12d9b230fbade72a77257136826b00c7f48"
+    },
+    "netflix-markdown/workspace/metrics.json": {
+      "bytes": 18943,
+      "sha256": "31b6757301058172abe8b3a5aaf4fb80def1d655f527a127f554c980e313f1f3"
+    },
+    "netflix-markdown/workspace/report.md": {
+      "bytes": 21783,
+      "sha256": "519d63dce9453de40f5116f68fe2e19358434b1d80de363ffb6a0a87450711dc"
+    },
+    "netflix-markdown/workspace/tables/country_counts.csv": {
+      "bytes": 6055,
+      "sha256": "cbe9d211eb55a9917f0d246472f6f39ea3157c9ab48f9e0dd9f3cbe3b96eb896"
+    },
+    "netflix-markdown/workspace/tables/genre_counts.csv": {
+      "bytes": 1957,
+      "sha256": "5a3bc17dbb79e2ca809da2a914680de26ec035ce63986f52705ea8110ed50628"
+    },
+    "netflix-markdown/workspace/tables/movie_duration_by_add_year.csv": {
+      "bytes": 258,
+      "sha256": "2c383d3340cd1261871698466ac56db3b6bdf966f419bb99a7e582e61c735917"
+    },
+    "netflix-markdown/workspace/tables/movie_duration_by_genre.csv": {
+      "bytes": 394,
+      "sha256": "ba69e8ae21ec349e8d8bad7f3d433f905da2f7511f6b4938279ad04e143a7f60"
+    },
+    "netflix-markdown/workspace/tables/movie_duration_stats.csv": {
+      "bytes": 181,
+      "sha256": "6bd5621f819ab5eb08acfd74f6256148007c14387de462b96f83df834fba069b"
+    },
+    "netflix-markdown/workspace/tables/netflix_titles_clean.csv": {
+      "bytes": 3729479,
+      "sha256": "1021adbaf5a25e523a35e363c139219fdf54fffecca02ded36b0317e8d12a1d7"
+    },
+    "netflix-markdown/workspace/tables/overview_type.csv": {
+      "bytes": 126,
+      "sha256": "458cb00405cab94e6b435c99879097fbc85a4429a746caa9b891cb2f355b04a5"
+    },
+    "netflix-markdown/workspace/tables/qc_missing.csv": {
+      "bytes": 294,
+      "sha256": "29f9ca98010f734d135f719817be5009d7f88549e8683156e51fa7398d0c3cbc"
+    },
+    "netflix-markdown/workspace/tables/rating_counts.csv": {
+      "bytes": 550,
+      "sha256": "b1d4ad5270fc9b3fdf24a8b70ffc905de775b2d3a779980407de2853379fddb5"
+    },
+    "netflix-markdown/workspace/tables/rating_tier.csv": {
+      "bytes": 375,
+      "sha256": "d617878141f1bb845150bd3afdc9e6b221161b4bff20d27f28b86b9c9f370cab"
+    },
+    "netflix-markdown/workspace/tables/release_year_bucket.csv": {
+      "bytes": 351,
+      "sha256": "6e1ec7761592fb35d43e11a712d2cf837824e015a1cf7d5e5d5d69e2fb40dcf3"
+    },
+    "netflix-markdown/workspace/tables/tv_seasons_counts.csv": {
+      "bytes": 414,
+      "sha256": "3da8482b4b6f33b265112f9801745f1d292c9619096490c4cb7401463bb5ce88"
+    },
+    "netflix-markdown/workspace/tables/year_2016_2020_profile.csv": {
+      "bytes": 423,
+      "sha256": "3dd77243abc5f187c4f277ca80e59eca5df16e69bca29ba564d4cb93defa142a"
+    },
+    "netflix-markdown/workspace/tables/year_added_by_type.csv": {
+      "bytes": 448,
+      "sha256": "7cfacbed1d56a989ed94cf7f2321341ea1736a369c7f99025a9ebbde20ed2872"
+    },
+    "datasets/netflix/netflix_titles.csv": {
+      "bytes": 3399671,
+      "sha256": "df1f4ad2027a5a14c3a33932ef0d4054565ff88adf92b7f263601b70fdc6f3f3"
+    },
+    "netflix-interactive/session.jsonl": {
+      "bytes": 442197,
+      "sha256": "aa8b9259d7c4f8bbf83c2747a800af09ccb7155c444b34d74d45b4ebb6fbe1bb"
+    },
+    "netflix-interactive/agent-binding.json": {
+      "bytes": 13143,
+      "sha256": "373d26cb6e2a7d6cf0e6abe39a5e58b5de167bd521ca495a9ccb4b4ea229a53c"
+    },
+    "netflix-interactive/workspace/README.md": {
+      "bytes": 4555,
+      "sha256": "9423bf240e2bccba979f65dc766637da5fc53ad44d13e56bc81977f9e93980b4"
+    },
+    "netflix-interactive/workspace/derived/records.json": {
+      "bytes": 3059300,
+      "sha256": "3fe766a9870adb632ff57b5e5c9e8255266e747a631ad52fa7f1684e8d1fc820"
+    },
+    "netflix-interactive/workspace/report.html": {
+      "bytes": 4260724,
+      "sha256": "f234669d5c4ec65bf4bb9590c37a83504db3e0ec826263d69d86162f0776fe9c"
+    },
+    "netflix-interactive/workspace/scripts/build_report.py": {
+      "bytes": 2996,
+      "sha256": "1220f6e74e17b552041657dfa2edc685fe2a2a8bf65854b963fdc3a9dca0c9f8"
+    },
+    "netflix-interactive/workspace/scripts/prepare_data.py": {
+      "bytes": 13424,
+      "sha256": "dc94c12fb9d7bfa5a8d0674688f18abdbdb4ed85939b512442673fd25e913740"
+    },
+    "netflix-interactive/workspace/src/app.js": {
+      "bytes": 40200,
+      "sha256": "d12cbc8351a3813b01b8d663640a155345469819cc153a3df22031c8c0531fd0"
+    },
+    "netflix-interactive/workspace/src/styles.css": {
+      "bytes": 11936,
+      "sha256": "88270dbf4e55a8ac9a899338aded1652094c4e7a9da9146435d994ba621bd2b6"
+    },
+    "netflix-interactive/workspace/src/template.html": {
+      "bytes": 15337,
+      "sha256": "f918a35feb9c8dab98aeaf9cbc7fb79df3e009c66ddbd8071ce88851433a2888"
+    },
+    "netflix-interactive/workspace/vendor/LICENSE": {
+      "bytes": 11990,
+      "sha256": "634293835b43a6dd2094fa39182a3d9a6b9ca43b7fdb9ac354e8037af2a3093a"
+    },
+    "netflix-interactive/workspace/vendor/NOTICE": {
+      "bytes": 168,
+      "sha256": "d491d358344f842685c1b1585970999db65fe30ecf7ef3867af8814f4016c016"
+    },
+    "netflix-interactive/workspace/vendor/echarts.min.js": {
+      "bytes": 1121883,
+      "sha256": "b66b25aeb4df84e33199dc21694014d336d222cbd9deb0e5a7c14bd6aa0d0fd0"
+    },
+    "datasets/netflix/SOURCE.md": {
+      "bytes": 639,
+      "sha256": "a9f6a30b9067aadbe3ff43173b006d4cd894c7e432690bab1e19cc1ee459489d"
+    },
+    "provenance.json": {
+      "bytes": 1436,
+      "sha256": "df32082e86210b54e9429e06a65f86cc775500335cc105a4880425bab4e114cb"
+    }
+  },
+  "examples": [
+    {
+      "id": "9431eaaa-67bf-4ca3-900c-cd2e60dde9eb",
+      "title": "Netflix 内容画像 · Markdown 分析",
+      "directory": "netflix-markdown",
+      "report": "report.md",
+      "runId": "bbe7e694-adee-4632-b146-e2f65870463d",
+      "createdAt": "2026-11-08T13:45:11.700Z",
+      "inputs": [
+        {
+          "inputId": "e20cbd9b-d36b-4508-a103-8006dc3a4cb3",
+          "runId": "ba26c8ed-d0f8-417d-9ff4-04d9ef487e25",
+          "kind": "prompt",
+          "entryId": "63ed33e7",
+          "digest": "a5f6edf1726ccec697c205e8ed68d6c69988a86a490f59b305bc07094d8a8906"
+        },
+        {
+          "inputId": "30d5c165-5d6e-4cb1-90c3-7d21ae3b6207",
+          "runId": "bbe7e694-adee-4632-b146-e2f65870463d",
+          "kind": "prompt",
+          "entryId": "5b39aeae",
+          "digest": "9dd31d4178419edfffd243e298d2174131b9c88039f570b45e19ed0c863b2750"
+        },
+        {
+          "inputId": "a06bb6f3-96f1-400d-84df-f6f6ba1bc63c",
+          "runId": "bbe7e694-adee-4632-b146-e2f65870463d",
+          "kind": "steer",
+          "entryId": "223e2967",
+          "digest": "c1a6ac34a6a6807ab203a5d5692e166ff7f7486fa4c0168c92d516b0e69a9ca3"
+        }
+      ]
+    },
+    {
+      "id": "12fc90fe-0039-4962-a17d-6e3fa2c3c59d",
+      "title": "Netflix 内容探索 · 交互报告",
+      "directory": "netflix-interactive",
+      "report": "report.html",
+      "runId": "0f5be0f5-f08d-4132-85a1-e2efddb22ae4",
+      "createdAt": "2026-11-08T13:59:15.226Z",
+      "inputs": [
+        {
+          "inputId": "5e34cbe6-bbdc-46b9-9654-efde15c59ea3",
+          "runId": "0f5be0f5-f08d-4132-85a1-e2efddb22ae4",
+          "kind": "prompt",
+          "entryId": "9920d945",
+          "digest": "ebfc60f4ed37837aa7a7eb0480609ff705769dc18ed74b85c3c365ee985f0c7f"
+        },
+        {
+          "inputId": "8c49d323-38fc-4805-8110-a35dcc5a3c94",
+          "runId": "0f5be0f5-f08d-4132-85a1-e2efddb22ae4",
+          "kind": "steer",
+          "entryId": "6dd92eec",
+          "digest": "58975460f03f69893cd8fe2864fc5274a00834ad60f005a05333332dc1ecb52a"
+        },
+        {
+          "inputId": "e56a4a09-162a-4bbc-b37a-051f3edd318b",
+          "runId": "0f5be0f5-f08d-4132-85a1-e2efddb22ae4",
+          "kind": "steer",
+          "entryId": "2b55f3a3",
+          "digest": "02fbb6d2deaa70146f515d0443f87ce465a0f34e0968328b689a80e5139bba81"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Netflix 影片与剧集内容探索 · 离线交互报告</title>
+<meta name="description" content="基于 Netflix Movies and TV Shows（Kaggle, shivamb）本地快照的离线交互内容探索报告">
+<style>
+/*APP_STYLES*/
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Netflix 内容探索 · 离线交互报告</p>
+    <h1>Netflix 影片与剧集：内容结构探索</h1>
+    <p class="lede">
+      以本地快照 <span class="src-id">data/netflix_titles.csv</span> 为基础，按<b>电影／剧集</b>、<b>制作国家/地区</b>、<b>题材</b>与<b>发行年份范围</b>筛选，
+      所有指标与结果列表按唯一 ID（show_id）去重联动。输入片名即可搜索并打开作品详情。
+    </p>
+    <div class="hero-meta">
+      <span class="pill">作品数 <b id="hero-total">—</b></span>
+      <span class="pill">发行年份 <b id="hero-ry">—</b></span>
+      <span class="pill">上架日期 <b id="hero-added">—</b></span>
+      <span class="pill">国家/地区字段缺失 <b id="hero-unk">—</b> 条</span>
+      <span class="pill">页面完全离线，不联网</span>
+    </div>
+  </header>
+
+  <section class="source" aria-label="数据来源">
+    <strong>数据来源</strong>
+    <p>Netflix Movies and TV Shows · shivamb / Kaggle ·
+      <span class="url">https://www.kaggle.com/datasets/shivamb/netflix-shows/data</span>
+    </p>
+    <p class="muted">本地快照文件：data/netflix_titles.csv（原始 12 列、<span id="src-rows">—</span> 行）。
+      本报告是 Kaggle 公开数据集的离线快照分析，与 Netflix 官方无关；数据只代表该快照，不代表当前 Netflix 目录。</p>
+  </section>
+
+  <section class="filters" aria-label="筛选条件">
+    <div class="filter-grid">
+      <div class="field">
+        <div class="legend">内容类型</div>
+        <div class="seg" id="type-seg" role="group" aria-label="内容类型">
+          <button type="button" data-type="all" aria-pressed="true">全部</button>
+          <button type="button" data-type="movie" aria-pressed="false">电影</button>
+          <button type="button" data-type="tv" aria-pressed="false">剧集</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-country">制作国家/地区（单一选择）</label>
+        <select id="f-country"></select>
+      </div>
+      <div class="field">
+        <label for="f-genre">题材（单一选择）</label>
+        <select id="f-genre"></select>
+      </div>
+      <div class="field">
+        <div class="legend">发行年份范围</div>
+        <div class="range-wrap">
+          <div class="range-row"><span aria-hidden="true">下限</span><input type="range" id="f-year-min" aria-label="发行年份下限"></div>
+          <div class="range-row"><span aria-hidden="true">上限</span><input type="range" id="f-year-max" aria-label="发行年份上限"></div>
+          <div class="range-values"><span>从 <b id="year-min-label">—</b></span><span>到 <b id="year-max-label">—</b></span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-q">片名搜索</label>
+        <input type="search" id="f-q" placeholder="输入片名关键词，如 Stranger" autocomplete="off">
+      </div>
+    </div>
+    <div class="filter-actions">
+      <p class="summary" id="filter-summary" aria-live="polite"></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" id="f-clear-search">清除搜索</button>
+        <button type="button" class="btn primary" id="f-reset">清除全部筛选</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis" aria-label="筛选结果概览">
+    <div class="kpi">
+      <div class="k-label">作品总数（按 show_id 去重）</div>
+      <div class="k-value" id="k-total">—</div>
+      <div class="k-sub" id="k-total-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">电影 / 剧集占比</div>
+      <div class="k-value" id="k-type-movie">—</div>
+      <div class="bar-split" aria-hidden="true"><i class="m" id="k-bar-m" style="width:0"></i><i class="t" id="k-bar-t" style="width:0"></i></div>
+      <div class="k-sub" id="k-type-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">制作国家/地区</div>
+      <div class="k-value" id="k-country">—</div>
+      <div class="k-sub" id="k-country-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">题材</div>
+      <div class="k-value" id="k-genre">—</div>
+      <div class="k-sub" id="k-genre-sub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">电影时长 / 剧集季数（分开统计）</div>
+      <div class="k-value" id="k-duration">—</div>
+      <div class="k-sub" id="k-duration-sub">—</div>
+    </div>
+  </section>
+
+  <div class="section-head">
+    <div>
+      <h2>内容结构</h2>
+      <p>下列图表均基于当前筛选结果（与结果列表同一口径）。多维标签采用<b>全计数</b>：一部作品涉及 N 个国家/地区或题材，就在对应分类中各计 1 次，因此分布合计可大于作品总数。</p>
+    </div>
+  </div>
+
+  <section class="charts" aria-label="内容结构图表">
+    <figure class="card">
+      <figcaption>
+        <h3>电影与剧集构成</h3>
+        <p class="cap">按唯一 ID 计数；点击扇区可切换类型筛选。</p>
+      </figcaption>
+      <div class="chart short" id="c-type" role="img" aria-label="电影与剧集构成环形图"></div>
+    </figure>
+
+    <figure class="card">
+      <figcaption>
+        <h3>内容分级分布</h3>
+        <p class="cap">分级是源数据中的内容分级标签（如 TV-MA、PG-13），<b>不是用户评分</b>，不能解读为口碑或质量。</p>
+      </figcaption>
+      <div class="chart short" id="c-rating" role="img" aria-label="内容分级分布条形图"></div>
+    </figure>
+
+    <figure class="card">
+      <figcaption>
+        <h3>制作国家/地区 Top 12</h3>
+        <p class="cap">全计数口径：合拍作品在多个国家/地区各计 1 次；“未标注”为源字段缺失，单列显示。点击条形可筛选。</p>
+      </figcaption>
+      <div class="chart tall" id="c-country" role="img" aria-label="制作国家/地区分布条形图"></div>
+    </figure>
+
+    <figure class="card">
+      <figcaption>
+        <h3>题材 Top 12</h3>
+        <p class="cap">全计数口径：一部作品可属多个题材，各计 1 次；“未标注”包含仅带 Movies／TV Shows 格式标签的记录。点击条形可筛选。</p>
+      </figcaption>
+      <div class="chart tall" id="c-genre" role="img" aria-label="题材分布条形图"></div>
+    </figure>
+
+    <figure class="card wide">
+      <figcaption>
+        <h3>发行年份分布（堆叠：电影 / 剧集）</h3>
+        <p class="cap">发行年份（release_year）≠ 上架日期（date_added）。横轴覆盖快照内全部年份，点击柱体可将年份范围锁定到该年。</p>
+      </figcaption>
+      <div class="chart" id="c-year" role="img" aria-label="发行年份堆叠柱状图"></div>
+    </figure>
+
+    <figure class="card wide">
+      <figcaption>
+        <h3>上架年份分布（按上架日期）</h3>
+        <p class="cap">仅统计有上架日期的记录（缺失 <span id="added-missing">—</span> 条未计入）。<span style="color:#a3611b;font-weight:600">2021 年为不完整年度</span>（快照最后上架日期为 <span id="added-max">—</span>），且数据集不含下架/移除信息，因此这些柱体只反映“新增上架记录”，<b>不能当作片库净增长</b>。</p>
+      </figcaption>
+      <div class="chart" id="c-added" role="img" aria-label="上架年份柱状图"></div>
+    </figure>
+
+    <figure class="card">
+      <figcaption>
+        <h3>电影时长分布（分钟）</h3>
+        <p class="cap">仅电影，按分钟分箱；与剧集季数不可混合平均。</p>
+      </figcaption>
+      <div class="chart short" id="c-runtime" role="img" aria-label="电影时长分布柱状图"></div>
+    </figure>
+
+    <figure class="card">
+      <figcaption>
+        <h3>剧集季数分布</h3>
+        <p class="cap">仅剧集，按季数分箱；“9 季及以上”为合并区间。</p>
+      </figcaption>
+      <div class="chart short" id="c-seasons" role="img" aria-label="剧集季数分布柱状图"></div>
+    </figure>
+  </section>
+
+  <section class="results" aria-label="筛选结果列表">
+    <div class="results-head">
+      <div>
+        <h2>作品列表</h2>
+        <p class="results-count" id="results-count" aria-live="polite">—</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label for="f-sort" style="font-size:12.5px;color:var(--muted)">排序</label>
+        <select id="f-sort" style="width:auto">
+          <option value="ryDesc">发行年份：新 → 旧</option>
+          <option value="ryAsc">发行年份：旧 → 新</option>
+          <option value="title">片名：A → Z</option>
+          <option value="id">原始顺序（show_id）</option>
+        </select>
+        <label for="page-size" style="font-size:12.5px;color:var(--muted)">每页</label>
+        <select id="page-size" style="width:auto">
+          <option value="20" selected>20 条</option>
+          <option value="50">50 条</option>
+        </select>
+      </div>
+    </div>
+
+    <section class="detail" id="detail" hidden aria-live="polite">
+      <div class="detail-top">
+        <div>
+          <h3 id="d-title">—</h3>
+          <p class="src-id" id="d-id"></p>
+        </div>
+        <button type="button" class="close" id="d-close" aria-label="关闭作品详情">×</button>
+      </div>
+      <dl class="detail-grid">
+        <div><dt>类型</dt><dd id="d-type">—</dd></div>
+        <div><dt>发行年份</dt><dd id="d-year">—</dd></div>
+        <div><dt>上架日期</dt><dd id="d-added">—</dd></div>
+        <div><dt>内容分级（非评分）</dt><dd id="d-rating">—</dd></div>
+        <div><dt>时长 / 季数</dt><dd id="d-duration">—</dd></div>
+        <div><dt>制作国家/地区</dt><dd id="d-country">—</dd></div>
+        <div><dt>题材</dt><dd id="d-genre">—</dd></div>
+        <div><dt>导演</dt><dd id="d-director">—</dd></div>
+        <div><dt>主演</dt><dd id="d-cast">—</dd></div>
+      </dl>
+      <p class="desc" id="d-desc"></p>
+    </section>
+
+    <div class="table-wrap" id="table-wrap">
+      <table>
+        <caption class="sr-only">当前筛选条件下的作品列表，按 show_id 去重</caption>
+        <thead>
+          <tr>
+            <th scope="col">片名</th>
+            <th scope="col">类型</th>
+            <th scope="col" class="hide-sm">制作国家/地区</th>
+            <th scope="col">题材</th>
+            <th scope="col">发行年份</th>
+            <th scope="col" class="hide-sm">上架日期</th>
+            <th scope="col" class="hide-sm">分级</th>
+            <th scope="col">时长/季数</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="empty" id="empty" hidden>
+      <h3>没有符合当前条件的作品</h3>
+      <p>当前筛选组合在快照中没有匹配记录。可以放宽发行年份范围、换一个国家/地区或题材，或清除全部筛选重新开始。</p>
+      <button type="button" class="btn primary" id="empty-reset">清除全部筛选</button>
+    </div>
+
+    <nav class="pager" id="pager" aria-label="列表分页">
+      <span id="pager-info">—</span>
+      <div class="pager-controls" id="pager-controls"></div>
+    </nav>
+  </section>
+
+  <section class="notes-block" aria-label="口径与局限">
+    <div class="panel">
+      <h2>覆盖范围与清理口径</h2>
+      <ul id="scope-list">
+        <li>快照共 <b id="n-raw">—</b> 行、12 列；按 show_id 去重后 <b id="n-uniq">—</b> 部作品（重复 ID <b id="n-dup">—</b> 条已移除）。</li>
+        <li>内容类型：电影 <b id="n-movie">—</b> 部、剧集 <b id="n-tv">—</b> 部。</li>
+        <li>发行年份跨度 <b id="n-ry">—</b>；上架日期跨度 <b id="n-added">—</b>。</li>
+        <li>国家/地区为逗号分隔多值字段，拆分后去空去重；缺失 <b id="n-country-missing">—</b> 条记为“未标注”。</li>
+        <li>题材同样多值拆分；源数据 <b id="n-genre-tags">—</b> 个标签中 Movies／TV Shows 只是格式标签，已从题材维度排除，仅含格式标签的 <b id="n-format">—</b> 条记为“未标注”。</li>
+        <li>上架日期按 “September 25, 2021” 解析为日期；缺失 <b id="n-added-missing">—</b> 条不参与上架趋势。</li>
+        <li>分级缺失 <b id="n-rating-missing">—</b> 条记为“未标注”；其中 <b id="n-rating-swap">—</b> 条原始记录的时长被误写入分级列，已回填为电影分钟数。</li>
+        <li>电影按分钟、剧集按季数分别解析，两类单位不合并统计。</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h2>口径与解读边界</h2>
+      <ul>
+        <li><b>去重键</b>：show_id；作品总数、占比、分布与列表共用同一筛选结果集（含片名搜索）。</li>
+        <li><b>多值全计数</b>：国家/地区与题材的“出现次数”合计大于作品数；占比分母始终是当前筛选的作品总数，因此单项占比之和可超过 100%。</li>
+        <li><b>未标注</b>：国家/地区、题材、分级、上架日期的缺失都保留为可见类别，不与“其他”合并。</li>
+        <li><b>发行年份 ≠ 上架日期</b>：发行年份是作品首映/发行年，上架日期是加入 Netflix 目录的日期，两者相差数十年也属正常。</li>
+        <li><b>内容分级</b>（TV-MA、PG-13 等）是内容适龄标签，<b>不是用户评分</b>；快照也不含评分、观看量。</li>
+        <li><b>上架趋势</b>：2021 年截至 <span id="n-added-max-2">—</span>，仅为部分年度；数据集无下架记录，新增上架数不能等同于片库净增长。</li>
+        <li><b>快照边界</b>：仅反映该 Kaggle 快照（约 2008–2021 年上架记录），不代表 Netflix 当前或历史完整片库；国家/地区为自由文本，存在合拍与命名差异。</li>
+      </ul>
+    </div>
+  </section>
+
+  <details class="vendor">
+    <summary>内置图表库与许可（ECharts 6.1.0，Apache-2.0）</summary>
+    <p style="margin-top:10px;font-size:12.5px;color:var(--muted)">本页图表库已随文件内嵌，无 CDN 请求。以下为随附的 NOTICE 与 LICENSE 原文。</p>
+    <pre id="vendor-notice">/*VENDOR_NOTICE*/</pre>
+    <pre id="vendor-license">/*VENDOR_LICENSE*/</pre>
+  </details>
+
+  <footer>
+    <span>Netflix Movies and TV Shows · shivamb / Kaggle · 离线快照分析</span>
+    <span>数据文件：data/netflix_titles.csv（未修改）</span>
+  </footer>
+</div>
+
+<script type="application/json" id="app-data">/*APP_DATA*/</script>
+<script>/*ECHARTS_LIBRARY*/</script>
+<script>/*APP_JS*/</script>
+</body>
+</html>

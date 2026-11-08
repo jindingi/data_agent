@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "source": "https://www.kaggle.com/datasets/shivamb/netflix-shows/data",
+  "license": "CC0-1.0",
+  "examples": [
+    {
+      "id": "9431eaaa-67bf-4ca3-900c-cd2e60dde9eb",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "generatedAt": "2026-11-08T13:48:19.023Z",
+      "commit": "5e58ce22edc3e0cfe0669ce0ce58d9c0511fdbe8",
+      "sourceTreeHash": "2578cda88c5dd592ee8ff989862c765a05a31ce6016bd231313658f94762619b",
+      "skillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "originalSessionSha256": "61c0e2ec007dfa6281c342d6e61a27f275f972a6ddeb17ee5132cb749212494f",
+      "reportSha256": "519d63dce9453de40f5116f68fe2e19358434b1d80de363ffb6a0a87450711dc",
+      "hadNetworkInterruption": true
+    },
+    {
+      "id": "12fc90fe-0039-4962-a17d-6e3fa2c3c59d",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "generatedAt": "2026-11-08T13:59:15.349Z",
+      "commit": "5e58ce22edc3e0cfe0669ce0ce58d9c0511fdbe8",
+      "sourceTreeHash": "2578cda88c5dd592ee8ff989862c765a05a31ce6016bd231313658f94762619b",
+      "skillFingerprint": "0fd8e2256a3fd727e2fec54086b6ee2d324be9fb34c339d61638796b1ac0a4f3",
+      "originalSessionSha256": "aa8b9259d7c4f8bbf83c2747a800af09ccb7155c444b34d74d45b4ebb6fbe1bb",
+      "reportSha256": "f234669d5c4ec65bf4bb9590c37a83504db3e0ec826263d69d86162f0776fe9c",
+      "hadNetworkInterruption": false
+    }
+  ]
+}

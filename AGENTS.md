@@ -105,5 +105,6 @@ Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信
 - 产品行为变更同步产品/技术/使用文档；新增计划注明目标与现状。任务完成后把长期约束归入正式文档，临时计划和流水式过程记录不作为长期文档堆积；历史证据由 Git 与忽略目录中的测试结果保留。
 - 每阶段完成验收后必须创建本地 commit，记录范围与检查；未完成只能如实标 WIP。检查 staged diff 与 `git diff --cached --check`，不混入他人改动、不自动 push。
 - 每次 commit 必须通过 Husky：lint-staged 对暂存代码执行 ESLint/Prettier，再跑全量 lint 和 check；安装依赖时 prepare 自动配置 hooks。禁止 `--no-verify`、`HUSKY=0`、更改 hooksPath 或关闭整套规则绕过。局部例外必须解释原因；全量质量工作流另见 .github/workflows/quality.yml。
+- `resources/examples/` 中审核过的公开数据、原生示例 JSONL、配置、脚本及报告作为发行资源入 Git；原始评测及凭证仍忽略，详见版本管理规则。
 - 长期文档、正式源码、可复用脚本、测试与 lockfile 入 Git；密钥、SQLite/JSONL、下载运行时、out/release、截图、临时研究与测试结果仅留忽略目录。不用 `git add -f` 绕过规则。
 - 优先 MCP、Skill、CLI、API、代码/文件；禁止滥用 Computer Use。例如设计工具优先使用其 API/MCP/CLI，而非手动操纵桌面。产品 UI 验收优先既有 Electron/CDP harness。

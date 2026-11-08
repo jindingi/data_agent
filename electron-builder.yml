@@ -7,6 +7,8 @@ files:
   - out/**
   - package.json
 extraResources:
+  - from: resources/examples
+    to: examples
   - from: runtime/report-runtime
     to: report-runtime
   - from: runtime/darwin-arm64

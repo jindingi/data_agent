@@ -1,3 +1,4 @@
+import type { ExampleStatus } from '../examples';
 import type { HtmlReportState } from '../html-report';
 import type { WorkspaceEntry, WorkspaceListing, WorkspacePreview } from '../workspace';
 import {
@@ -20,6 +21,8 @@ import type { DeletionPreview, DeletionResult } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ ...base, type: z.literal('examples.status') }).strict(),
+  z.object({ ...base, type: z.literal('examples.install') }).strict(),
   z
     .object({
       ...base,
@@ -264,6 +267,8 @@ export type AppEvent =
   | { type: 'sessions.changed' }
   | { type: 'runtime.event'; snapshot: RuntimeSnapshot };
 export interface CommandResponses {
+  'examples.status': ExampleStatus;
+  'examples.install': ExampleStatus;
   'report.open': HtmlReportState;
   'report.close': null;
   'report.layout': null;

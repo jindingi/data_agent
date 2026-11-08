@@ -110,6 +110,27 @@ export class AgentConfigService {
       .prepare('UPDATE agent_config_revisions SET snapshot=? WHERE revision=?')
       .run(JSON.stringify(binding), binding.revision);
   }
+  /** Fresh-database installer only; callers own the enclosing transaction. */
+  importExampleBindings(bindings: AgentBinding[]) {
+    const local = this.current();
+    for (const value of bindings) {
+      const binding = verifyBinding(value);
+      if (!binding.revision || binding.revision <= local.revision!)
+        throw new Error('示例配置版本冲突');
+      const existing = this.db
+        .prepare('SELECT snapshot FROM agent_config_revisions WHERE revision=?')
+        .get(binding.revision) as { snapshot: string } | undefined;
+      if (existing) {
+        if (existing.snapshot !== JSON.stringify(binding)) throw new Error('示例配置快照冲突');
+      } else
+        this.db
+          .prepare('INSERT INTO agent_config_revisions(revision,snapshot) VALUES (?,?)')
+          .run(binding.revision, JSON.stringify(binding));
+      materializeSkills(this.resourcesRoot, binding, this.binarySources);
+    }
+    // The imported historical snapshot must never become the default for new user sessions.
+    this.insert(local.config, local.skills);
+  }
   /** Called inside the session creation transaction, before any first input can queue. */
   bindNew(sessionId: string) {
     this.db

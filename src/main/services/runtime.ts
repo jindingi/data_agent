@@ -1,7 +1,6 @@
 import type { AgentConfigService } from './agent-config';
 import type { AgentBinding } from '../../shared/agent-config';
-import { frozenSkillPath } from '../../node/agent-config-resources';
-import { resolve } from 'node:path';
+import { skillResourcePath } from '../../node/skill-resource-path';
 import { submissionDigest } from '../../node/submission-digest';
 import { RunLedger } from './runtime/run-ledger';
 import { RunAdmission } from './runtime/admission';
@@ -481,23 +480,15 @@ export class RuntimeService {
             return { output: '当前任务无法执行工具', isError: true };
           if (task.agentConfig && !task.agentConfig.config.enabledTools.includes(operation.name))
             return { output: `工具 ${operation.name} 在此会话中未启用`, isError: true };
-          // Legacy skill locations remain in the prompt, but reads use frozen content.
-          const readPath =
-            operation.name === 'read'
-              ? resolve(task.outputDirectory ?? session.workspace, operation.path)
-              : undefined;
-          const skill =
-            operation.name === 'read' &&
-            task.agentConfig?.skills.find((s) => s.filePath === readPath);
-          if (skill && this.agentConfigs)
-            operation = {
-              ...operation,
-              path: frozenSkillPath(
-                this.agentConfigs.resourcesRoot,
-                skill.bundleHash ?? skill.sha256,
-                skill.id,
-              ),
-            } as typeof operation;
+          if (operation.name === 'read' && task.agentConfig && this.agentConfigs) {
+            const path = skillResourcePath(
+              task.agentConfig,
+              this.agentConfigs.resourcesRoot,
+              operation.path,
+              task.outputDirectory ?? session.workspace,
+            );
+            if (path) operation = { ...operation, path };
+          }
           return this.tools.execute(
             {
               sessionId: session.id,
@@ -536,6 +527,7 @@ export class RuntimeService {
           thinkingLevel: task.thinkingLevel,
           apiKey,
           skillsDirectory: this.skillsDirectory,
+          skillResourcesRoot: this.agentConfigs?.resourcesRoot,
           ...(task.agentConfig ? { agentConfig: task.agentConfig } : {}),
           ...(task.baseUrl ? { baseUrl: task.baseUrl } : {}),
           ...(this.testBaseUrl ? { testBaseUrl: this.testBaseUrl } : {}),

@@ -1,3 +1,4 @@
+import { ExampleService } from './services/examples';
 import { HtmlReportService } from './services/html-reports';
 import { WorkspaceFileService } from './services/workspace';
 import { AgentConfigService } from './services/agent-config';
@@ -110,6 +111,15 @@ if (primaryInstance)
           ? join(process.resourcesPath, 'report-runtime')
           : join(resourceAppPath, 'runtime/report-runtime'),
       );
+      const examples = new ExampleService(
+        db,
+        paths,
+        app.isPackaged
+          ? join(process.resourcesPath, 'examples')
+          : join(resourceAppPath, 'resources/examples'),
+        agentConfigs,
+      );
+      examples.install(automation && process.argv.includes('--data-agent-no-examples'));
       const sessions = new SessionService(db, paths, undefined, agentConfigs);
       sessions.recoverIntents();
       sessions.reconcile();
@@ -191,6 +201,7 @@ if (primaryInstance)
         background,
       );
       registerHandlers({
+        examples,
         reports,
         workspaceFiles,
         trusted: (event) =>

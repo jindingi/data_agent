@@ -265,3 +265,9 @@ stateDiagram-v2
 | 内存交互与会话删除                   | [interactions.ts](../src/main/services/interactions.ts)、[deletion.ts](../src/main/services/deletion.ts)  |
 
 维护时至少检查这些功能用例：sessions.storage-migration、sessions.run-migration、sessions.metadata-writes、sessions.history-recovery、conversation.snapshot、conversation.input-identity、approvals.policy、approvals.clarification、lifecycle.crash、sessions.deletion。命令与选取规则见 [测试指南](testing-guide.md)。
+
+## 内置示例初始化登记
+
+`app_metadata` 的 `examples.initialization` 保存 `{state,sessions?}`，state 为 pending/done/skipped；sessions 只含发行示例的普通 session ID、标题和首要报告相对名，不是产物索引。openDatabase 在首次迁移及该键的同一事务中，为新数据库写 pending、已有数据库写 skipped。没有新增业务表或执行层。
+
+初始化按原生会话登记已有完成 run 与 committed 输入，不恢复历史执行。完成后即使删除全部示例，done 不变。目录与 JSONL 的发布和数据库登记不是天然原子；恢复只接受清单内相同字节，已修改目标保留并报错。详情见 [技术设计](technical-design.md)。

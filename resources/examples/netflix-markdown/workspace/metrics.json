@@ -1,0 +1,902 @@
+{
+  "raw_rows": 8807,
+  "raw_cols": 12,
+  "whitespace_padded": {
+    "title": 1,
+    "date_added": 88
+  },
+  "rating_duration_swapped": 3,
+  "missing": {
+    "show_id": 0,
+    "type": 0,
+    "title": 0,
+    "director": 2634,
+    "cast": 825,
+    "country": 831,
+    "date_added": 10,
+    "release_year": 0,
+    "rating": 7,
+    "duration": 0,
+    "listed_in": 0,
+    "description": 0
+  },
+  "unique_id": 8807,
+  "dup_id": 0,
+  "dup_rows_exact": 0,
+  "dup_title_groups": 1,
+  "dup_title_rows": [
+    {
+      "show_id": "s3372",
+      "type": "Movie",
+      "title": "Consequences",
+      "release_year": 2014
+    },
+    {
+      "show_id": "s6530",
+      "type": "Movie",
+      "title": "Consequences",
+      "release_year": 2014
+    }
+  ],
+  "date_missing": 10,
+  "date_parsed": 8797,
+  "date_min": "2008-01-01",
+  "date_max": "2021-09-25",
+  "release_year_min": 1925,
+  "release_year_max": 2021,
+  "added_before_release": 14,
+  "added_before_release_rows": [
+    {
+      "show_id": "s1552",
+      "type": "TV Show",
+      "title": "Hilda",
+      "date_added": "December 14, 2020",
+      "release_year": 2021
+    },
+    {
+      "show_id": "s1697",
+      "type": "TV Show",
+      "title": "Polly Pocket",
+      "date_added": "November 15, 2020",
+      "release_year": 2021
+    },
+    {
+      "show_id": "s2921",
+      "type": "TV Show",
+      "title": "Love Is Blind",
+      "date_added": "February 13, 2020",
+      "release_year": 2021
+    },
+    {
+      "show_id": "s3169",
+      "type": "TV Show",
+      "title": "Fuller House",
+      "date_added": "December 6, 2019",
+      "release_year": 2020
+    },
+    {
+      "show_id": "s3288",
+      "type": "TV Show",
+      "title": "Maradona in Mexico",
+      "date_added": "November 13, 2019",
+      "release_year": 2020
+    },
+    {
+      "show_id": "s3370",
+      "type": "TV Show",
+      "title": "BoJack Horseman",
+      "date_added": "October 25, 2019",
+      "release_year": 2020
+    },
+    {
+      "show_id": "s3434",
+      "type": "TV Show",
+      "title": "The Hook Up Plan",
+      "date_added": "October 11, 2019",
+      "release_year": 2020
+    },
+    {
+      "show_id": "s4845",
+      "type": "TV Show",
+      "title": "Unbreakable Kimmy Schmidt",
+      "date_added": "May 30, 2018",
+      "release_year": 2019
+    },
+    {
+      "show_id": "s4846",
+      "type": "TV Show",
+      "title": "Arrested Development",
+      "date_added": "May 29, 2018",
+      "release_year": 2019
+    },
+    {
+      "show_id": "s5395",
+      "type": "Movie",
+      "title": "Hans Teeuwen: Real Rancour",
+      "date_added": "July 1, 2017",
+      "release_year": 2018
+    },
+    {
+      "show_id": "s5659",
+      "type": "TV Show",
+      "title": "Sense8",
+      "date_added": "December 23, 2016",
+      "release_year": 2018
+    },
+    {
+      "show_id": "s5678",
+      "type": "TV Show",
+      "title": "Tokyo Trial",
+      "date_added": "December 13, 2016",
+      "release_year": 2017
+    },
+    {
+      "show_id": "s7064",
+      "type": "Movie",
+      "title": "Incoming",
+      "date_added": "October 26, 2018",
+      "release_year": 2019
+    },
+    {
+      "show_id": "s7113",
+      "type": "TV Show",
+      "title": "Jack Taylor",
+      "date_added": "March 31, 2013",
+      "release_year": 2016
+    }
+  ],
+  "2021_months": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "2021_count": 1498,
+  "multi_country_rows": 1315,
+  "multi_country_max": 12,
+  "multi_genre_rows": 6787,
+  "genres_per_title_mean": 2.194050187350971,
+  "countries_per_title_mean": 1.2552657973921766,
+  "n_country_labels": 122,
+  "n_genre_labels": 42,
+  "n_movie": 6131,
+  "n_tv": 2676,
+  "pct_movie": 0.6961507891449983,
+  "pct_tv": 0.3038492108550017,
+  "release_year_median": 2017.0,
+  "release_year_q25": 2013.0,
+  "release_year_q75": 2019.0,
+  "release_2010plus": 7472,
+  "release_2016_2021": 5656,
+  "country_known_titles": 7976,
+  "country_unknown_titles": 831,
+  "country_token_total": 10012,
+  "top_countries": [
+    {
+      "country": "United States",
+      "合计": 3690,
+      "电影": 2752,
+      "剧集": 938
+    },
+    {
+      "country": "India",
+      "合计": 1046,
+      "电影": 962,
+      "剧集": 84
+    },
+    {
+      "country": "United Kingdom",
+      "合计": 806,
+      "电影": 534,
+      "剧集": 272
+    },
+    {
+      "country": "Canada",
+      "合计": 445,
+      "电影": 319,
+      "剧集": 126
+    },
+    {
+      "country": "France",
+      "合计": 393,
+      "电影": 303,
+      "剧集": 90
+    },
+    {
+      "country": "Japan",
+      "合计": 318,
+      "电影": 119,
+      "剧集": 199
+    },
+    {
+      "country": "Spain",
+      "合计": 232,
+      "电影": 171,
+      "剧集": 61
+    },
+    {
+      "country": "South Korea",
+      "合计": 231,
+      "电影": 61,
+      "剧集": 170
+    },
+    {
+      "country": "Germany",
+      "合计": 226,
+      "电影": 182,
+      "剧集": 44
+    },
+    {
+      "country": "Mexico",
+      "合计": 169,
+      "电影": 111,
+      "剧集": 58
+    },
+    {
+      "country": "China",
+      "合计": 162,
+      "电影": 114,
+      "剧集": 48
+    },
+    {
+      "country": "Australia",
+      "合计": 160,
+      "电影": 94,
+      "剧集": 66
+    },
+    {
+      "country": "Egypt",
+      "合计": 117,
+      "电影": 102,
+      "剧集": 15
+    },
+    {
+      "country": "Turkey",
+      "合计": 113,
+      "电影": 83,
+      "剧集": 30
+    },
+    {
+      "country": "Hong Kong",
+      "合计": 105,
+      "电影": 100,
+      "剧集": 5
+    }
+  ],
+  "us_count": 3690,
+  "us_share_known": 0.46263791374122365,
+  "us_india_share_known": 0.5937813440320963,
+  "top3_movie_countries": {
+    "United States": 2752,
+    "India": 962,
+    "United Kingdom": 534
+  },
+  "n_titles_movie": 6131,
+  "top3_tv_countries": {
+    "United States": 938,
+    "United Kingdom": 272,
+    "Japan": 199
+  },
+  "n_titles_tv": 2676,
+  "genre_token_total": 19323,
+  "top_genres": [
+    {
+      "genre": "International Movies",
+      "合计": 2752,
+      "电影": 2752,
+      "剧集": 0
+    },
+    {
+      "genre": "Dramas",
+      "合计": 2427,
+      "电影": 2427,
+      "剧集": 0
+    },
+    {
+      "genre": "Comedies",
+      "合计": 1674,
+      "电影": 1674,
+      "剧集": 0
+    },
+    {
+      "genre": "International TV Shows",
+      "合计": 1351,
+      "电影": 0,
+      "剧集": 1351
+    },
+    {
+      "genre": "Documentaries",
+      "合计": 869,
+      "电影": 869,
+      "剧集": 0
+    },
+    {
+      "genre": "Action & Adventure",
+      "合计": 859,
+      "电影": 859,
+      "剧集": 0
+    },
+    {
+      "genre": "TV Dramas",
+      "合计": 763,
+      "电影": 0,
+      "剧集": 763
+    },
+    {
+      "genre": "Independent Movies",
+      "合计": 756,
+      "电影": 756,
+      "剧集": 0
+    },
+    {
+      "genre": "Children & Family Movies",
+      "合计": 641,
+      "电影": 641,
+      "剧集": 0
+    },
+    {
+      "genre": "Romantic Movies",
+      "合计": 616,
+      "电影": 616,
+      "剧集": 0
+    },
+    {
+      "genre": "TV Comedies",
+      "合计": 581,
+      "电影": 0,
+      "剧集": 581
+    },
+    {
+      "genre": "Thrillers",
+      "合计": 577,
+      "电影": 577,
+      "剧集": 0
+    },
+    {
+      "genre": "Crime TV Shows",
+      "合计": 470,
+      "电影": 0,
+      "剧集": 470
+    },
+    {
+      "genre": "Kids' TV",
+      "合计": 451,
+      "电影": 0,
+      "剧集": 451
+    },
+    {
+      "genre": "Docuseries",
+      "合计": 395,
+      "电影": 0,
+      "剧集": 395
+    }
+  ],
+  "top_movie_genres": [
+    {
+      "genre": "International Movies",
+      "count": 2752,
+      "share": 0.44886641657152176
+    },
+    {
+      "genre": "Dramas",
+      "count": 2427,
+      "share": 0.39585711955635294
+    },
+    {
+      "genre": "Comedies",
+      "count": 1674,
+      "share": 0.27303865601043875
+    },
+    {
+      "genre": "Documentaries",
+      "count": 869,
+      "share": 0.14173870494209753
+    },
+    {
+      "genre": "Action & Adventure",
+      "count": 859,
+      "share": 0.14010764964932312
+    },
+    {
+      "genre": "Independent Movies",
+      "count": 756,
+      "share": 0.12330778013374653
+    },
+    {
+      "genre": "Children & Family Movies",
+      "count": 641,
+      "share": 0.10455064426684064
+    },
+    {
+      "genre": "Romantic Movies",
+      "count": 616,
+      "share": 0.10047300603490458
+    },
+    {
+      "genre": "Thrillers",
+      "count": 577,
+      "share": 0.09411189039308432
+    },
+    {
+      "genre": "Music & Musicals",
+      "count": 375,
+      "share": 0.06116457347904094
+    }
+  ],
+  "top_tv_genres": [
+    {
+      "genre": "International TV Shows",
+      "count": 1351,
+      "share": 0.5048579970104634
+    },
+    {
+      "genre": "TV Dramas",
+      "count": 763,
+      "share": 0.2851270553064275
+    },
+    {
+      "genre": "TV Comedies",
+      "count": 581,
+      "share": 0.2171150971599402
+    },
+    {
+      "genre": "Crime TV Shows",
+      "count": 470,
+      "share": 0.1756352765321375
+    },
+    {
+      "genre": "Kids' TV",
+      "count": 451,
+      "share": 0.16853512705530643
+    },
+    {
+      "genre": "Docuseries",
+      "count": 395,
+      "share": 0.1476083707025411
+    },
+    {
+      "genre": "Romantic TV Shows",
+      "count": 370,
+      "share": 0.1382660687593423
+    },
+    {
+      "genre": "Reality TV",
+      "count": 255,
+      "share": 0.0952914798206278
+    },
+    {
+      "genre": "British TV Shows",
+      "count": 253,
+      "share": 0.0945440956651719
+    },
+    {
+      "genre": "Anime Series",
+      "count": 176,
+      "share": 0.06576980568011959
+    }
+  ],
+  "n_movie_genre_labels": 20,
+  "n_tv_genre_labels": 22,
+  "genre_shared_labels": [],
+  "rating_counts": {
+    "TV-MA": 3207,
+    "TV-14": 2160,
+    "TV-PG": 863,
+    "R": 799,
+    "PG-13": 490,
+    "TV-Y7": 334,
+    "TV-Y": 307,
+    "PG": 287,
+    "TV-G": 220,
+    "NR": 80,
+    "G": 41,
+    "TV-Y7-FV": 6,
+    "NC-17": 3,
+    "UR": 3
+  },
+  "n_rating_labels": 14,
+  "tier_table": [
+    {
+      "分级档": "低龄/家庭",
+      "电影": 442,
+      "剧集": 466,
+      "合计": 908,
+      "电影占比": 0.07209264394062959,
+      "剧集占比": 0.1741405082212257
+    },
+    {
+      "分级档": "家长指引",
+      "电影": 827,
+      "剧集": 323,
+      "合计": 1150,
+      "电影占比": 0.13488827271244494,
+      "剧集占比": 0.12070254110612855
+    },
+    {
+      "分级档": "青少年",
+      "电影": 1917,
+      "剧集": 733,
+      "合计": 2650,
+      "电影占比": 0.3126732996248573,
+      "剧集占比": 0.2739162929745889
+    },
+    {
+      "分级档": "成人",
+      "电影": 2862,
+      "剧集": 1147,
+      "合计": 4009,
+      "电影占比": 0.4668080247920405,
+      "剧集占比": 0.4286248131539611
+    },
+    {
+      "分级档": "未分级",
+      "电影": 83,
+      "剧集": 7,
+      "合计": 90,
+      "电影占比": 0.013537758930027727,
+      "剧集占比": 0.002615844544095665
+    }
+  ],
+  "movie_adult_share": 0.4668080247920405,
+  "tv_adult_share": 0.4286248131539611,
+  "movie_kids_share": 0.07209264394062959,
+  "tv_kids_share": 0.1741405082212257,
+  "unrated_count": 90,
+  "year_table": [
+    {
+      "上架年份": 2008,
+      "电影": 1,
+      "剧集": 1,
+      "合计": 2,
+      "剧集占比": 0.5
+    },
+    {
+      "上架年份": 2009,
+      "电影": 2,
+      "剧集": 0,
+      "合计": 2,
+      "剧集占比": 0.0
+    },
+    {
+      "上架年份": 2010,
+      "电影": 1,
+      "剧集": 0,
+      "合计": 1,
+      "剧集占比": 0.0
+    },
+    {
+      "上架年份": 2011,
+      "电影": 13,
+      "剧集": 0,
+      "合计": 13,
+      "剧集占比": 0.0
+    },
+    {
+      "上架年份": 2012,
+      "电影": 3,
+      "剧集": 0,
+      "合计": 3,
+      "剧集占比": 0.0
+    },
+    {
+      "上架年份": 2013,
+      "电影": 6,
+      "剧集": 5,
+      "合计": 11,
+      "剧集占比": 0.45454545454545453
+    },
+    {
+      "上架年份": 2014,
+      "电影": 19,
+      "剧集": 5,
+      "合计": 24,
+      "剧集占比": 0.20833333333333334
+    },
+    {
+      "上架年份": 2015,
+      "电影": 56,
+      "剧集": 26,
+      "合计": 82,
+      "剧集占比": 0.3170731707317073
+    },
+    {
+      "上架年份": 2016,
+      "电影": 253,
+      "剧集": 176,
+      "合计": 429,
+      "剧集占比": 0.41025641025641024
+    },
+    {
+      "上架年份": 2017,
+      "电影": 839,
+      "剧集": 349,
+      "合计": 1188,
+      "剧集占比": 0.2937710437710438
+    },
+    {
+      "上架年份": 2018,
+      "电影": 1237,
+      "剧集": 412,
+      "合计": 1649,
+      "剧集占比": 0.2498483929654336
+    },
+    {
+      "上架年份": 2019,
+      "电影": 1424,
+      "剧集": 592,
+      "合计": 2016,
+      "剧集占比": 0.29365079365079366
+    },
+    {
+      "上架年份": 2020,
+      "电影": 1284,
+      "剧集": 595,
+      "合计": 1879,
+      "剧集占比": 0.31665779670037253
+    },
+    {
+      "上架年份": 2021,
+      "电影": 993,
+      "剧集": 505,
+      "合计": 1498,
+      "剧集占比": 0.3371161548731642
+    }
+  ],
+  "win_total": 7161,
+  "win_movie": 5037,
+  "win_tv": 2124,
+  "win_tv_share": 0.29660661918726433,
+  "win_share_of_all": 0.8131032133530146,
+  "growth_2016_2020": 3.3799533799533803,
+  "tv_share_2016": 0.41025641025641024,
+  "tv_share_2020": 0.31665779670037253,
+  "tv_share_2019": 0.29365079365079366,
+  "tv_share_2015": 0.3170731707317073,
+  "peak_year": 2019,
+  "peak_year_count": 2016,
+  "year_change": {
+    "2016": 4.2317073170731705,
+    "2017": 1.7692307692307692,
+    "2018": 0.388047138047138,
+    "2019": 0.222559126743481,
+    "2020": -0.06795634920634919
+  },
+  "lag_median": 1.0,
+  "lag_share_same_or_next": 0.550187563942253,
+  "lag_share_10plus": 0.15232465613277255,
+  "movie_duration_by_year": [
+    {
+      "上架年份": 2015.0,
+      "电影数": 56,
+      "中位时长": 82.0,
+      "平均时长": 83.57142857142857
+    },
+    {
+      "上架年份": 2016.0,
+      "电影数": 253,
+      "中位时长": 88.0,
+      "平均时长": 83.54545454545455
+    },
+    {
+      "上架年份": 2017.0,
+      "电影数": 839,
+      "中位时长": 94.0,
+      "平均时长": 95.65435041716329
+    },
+    {
+      "上架年份": 2018.0,
+      "电影数": 1237,
+      "中位时长": 100.0,
+      "平均时长": 101.7396928051738
+    },
+    {
+      "上架年份": 2019.0,
+      "电影数": 1424,
+      "中位时长": 99.0,
+      "平均时长": 99.92345505617978
+    },
+    {
+      "上架年份": 2020.0,
+      "电影数": 1284,
+      "中位时长": 101.0,
+      "平均时长": 101.58566978193146
+    }
+  ],
+  "tv_season_median_by_year": [
+    {
+      "year": 2015.0,
+      "n": 26,
+      "median": 1.0
+    },
+    {
+      "year": 2016.0,
+      "n": 176,
+      "median": 1.0
+    },
+    {
+      "year": 2017.0,
+      "n": 349,
+      "median": 1.0
+    },
+    {
+      "year": 2018.0,
+      "n": 412,
+      "median": 1.0
+    },
+    {
+      "year": 2019.0,
+      "n": 592,
+      "median": 1.0
+    },
+    {
+      "year": 2020.0,
+      "n": 595,
+      "median": 1.0
+    }
+  ],
+  "movie_min_n": 6131,
+  "movie_min_missing": 0,
+  "movie_min_mean": 99.56499755341706,
+  "movie_min_median": 98.0,
+  "movie_min_std": 28.28950441612769,
+  "movie_min_p10": 65.0,
+  "movie_min_p25": 87.0,
+  "movie_min_p75": 114.0,
+  "movie_min_p90": 133.0,
+  "movie_min_min": 3,
+  "movie_min_max": 312,
+  "movie_under_60": 0.07470233240906866,
+  "movie_under_90": 0.30027727939977167,
+  "movie_90_120": 0.513456206165389,
+  "movie_over_120": 0.18626651443483935,
+  "movie_under_75_count": 876,
+  "movie_duration_by_genre": [
+    {
+      "题材": "International Movies",
+      "电影数": 2752,
+      "中位时长": 107.0,
+      "均值": 110.34992732558139
+    },
+    {
+      "题材": "Dramas",
+      "电影数": 2427,
+      "中位时长": 109.0,
+      "均值": 113.0510918829831
+    },
+    {
+      "题材": "Comedies",
+      "电影数": 1674,
+      "中位时长": 101.0,
+      "均值": 103.8763440860215
+    },
+    {
+      "题材": "Documentaries",
+      "电影数": 869,
+      "中位时长": 86.0,
+      "均值": 81.63060989643269
+    },
+    {
+      "题材": "Action & Adventure",
+      "电影数": 859,
+      "中位时长": 108.0,
+      "均值": 113.51571594877765
+    },
+    {
+      "题材": "Independent Movies",
+      "电影数": 756,
+      "中位时长": 98.0,
+      "均值": 101.0515873015873
+    },
+    {
+      "题材": "Children & Family Movies",
+      "电影数": 641,
+      "中位时长": 87.0,
+      "均值": 79.93603744149766
+    },
+    {
+      "题材": "Romantic Movies",
+      "电影数": 616,
+      "中位时长": 107.0,
+      "均值": 110.57305194805195
+    }
+  ],
+  "tv_n": 2676,
+  "tv_missing": 0,
+  "tv_season_mean": 1.764947683109118,
+  "tv_season_median": 1.0,
+  "tv_season_max": 17,
+  "tv_season_min": 1,
+  "tv_one_season_share": 0.6700298953662183,
+  "tv_two_season_share": 0.15881913303437967,
+  "tv_3plus_share": 0.1711509715994021,
+  "tv_5plus_share": 0.061285500747384154,
+  "tv_10plus_count": 17,
+  "season_top": {
+    "1": 1793,
+    "2": 425,
+    "3": 199,
+    "4": 95,
+    "5": 65,
+    "6": 33
+  },
+  "longest": [
+    {
+      "title": "Grey's Anatomy",
+      "seasons": 17.0,
+      "release_year": 2020
+    },
+    {
+      "title": "Supernatural",
+      "seasons": 15.0,
+      "release_year": 2019
+    },
+    {
+      "title": "NCIS",
+      "seasons": 15.0,
+      "release_year": 2017
+    },
+    {
+      "title": "Heartland",
+      "seasons": 13.0,
+      "release_year": 2019
+    },
+    {
+      "title": "COMEDIANS of the world",
+      "seasons": 13.0,
+      "release_year": 2019
+    }
+  ],
+  "year_profile": [
+    {
+      "上架年份": 2016,
+      "作品数": 429,
+      "剧集占比": 0.41025641025641024,
+      "首位题材": "International TV Shows",
+      "首位题材数": 86,
+      "电影中位时长": 88.0,
+      "剧集中位季数": 1.0
+    },
+    {
+      "上架年份": 2017,
+      "作品数": 1188,
+      "剧集占比": 0.2937710437710438,
+      "首位题材": "International Movies",
+      "首位题材数": 395,
+      "电影中位时长": 94.0,
+      "剧集中位季数": 1.0
+    },
+    {
+      "上架年份": 2018,
+      "作品数": 1649,
+      "剧集占比": 0.2498483929654336,
+      "首位题材": "International Movies",
+      "首位题材数": 668,
+      "电影中位时长": 100.0,
+      "剧集中位季数": 1.0
+    },
+    {
+      "上架年份": 2019,
+      "作品数": 2016,
+      "剧集占比": 0.29365079365079366,
+      "首位题材": "International Movies",
+      "首位题材数": 610,
+      "电影中位时长": 99.0,
+      "剧集中位季数": 1.0
+    },
+    {
+      "上架年份": 2020,
+      "作品数": 1879,
+      "剧集占比": 0.31665779670037253,
+      "首位题材": "International Movies",
+      "首位题材数": 575,
+      "电影中位时长": 101.0,
+      "剧集中位季数": 1.0
+    }
+  ],
+  "share_of_all_in_2016_2020": 0.8131032133530146
+}

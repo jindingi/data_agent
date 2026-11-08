@@ -1,0 +1,14 @@
+[
+  {
+    "id": "netflix-markdown",
+    "title": "Netflix 内容画像 · Markdown 分析",
+    "prompt": "请分析附带的 Netflix 影片与剧集数据，回答：这份片库快照的内容结构是什么样的？电影与剧集、制作国家/地区、题材和内容分级有哪些差异？样本中 2016–2020 年上架作品的数量与类型结构如何变化？电影时长与剧集季数各是什么分布？\n\n请先检查缺失值、重复 ID、多国家/多题材、日期和字段异常。区分上架日期与发行年份，注明 2021 不完整；电影分钟数和剧集季数分开统计。多标签使用全计数并说明口径，作品总数按唯一 ID 去重。不要把内容分级当用户评分，不推断播放热度、收入、当时片库总量或净增长。清理仅写派生文件，保留依据，不修改原 CSV。\n\n用中文生成 `report.md`，包含主要发现、清晰的静态图表、清理说明、统计口径和局限。保留实际使用的 Python 脚本与必要的汇总 CSV；使用相对于自身/工作区的数据路径，可用内置 Python 重新运行，不安装依赖。\n\n在报告中注明数据来源：Netflix Movies and TV Shows，shivamb / Kaggle，https://www.kaggle.com/datasets/shivamb/netflix-shows/data 。说明本报告分析的是所附历史文件，并注明文件中最新有效上架日期。\n\n输入文件位于当前工作区 data/netflix_titles.csv；报告、图表及可复跑脚本写在当前工作区。",
+    "report": "report.md"
+  },
+  {
+    "id": "netflix-interactive",
+    "title": "Netflix 内容探索 · 交互报告",
+    "prompt": "请用附带的 Netflix 影片与剧集数据制作一份中文离线内容探索报告。让用户按电影/剧集、制作国家/地区、题材和发行年份范围筛选，探索内容结构，并通过片名搜索查看作品详情。\n\n筛选后，作品总数、电影/剧集占比、国家/题材分布与结果列表必须联动，按唯一 ID 去重。多国家/多题材须明确全计数口径。显示缺失/未知类别，区分发行年份与上架日期；如展示上架趋势，说明 2021 不完整、没有下架数据，不能当作净增长。内容分级不是用户评分；电影分钟数与剧集季数分开显示。提供清除筛选、空结果和列表分页，避免一次渲染全部记录。\n\n生成单文件 `report.html`，使用内置 ECharts，并嵌入必要数据、样式和脚本，不依赖 CDN、联网或原始绝对路径。保留生成 HTML 和整理数据的 Python/JS 脚本，使它们在工作区内可重新执行。不要修改输入 CSV，不安装依赖。\n\n在报告中可见地注明来源：Netflix Movies and TV Shows，shivamb / Kaggle，https://www.kaggle.com/datasets/shivamb/netflix-shows/data 。注明本地快照的覆盖范围、清理口径与局限；来源文字在离线时仍可阅读。\n\n输入文件位于当前工作区 data/netflix_titles.csv；报告、图表及可复跑脚本写在当前工作区。",
+    "report": "report.html"
+  }
+]

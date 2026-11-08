@@ -22,3 +22,6 @@ node_modules/
 
 # Byte-hashed runtime provenance; change only through runtime preparation.
 /resources/runtime-lock.json
+
+# Audited public example bytes are hashed and must retain their original representation.
+/resources/examples/

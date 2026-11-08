@@ -4,6 +4,7 @@ import {
   type AgentBinding,
   type ToolId,
 } from '../shared/agent-config';
+import { appendResourceLocations } from './resource-locations';
 import { bindAgentConfiguration } from './agent-configuration';
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai';
 import { RequestBudget } from './request-budget';
@@ -48,6 +49,7 @@ export interface RuntimeConfig {
   testBaseUrl?: string;
   baseUrl?: string;
   skillsDirectory?: string;
+  skillResourcesRoot?: string;
   agentConfig?: AgentBinding;
   protectedRoots: string[];
 }
@@ -150,25 +152,6 @@ export class SessionRuntime {
     // Keep the native system prefix for resumed sessions. New attachments travel with
     // their user input; budgets are enforced at the transport boundary, never injected.
     const priorCwd = priorSystem?.sections?.cwd?.match(/^<cwd>\n([\s\S]*)\n<\/cwd>$/)?.[1];
-    // Upgrade old run/version sessions once, by appending to history instead of rewriting
-    // an already-sent system prefix. New sessions need no extra context messages.
-    if (
-      priorCwd &&
-      priorCwd !== config.workspace &&
-      !instance.manager
-        .getEntries()
-        .some(
-          (entry) =>
-            entry.type === 'custom_message' &&
-            entry.customType === 'data_agent.workspace_migration',
-        )
-    ) {
-      instance.manager.appendCustomMessageEntry(
-        'data_agent.workspace_migration',
-        `工作台目录规则已升级：本会话后续任务统一在 ${config.workspace} 工作并保存产物；历史中的 run/version 输出目录不再用于新产物。旧文件保留供读取。这是一次性目录迁移说明，不是新的用户任务。`,
-        false,
-      );
-    }
     const registeredTools = dependencies?.tools
       ? genericTools(dependencies.tools, redact, toolBudget).filter(
           (tool) =>
@@ -188,6 +171,13 @@ export class SessionRuntime {
           registeredTools,
         )
       : undefined;
+    appendResourceLocations(
+      instance.manager,
+      priorCwd,
+      config.workspace,
+      config.agentConfig,
+      config.skillResourcesRoot,
+    );
     const resources = {
       systemPrompt:
         configured?.prompt ??

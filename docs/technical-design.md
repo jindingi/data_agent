@@ -429,3 +429,11 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 Main 仅对 read 当前 session 下符合固定路径结构、canonical 路径未重定向的日志给予受保护路径读取例外；仍受 read 的有界文本读取与其他敏感路径规则约束。其他 session 日志、目录枚举和日志写入/删除继续受保护。该例外从可信 Main 路径派生，重启或下一 run 后可读取仍保留的日志，不持久化能力索引，也不改写旧上下文。禁止把整个 logs 根从 protectedRoots 移除。
 
 Renderer 不再获取日志清单或分页正文；旧 `logs.list/page` IPC、LogService 与 ToolLogViewer 已移除。历史日志原样保留，不主动迁移或清理；删除会话仍按固定 session 日志目录清理并保留 workspace。已发送的历史工具结果及 system/tools/skills 前缀保持原样，新的截断结果作为正常 toolResult 追加。
+
+## 内置会话与目录迁移
+
+`resources/examples/catalog.json` 枚举两份真实原生会话、不可变配置及全部发行文件的字节数与 SHA-256。Main 的 ExampleService 仅在全新数据库的 `examples.initialization` 为 pending 时初始化；资源均校验并复制到普通可写 workspace，JSONL 字节不改写。app_metadata 的完成标记独立于会话是否存在，避免删除后重建。已有数据库登记 skipped。
+
+安装在发布文件前保留 pending 意图；已发布文件必须逐字节匹配才可恢复登记，不覆盖不同内容或符号链接。SQLite 一次事务写入历史修订、普通会话/已提交输入/本机来源和完成标记；失败时回滚 DB，已发布的相同文件可供下一次恢复。历史修订保留原编号，随后创建本机默认修订，避免示例配置成为新会话默认值。
+
+迁移不改历史 system/cwd/skill 路径或工具定义。Main 按绑定的精确 skill 主文件与附属资源白名单映射 read 到本机冻结缓存；Agent 尾部追加一次持久化 `data_agent.resource_locations`，说明实际 workspace 与本机 skill 位置。默认工具 cwd 使用本机工作区，旧前缀在重启、工具循环及 steer/followup 后保留；不得为了导入强制压缩或重写已有内容。

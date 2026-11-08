@@ -24,10 +24,12 @@ import { WorkspaceReport } from './WorkspaceReport';
 
 export function WorkspacePanel({
   sessionId,
+  initialReport,
   hidden,
   close,
 }: {
   sessionId: string | null;
+  initialReport?: string;
   hidden: boolean;
   close: () => void;
 }) {
@@ -144,6 +146,18 @@ export function WorkspacePanel({
       ++selection.current;
     };
   }, [sessionId, selected, hidden, directories]);
+  const openedInitial = useRef(false);
+  useEffect(() => {
+    if (openedInitial.current || hidden || !initialReport || !directories.root) return;
+    openedInitial.current = true;
+    const entry = directories.root.entries.find(
+      (e) => e.kind === 'file' && e.relativePath === initialReport,
+    );
+    if (entry) {
+      setSelected(entry);
+      setTab('preview');
+    }
+  }, [hidden, initialReport, directories]);
   function choose(entry: WorkspaceEntry) {
     if (entry.kind !== 'file') return;
     setSelected(entry);

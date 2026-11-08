@@ -46,6 +46,7 @@ export function verifyRelease(
   for (const [source, target] of [
     ['resources/python', 'python'],
     ['resources/skills', 'skills'],
+    ['resources/examples', 'examples'],
   ])
     for (const file of files(join(sourceRoot, source)).filter(
       (f) => !f.includes('__pycache__') && !f.endsWith('.pyc'),

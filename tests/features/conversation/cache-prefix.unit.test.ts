@@ -136,7 +136,7 @@ it.each([false, true])(
         .split('\n')
         .map((line) => JSON.parse(line));
       expect(
-        upgraded.filter((entry) => entry.customType === 'data_agent.workspace_migration'),
+        upgraded.filter((entry) => entry.customType === 'data_agent.resource_locations'),
       ).toHaveLength(legacy ? 1 : 0);
       await runtime.dispose();
       snapshot = undefined;
@@ -170,7 +170,7 @@ it.each([false, true])(
         .split('\n')
         .map((line) => JSON.parse(line));
       expect(
-        restored.filter((entry) => entry.customType === 'data_agent.workspace_migration'),
+        restored.filter((entry) => entry.customType === 'data_agent.resource_locations'),
       ).toHaveLength(legacy ? 1 : 0);
     } finally {
       await runtime?.dispose();

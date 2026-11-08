@@ -25,6 +25,7 @@ const runtimeConfigSchema = z
     testBaseUrl: z.string().url().optional(),
     baseUrl: z.string().url().optional(),
     skillsDirectory: z.string().optional(),
+    skillResourcesRoot: z.string().optional(),
     agentConfig: agentBindingSchema.optional(),
   })
   .strict();
