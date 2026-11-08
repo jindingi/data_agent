@@ -19,6 +19,7 @@ export type ToolHandler = (
   toolCallId: string,
   operation: ToolOperation,
   observers: { output(text: string): void; interaction(value: Interaction | null): void },
+  maxOutputBytes?: number,
 ) => Promise<ToolResult>;
 
 /** Owns one Host transport. Session admission will own separate instances per active session. */
@@ -84,11 +85,16 @@ export class AgentProcess {
               if (this.status === 'ready') this.port?.postMessage(message);
             };
             const task = onTool
-              ? onTool(request.toolCallId, request.operation, {
-                  output: (output) => post({ type: 'tool.update', id: request.id, output }),
-                  interaction: (interaction) =>
-                    post({ type: 'tool.interaction', id: request.id, interaction }),
-                })
+              ? onTool(
+                  request.toolCallId,
+                  request.operation,
+                  {
+                    output: (output) => post({ type: 'tool.update', id: request.id, output }),
+                    interaction: (interaction) =>
+                      post({ type: 'tool.interaction', id: request.id, interaction }),
+                  },
+                  request.maxOutputBytes,
+                )
               : Promise.resolve({ output: '该 Host 未配置工具执行器', isError: true });
             void task
               .then((result) => post({ type: 'tool.result', id: request.id, result }))

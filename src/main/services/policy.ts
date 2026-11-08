@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { canonicalPath, inside, sensitivePath } from '../../node/path-policy';
 import type { RuntimePaths } from '../../node/runtime-paths';
 import type { ToolOperation } from '../../shared/tools';
+import { toolLimits } from '../../shared/tool-limits';
 
 const inspectSchema = z.object({
   accesses: z.array(z.object({ action: z.enum(['read', 'write', 'delete']), path: z.string() })),
@@ -148,11 +149,11 @@ export class PolicyService {
     const handle = await open(file, 'r');
     try {
       const stat = await handle.stat();
-      if (!stat.isFile() || stat.size > 256 * 1024)
+      if (!stat.isFile() || stat.size > toolLimits.textBytes)
         throw new Error('脚本不是普通文件或超过 256 KiB 检查上限');
-      const buffer = Buffer.alloc(Math.min(stat.size + 1, 256 * 1024 + 1));
+      const buffer = Buffer.alloc(Math.min(stat.size + 1, toolLimits.textBytes + 1));
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-      if (bytesRead > 256 * 1024) throw new Error('脚本检查超限');
+      if (bytesRead > toolLimits.textBytes) throw new Error('脚本检查超限');
       return buffer.subarray(0, bytesRead).toString('utf8');
     } finally {
       await handle.close();

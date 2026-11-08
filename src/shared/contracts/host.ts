@@ -9,6 +9,7 @@ import {
   messageSchema,
 } from '../runtime';
 import { toolOperationSchema, toolResultSchema, interactionSchema } from '../tools';
+import { toolLimits } from '../tool-limits';
 const id = z.string().uuid();
 const runtimeConfigSchema = z
   .object({
@@ -90,6 +91,7 @@ export const hostResponseSchema = z.discriminatedUnion('type', [
     .object({
       id,
       type: z.literal('tool.request'),
+      maxOutputBytes: z.number().int().nonnegative().max(toolLimits.resultBytes).optional(),
       toolCallId: z.string().min(1).max(256),
       operation: toolOperationSchema,
     })

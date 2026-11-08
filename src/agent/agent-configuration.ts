@@ -9,6 +9,7 @@ import {
 import { dirname } from 'node:path';
 import { verifyBinding } from '../node/agent-config-resources';
 import { composeAgentPrompt, type AgentBinding } from '../shared/agent-config';
+import { restoreToolDeclarations } from './tools/history';
 
 export function configuredSkills(binding: AgentBinding): Skill[] {
   return binding.skills.map((s) => ({
@@ -64,6 +65,7 @@ export function bindAgentConfiguration(
       cwd: `<cwd>\n${workspace.replace(/\\/g, '/')}\n</cwd>`,
     };
     const previousTools = getCurrentTools(messages);
+    tools = restoreToolDeclarations(tools, previousTools);
     if (
       !!previous.content ||
       JSON.stringify(previous.sections) !== JSON.stringify(expectedSections) ||
@@ -80,5 +82,5 @@ export function bindAgentConfiguration(
       fingerprint: binding.fingerprint,
       revision: binding.revision,
     });
-  return { prompt, skills };
+  return { prompt, skills, tools };
 }

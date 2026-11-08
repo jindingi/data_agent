@@ -26,7 +26,9 @@ import { InputIdentity, trustedExtension, inputId, messageText } from './input-i
 import { EventAdapter } from './event-adapter';
 import { readTool } from './tools/read';
 import { redactor } from './redact';
-import { genericTools } from './tools';
+import { genericTools, ToolBatchBudget } from './tools';
+import { boundNewToolResult } from './tool-results';
+import { executionLimits } from '../shared/tool-limits';
 import type { ToolExecutor } from './tool-client';
 import type { Interaction } from '../shared/tools';
 
@@ -104,11 +106,19 @@ export class SessionRuntime {
     instance.adapter.restore(instance.manager);
     const redact = redactor(config.apiKey);
     instance.redact = redact;
+    const toolBudget = new ToolBatchBudget();
     const handlers = trustedExtension(
       new Map([
         [
           'message_end',
-          [async (event: unknown) => ({ message: redact((event as MessageEndEvent).message) })],
+          [
+            async (event: unknown) => ({
+              message: boundNewToolResult(
+                redact((event as MessageEndEvent).message),
+                toolBudget.resultBytes,
+              ),
+            }),
+          ],
         ],
         [
           'context',
@@ -156,14 +166,14 @@ export class SessionRuntime {
       );
     }
     const registeredTools = dependencies?.tools
-      ? genericTools(dependencies.tools, redact).filter(
+      ? genericTools(dependencies.tools, redact, toolBudget).filter(
           (tool) =>
             !config.agentConfig ||
             config.agentConfig.config.enabledTools.includes(
               tool.name as import('../shared/agent-config').ToolId,
             ),
         )
-      : [readTool(config.workspace, config.protectedRoots)];
+      : [readTool(config.workspace, config.protectedRoots, () => toolBudget.resultBytes)];
     if (config.agentConfig && !dependencies?.tools)
       throw new Error('Configured Agent requires a tool executor');
     const configured = config.agentConfig
@@ -195,13 +205,17 @@ export class SessionRuntime {
       thinkingLevel: config.thinkingLevel ?? (model.reasoning ? 'high' : 'off'),
       settingsManager: SettingsManager.inMemory({
         retry: { enabled: true, maxRetries: 2 },
-        compaction: { enabled: true },
+        compaction: {
+          enabled: true,
+          reserveTokens: executionLimits.compactionReserveTokens,
+          keepRecentTokens: executionLimits.compactionKeepRecentTokens,
+        },
         steeringMode: 'one-at-a-time',
         followUpMode: 'one-at-a-time',
         cacheWarming: 'off',
       }),
       resources,
-      registeredTools,
+      registeredTools: configured?.tools ?? registeredTools,
     });
     instance.session = session;
     instance.unsubscribeTools = dependencies?.tools?.subscribe((interactions) => {
@@ -232,10 +246,15 @@ export class SessionRuntime {
       return stream(selectedModel, context, {
         ...options,
         ...(dependencies?.fetch ? { fetch: dependencies.fetch } : {}),
-        maxTokens: Math.min(options?.maxTokens ?? 16_384, 16_384),
+        maxTokens: Math.min(
+          options?.maxTokens ?? executionLimits.modelOutputTokens,
+          executionLimits.modelOutputTokens,
+        ),
       });
     };
     session.subscribe((event) => {
+      if (event.type === 'message_end' && event.message.role === 'assistant')
+        toolBudget.begin(event.message.content.filter((block) => block.type === 'toolCall').length);
       if (event.type === 'message_start' && event.message.role === 'user') {
         const id = inputId(messageText(event.message));
         if (id) instance.turnUsage.begin(id);

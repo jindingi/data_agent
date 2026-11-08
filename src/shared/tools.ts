@@ -1,50 +1,106 @@
 import { z } from 'zod';
-const path = z.string().min(1).max(4096);
-export const toolOperationSchema = z.discriminatedUnion('name', [
-  z
+import { toolLimits } from './tool-limits';
+const path = z
+  .string()
+  .min(1)
+  .max(toolLimits.pathChars)
+  .describe('Absolute path or a path relative to the session workspace.');
+const text = z
+  .string()
+  .max(toolLimits.textBytes)
+  .refine(
+    (value) => new TextEncoder().encode(value).byteLength <= toolLimits.textBytes,
+    `UTF-8 text must not exceed ${toolLimits.textBytes} bytes`,
+  )
+  .describe(`UTF-8 text, at most ${toolLimits.textBytes} encoded bytes.`);
+/** One parameter contract generates both provider declarations and Main validation. */
+export const toolParameters = {
+  read: z
     .object({
-      name: z.literal('read'),
       path,
-      offset: z.number().int().min(1).optional(),
-      limit: z.number().int().min(1).max(2000).optional(),
-    })
-    .strict(),
-  z.object({ name: z.literal('write'), path, content: z.string().max(256 * 1024) }).strict(),
-  z
-    .object({
-      name: z.literal('edit'),
-      path,
-      oldText: z
-        .string()
+      offset: z
+        .number()
+        .int()
         .min(1)
-        .max(256 * 1024),
-      newText: z.string().max(256 * 1024),
+        .optional()
+        .describe('1-based starting line. Cannot be combined with byteOffset.'),
+      byteOffset: z
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe(
+          'UTF-8 byte position, starting at zero. Use the nextByteOffset returned by read to continue, including within long lines.',
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(toolLimits.maxReadLines)
+        .optional()
+        .describe(`Maximum lines to return, default ${toolLimits.readLines}.`),
     })
     .strict(),
-  z
+  write: z.object({ path, content: text }).strict(),
+  edit: z.object({ path, oldText: text.min(1), newText: text }).strict(),
+  bash: z
     .object({
-      name: z.literal('bash'),
-      command: z.string().min(1).max(100_000),
-      timeout: z.number().int().min(1).max(180).optional(),
+      command: z.string().min(1).max(toolLimits.commandChars),
+      timeout: z.number().int().min(1).max(toolLimits.timeoutSeconds).optional(),
     })
     .strict(),
-  z
+  grep: z
     .object({
-      name: z.literal('grep'),
-      pattern: z.string().min(1).max(1000),
+      pattern: z.string().min(1).max(toolLimits.patternChars),
       path,
       ignoreCase: z.boolean().optional(),
+      literal: z.boolean().optional(),
+      limit: z.number().int().min(1).max(toolLimits.maxSearchMatches).optional(),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Number of matches to skip. Continue with the returned nextOffset.'),
     })
     .strict(),
-  z.object({ name: z.literal('find'), pattern: z.string().max(1000), path }).strict(),
-  z.object({ name: z.literal('ls'), path }).strict(),
-  z
+  find: z
     .object({
-      name: z.literal('ask_clarification'),
-      question: z.string().min(1).max(4000),
-      options: z.array(z.string().min(1).max(500)).max(8).optional(),
+      pattern: z.string().max(toolLimits.patternChars),
+      path,
+      limit: z.number().int().min(1).max(toolLimits.maxDirectoryEntries).optional(),
+      offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
     })
     .strict(),
+  ls: z
+    .object({
+      path,
+      limit: z.number().int().min(1).max(toolLimits.maxDirectoryEntries).optional(),
+      offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    })
+    .strict(),
+  ask_clarification: z
+    .object({
+      question: z.string().min(1).max(toolLimits.questionChars),
+      options: z
+        .array(z.string().min(1).max(toolLimits.optionChars))
+        .max(toolLimits.options)
+        .optional(),
+    })
+    .strict(),
+};
+export const toolNames = Object.keys(toolParameters) as (keyof typeof toolParameters)[];
+export const toolOperationSchema = z.discriminatedUnion('name', [
+  toolParameters.read.extend({ name: z.literal('read') }),
+  toolParameters.write.extend({ name: z.literal('write') }),
+  toolParameters.edit.extend({ name: z.literal('edit') }),
+  toolParameters.bash.extend({ name: z.literal('bash') }),
+  toolParameters.grep.extend({ name: z.literal('grep') }),
+  toolParameters.find.extend({ name: z.literal('find') }),
+  toolParameters.ls.extend({ name: z.literal('ls') }),
+  toolParameters.ask_clarification.extend({ name: z.literal('ask_clarification') }),
 ]);
 export type ToolOperation = z.infer<typeof toolOperationSchema>;
 export const interactionSchema = z
@@ -72,7 +128,28 @@ export const toolResultSchema = z
   .object({
     output: z.string(),
     isError: z.boolean(),
-    details: z.record(z.string(), z.unknown()).optional(),
+    details: z
+      .object({
+        truncated: z.boolean().optional(),
+        truncationReason: z
+          .enum(['bytes', 'lines', 'entries', 'matches', 'scope', 'capture'])
+          .optional(),
+        nextByteOffset: z.number().int().nonnegative().optional(),
+        nextOffset: z.number().int().nonnegative().optional(),
+        scannedBytes: z.number().int().nonnegative().optional(),
+        returnedBytes: z.number().int().nonnegative().optional(),
+        scopeTruncated: z.boolean().optional(),
+        linesTruncated: z.boolean().optional(),
+        exitCode: z.number().int().nullable().optional(),
+        reason: z.string().optional(),
+        peakRss: z.number().nonnegative().optional(),
+        pid: z.number().int().nullable().optional(),
+        logPath: z.string().optional(),
+        logComplete: z.boolean().optional(),
+        logBytes: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ToolResult = z.infer<typeof toolResultSchema>;

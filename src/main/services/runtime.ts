@@ -476,7 +476,7 @@ export class RuntimeService {
             );
         },
         (snapshot) => this.update(task, snapshot),
-        async (toolCallId, operation, observers) => {
+        async (toolCallId, operation, observers, maxOutputBytes) => {
           if (!task.host?.pid || !isActive(task.snapshot.state))
             return { output: '当前任务无法执行工具', isError: true };
           if (task.agentConfig && !task.agentConfig.config.enabledTools.includes(operation.name))
@@ -519,6 +519,7 @@ export class RuntimeService {
             toolCallId,
             operation,
             observers,
+            maxOutputBytes,
           );
         },
         (toolCallId) => this.tools.cancelTool(task.snapshot.runId, toolCallId),

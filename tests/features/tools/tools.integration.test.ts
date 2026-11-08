@@ -265,7 +265,9 @@ it('tools.log-storage saves only bash overflow, keeps both streams and lets the 
   const expected = 'a'.repeat(2047) + '中文_END';
   expect(readFileSync(path, 'utf8')).toBe(expected);
   expect(result.output).toContain('日志路径：' + path);
-  expect(result.output.split('\n')[0]).toBe('a'.repeat(2047));
+  expect(result.output.split('\n')[0]).toBe('a'.repeat(1024));
+  expect(result.output).toContain('中文_END');
+  expect(result.details?.logComplete).toBe(true);
   expect(result.output).not.toContain('\ufffd');
   expect(
     streamed.every((value) => Buffer.byteLength(value) <= 2048 && !value.includes('\ufffd')),
@@ -361,4 +363,71 @@ it('tools.resource-release repeated settled runs release tool registries and pro
     tools.releaseRun(context.runId);
     expect(tools.resourceCounts()).toEqual({ active: 0, tails: 0, closed: 0, processBudgets: 0 });
   }
+});
+
+it('tools.search-pagination finds later matches and pages complete long paths with explicit bounds', async () => {
+  writeFileSync(
+    join(context.workspace, 'matches.txt'),
+    Array.from({ length: 160 }, (_, i) => `MATCH_${i + 1}`).join('\n') + '\n',
+  );
+  const first = await execute({ name: 'grep', path: 'matches.txt', pattern: 'MATCH_', limit: 30 });
+  expect(first.isError, first.output).toBe(false);
+  expect(first.details?.nextOffset).toBe(30);
+  expect(first.output).toContain('offset=30');
+  const next = await execute({
+    name: 'grep',
+    path: 'matches.txt',
+    pattern: 'MATCH_',
+    limit: 30,
+    offset: 30,
+  });
+  expect(next.output).toContain('MATCH_31');
+  expect(next.output).toContain('MATCH_60');
+  const normal = await execute({ name: 'grep', path: 'matches.txt', pattern: 'MATCH_' });
+  expect(normal.output).toContain('MATCH_100');
+  expect(normal.details?.nextOffset).toBe(100);
+
+  const dir = join(context.workspace, 'long');
+  mkdirSync(dir);
+  const names = Array.from({ length: 300 }, (_, i) => String(i).padStart(4, '0') + 'x'.repeat(240));
+  for (const name of names) writeFileSync(join(dir, name), '');
+  for (const name of ['find', 'ls'] as const) {
+    const found: string[] = [];
+    let offset = 0;
+    for (let page = 0; page < 5; page++) {
+      const result = await execute(
+        name === 'find'
+          ? { name, path: 'long', pattern: '', offset }
+          : { name, path: 'long', offset },
+      );
+      expect(result.isError, result.output).toBe(false);
+      expect(Buffer.byteLength(result.output)).toBeLessThanOrEqual(64 * 1024);
+      const lines = result.output.split('\n[')[0].split('\n');
+      found.push(...lines.map((line) => (name === 'ls' ? line.slice(2) : line)));
+      if (result.details?.nextOffset === undefined) break;
+      expect(result.details.nextOffset).toBeGreaterThan(offset);
+      offset = result.details.nextOffset;
+    }
+    expect(found).toEqual(names);
+  }
+  expect(readdirSync(join(root, 'data/logs'))).toEqual([]);
+}, 20_000);
+
+it('tools.log-continuation reads a saved long line beyond 8 MiB without broadening log access', async () => {
+  const path = toolLogPath(join(root, 'data/logs'), context.sessionId, context.runId, 'long-log');
+  mkdirSync(dirname(path), { recursive: true });
+  const offset = 9 * 1024 * 1024;
+  writeFileSync(path, 'a'.repeat(offset) + 'TAIL_AFTER_9_MIB\n');
+  const result = await execute({ name: 'read', path, byteOffset: offset });
+  expect(result.isError, result.output).toBe(false);
+  expect(result.output).toBe('TAIL_AFTER_9_MIB\n');
+  expect((await execute({ name: 'grep', path, pattern: 'TAIL' })).isError).toBe(true);
+  const denied = await tools.execute(
+    { ...context, sessionId: randomUUID() },
+    randomUUID(),
+    { name: 'read', path, byteOffset: offset },
+    { output() {}, interaction() {} },
+  );
+  expect(denied.isError).toBe(true);
+  expect(denied.output).not.toContain('TAIL_AFTER_9_MIB');
 });

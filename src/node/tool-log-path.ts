@@ -3,6 +3,7 @@ import { lstat, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { inside } from './path-policy';
+import { toolLimits } from '../shared/tool-limits';
 export function sessionLogDirectory(root: string, sessionId: string) {
   if (!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(sessionId))
     throw new Error('Invalid log identity');
@@ -37,7 +38,8 @@ export async function logReadAccess(
   if ((await realpath(requested)) !== expectedPath)
     throw new Error('日志路径已变更，禁止读取重定向日志');
   const stat = await lstat(requested);
-  if (!stat.isFile() || stat.size > 10 * 1024 * 1024) throw new Error('日志必须是限额内的普通文件');
+  if (!stat.isFile() || stat.size > toolLimits.runLogBytes)
+    throw new Error('日志必须是限额内的普通文件');
   const canonicalRoots = await Promise.all(
     protectedRoots.map(async (value) => {
       try {
