@@ -125,8 +125,8 @@ export function Composer({
               value={inputKind}
               onChange={(event) => setInputKind(event.target.value as 'steer' | 'followUp')}
             >
-              <option value="steer">插话</option>
-              <option value="followUp">后续提问</option>
+              <option value="steer">steer</option>
+              <option value="followUp">followup</option>
             </select>
           )}
           {selectedModel?.reasoning && selectedModel.thinkingLevels.length > 1 && (

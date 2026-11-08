@@ -65,7 +65,7 @@ export const cases = {
         await delay(250);
         assert.equal(fixture.requests.length, before);
         assert(!existsSync(join(root, 'never-write.txt')));
-        await page.getByText('未发送 · 后续提问', { exact: true }).waitFor();
+        await page.getByText('未发送 · followup', { exact: true }).waitFor();
       }
       const requestsBeforeRestart = fixture.requests.length;
       await app.stop();

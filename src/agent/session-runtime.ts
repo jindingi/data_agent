@@ -343,7 +343,8 @@ export class SessionRuntime {
       this.flush();
       return;
     }
-    if (this.running) throw new AppError('ALREADY_RUNNING', '该会话正在运行，请选择插话或后续提问');
+    if (this.running)
+      throw new AppError('ALREADY_RUNNING', '该会话正在运行，请选择 steer 或 followup');
     const text = this.identity.submit(input);
     this.turnUsage.begin(input.inputId);
     this.running = true;

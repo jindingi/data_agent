@@ -259,12 +259,12 @@ export class RuntimeService {
     const current = this.tasks.get(sessionId);
     if (current && isActive(current.snapshot.state)) {
       if (input.kind === 'prompt')
-        throw new AppError('ALREADY_RUNNING', '会话已有任务，请使用插话或后续提问');
+        throw new AppError('ALREADY_RUNNING', '会话已有任务，请使用 steer 或 followup');
       if (
         !current.host ||
         !['running', 'waiting_approval', 'waiting_input'].includes(current.snapshot.state)
       )
-        throw new AppError('NOT_RUNNING', '任务尚在等待启动，请稍后插话');
+        throw new AppError('NOT_RUNNING', '任务尚在等待启动，请稍后使用 steer');
       const files = inspectFiles(input.paths ?? []);
       this.insertInput(
         current,

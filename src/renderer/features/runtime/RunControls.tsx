@@ -35,7 +35,7 @@ export function RunControls({
           <div className="queued-input" key={input.inputId}>
             <span>
               {active ? '等待处理' : '未发送'} ·{' '}
-              {input.kind === 'steer' ? '插话' : input.kind === 'followUp' ? '后续提问' : '提问'}
+              {input.kind === 'steer' ? 'steer' : input.kind === 'followUp' ? 'followup' : '提问'}
             </span>
             <p>{input.text}</p>
             {!active && <button onClick={() => act(restore(input))}>放回输入框</button>}
@@ -45,7 +45,7 @@ export function RunControls({
         <div className="queued-input" data-unsent-input={input.inputId} key={input.inputId}>
           <span>
             未发送 ·{' '}
-            {input.kind === 'steer' ? '插话' : input.kind === 'followUp' ? '后续提问' : '提问'}
+            {input.kind === 'steer' ? 'steer' : input.kind === 'followUp' ? 'followup' : '提问'}
           </span>
           <p>{input.text}</p>
           <button onClick={() => act(restore(input))}>放回输入框</button>
