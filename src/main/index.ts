@@ -14,7 +14,6 @@ import { CredentialService } from './services/credentials';
 import { RuntimeService } from './services/runtime';
 import { ToolService } from './services/tools';
 import { DeletionService } from './services/deletion';
-import { LogService } from './services/logs';
 import { InteractionBroker } from './services/interactions';
 import { getRuntimePaths } from '../node/runtime-paths';
 import type { ModelOption } from '../shared/runtime';
@@ -120,16 +119,6 @@ if (primaryInstance)
       });
       const credentials = new CredentialService(db, safeStorage);
       const interactions = new InteractionBroker();
-      const logs = new LogService(paths.logs, async (sessionId, toolCallId) => {
-        sessions.get(sessionId);
-        const snapshot = await runtime?.restoreSnapshot(sessionId);
-        return Boolean(
-          snapshot?.tools.some((tool) => tool.id === toolCallId) ||
-          snapshot?.messages.some((message) =>
-            message.blocks.some((block) => block.type === 'toolCall' && block.id === toolCallId),
-          ),
-        );
-      });
       const tools = new ToolService(
         getRuntimePaths(resourceAppPath, process.resourcesPath, app.isPackaged),
         paths.logs,
@@ -236,7 +225,6 @@ if (primaryInstance)
               return null;
             }
           : undefined,
-        logs: logs,
         deletion: deletion,
       });
       Menu.setApplicationMenu(

@@ -1,8 +1,9 @@
 import { toolLogPath } from './tool-log-path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { mkdirSync, appendFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { RuntimePaths } from './runtime-paths';
+import { ProcessOutput, type ProcessLogBudget } from './process-output';
 
 export interface ProcessResult {
   output: string;
@@ -23,19 +24,20 @@ interface Options {
   signal?: AbortSignal;
   timeoutSeconds?: number;
   onOutput?: (text: string) => void;
+  saveOverflowLog?: boolean;
 }
 export class ProcessRunner {
   private children = new Set<ChildProcessWithoutNullStreams>();
-  private logBytes = new Map<string, number>();
+  private logBudgets = new Map<string, ProcessLogBudget>();
   constructor(
     private paths: RuntimePaths,
     private logs: string,
   ) {}
   releaseRun(runId: string) {
-    this.logBytes.delete(runId);
+    this.logBudgets.delete(runId);
   }
   get runCount() {
-    return this.logBytes.size;
+    return this.logBudgets.size;
   }
   environment(workspace: string) {
     const cache = join(workspace, '.cache');
@@ -61,8 +63,16 @@ export class ProcessRunner {
   async run(options: Options): Promise<ProcessResult> {
     options.signal?.throwIfAborted();
     const env = this.environment(options.cwd);
-    const logFile = toolLogPath(this.logs, options.sessionId, options.runId, options.toolCallId);
-    mkdirSync(dirname(logFile), { recursive: true, mode: 0o700 });
+    let log: { path: string; budget: ProcessLogBudget } | undefined;
+    if (options.saveOverflowLog) {
+      const budget = this.logBudgets.get(options.runId) ?? { remaining: 10 * 1024 * 1024 };
+      this.logBudgets.set(options.runId, budget);
+      log = {
+        path: toolLogPath(this.logs, options.sessionId, options.runId, options.toolCallId),
+        budget,
+      };
+    }
+    const output = new ProcessOutput(log);
     return new Promise((resolve, reject) => {
       const child = spawn(
         this.paths.python,
@@ -71,8 +81,6 @@ export class ProcessRunner {
       );
       this.children.add(child);
       let protocol = '',
-        bytes = 0,
-        chunks: Buffer[] = [],
         settled = false;
       let result: ProcessResult = {
         output: '',
@@ -110,21 +118,9 @@ export class ProcessRunner {
                 peakRss: message.peakRss,
               };
             if (message.type === 'output') {
-              const output = Buffer.from(message.data, 'base64');
-              const available = Math.max(0, 60 * 1024 - bytes);
-              if (available) {
-                const part = output.subarray(0, available);
-                chunks.push(part);
-                bytes += part.length;
-                options.onOutput?.(Buffer.concat(chunks).toString('utf8'));
-              }
-              if (output.length > available) result.truncated = true;
-              const logged = this.logBytes.get(options.runId) ?? 0;
-              const logPart = output.subarray(0, Math.max(0, 10 * 1024 * 1024 - logged));
-              if (logPart.length) {
-                appendFileSync(logFile, logPart, { mode: 0o600 });
-                this.logBytes.set(options.runId, logged + logPart.length);
-              }
+              const wasTruncated = output.truncated;
+              const text = output.append(Buffer.from(message.data, 'base64'));
+              if (!wasTruncated) options.onOutput?.(text);
             }
           } catch {
             result.reason = 'supervisor_protocol_error';
@@ -137,10 +133,8 @@ export class ProcessRunner {
         options.signal?.removeEventListener('abort', cancel);
         if (settled) return;
         settled = true;
-        result.output =
-          Buffer.concat(chunks).toString('utf8') +
-          (result.truncated ? '\n[输出已截断；完整日志受每次任务 10 MiB 上限约束。]' : '');
-        chunks = [];
+        result.output = output.finish();
+        result.truncated = output.truncated;
         resolve(result);
       };
       child.once('error', () => {

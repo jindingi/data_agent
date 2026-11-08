@@ -8,9 +8,11 @@ export async function readText(
   protectedRoots: string[],
   params: { path: string; offset?: number; limit?: number },
   signal?: AbortSignal,
+  expectedPath?: string,
 ) {
   const requested = resolve(workspace, params.path);
   const actual = await realpath(requested);
+  if (expectedPath && actual !== expectedPath) throw new Error('操作路径已变化，请重新调用工具');
   const roots = await Promise.all(
     protectedRoots.map(async (root) => {
       try {
@@ -22,8 +24,10 @@ export async function readText(
   );
   if (sensitivePath(requested, protectedRoots) || sensitivePath(actual, roots))
     throw new Error('禁止读取凭证或工作台控制文件');
-  const file = await open(actual, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(actual, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
+    if (expectedPath && (await realpath(actual)) !== expectedPath)
+      throw new Error('操作路径已变化，请重新调用工具');
     if (!(await file.stat()).isFile()) throw new Error('只能读取普通文本文件');
     const decoder = new TextDecoder('utf-8', { fatal: true });
     const buffer = Buffer.alloc(16 * 1024);

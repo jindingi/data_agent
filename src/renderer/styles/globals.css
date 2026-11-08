@@ -1123,16 +1123,6 @@ summary:focus-visible {
   padding: 8px;
   margin: 6px 0;
 }
-.tool-log {
-  border-top: 1px solid var(--border);
-  margin-top: 12px;
-}
-.tool-log pre {
-  max-height: 240px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 
 .result-panel.expanded {
   position: absolute;

@@ -1,6 +1,17 @@
-import { beforeEach, afterEach, expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  statSync,
+  readdirSync,
+  unlinkSync,
+  symlinkSync,
+  mkdirSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { openDatabase } from '../../../src/main/storage/database';
@@ -10,6 +21,7 @@ import { ToolService, type ToolContext } from '../../../src/main/services/tools'
 import { ensureAppPaths, getAppPaths } from '../../../src/node/app-paths';
 import { getRuntimePaths } from '../../../src/node/runtime-paths';
 import type { Interaction, ToolOperation } from '../../../src/shared/tools';
+import { toolLogPath } from '../../../src/node/tool-log-path';
 
 let root: string, db: ReturnType<typeof openDatabase>, tools: ToolService, context: ToolContext;
 
@@ -180,15 +192,24 @@ it('tools.output-limit stops actual oversized output processes and blocks furthe
 it('tools.log-limit retains at most 10 MiB across actual tools in one run with bounded UI output', async () => {
   const first = await execute({
     name: 'bash',
-    command: 'python3 -c \'print("x" * (12*1024*1024))\'',
+    command: 'python3 -c \'print("x" * (6*1024*1024), end="")\'',
   });
   expect(first.isError).toBe(false);
   expect(first.output).toContain('截断');
-  expect(Buffer.byteLength(first.output)).toBeLessThan(64 * 1024);
-  expect(
-    (await execute({ name: 'bash', command: 'python3 -c \'print("y" * 100000)\'' })).isError,
-  ).toBe(false);
-  const { readdirSync } = await import('node:fs');
+  expect(first.output).toContain('日志路径：');
+  expect(first.output).not.toContain('日志未完整保存');
+  expect(Buffer.byteLength(first.output)).toBeLessThan(4096);
+  const second = await execute({
+    name: 'bash',
+    command: 'python3 -c \'print("y" * (6*1024*1024), end="")\'',
+  });
+  expect(second.isError).toBe(false);
+  expect(second.output).toContain('日志路径：');
+  expect(second.output).toContain('日志未完整保存');
+  const third = await execute({ name: 'bash', command: 'python3 -c \'print("z" * 100000)\'' });
+  expect(third.isError).toBe(false);
+  expect(third.output).toContain('未保存本次输出日志');
+  expect(third.output).not.toContain('日志路径：');
   const logDir = join(root, 'data/logs', context.sessionId);
   expect(
     readdirSync(logDir).reduce(
@@ -201,7 +222,133 @@ it('tools.log-limit retains at most 10 MiB across actual tools in one run with b
       0,
     ),
   ).toBe(10 * 1024 * 1024);
+  expect(readdirSync(logDir)).toHaveLength(2);
 }, 15_000);
+
+it('tools.log-storage saves only bash overflow, keeps both streams and lets the Agent read only its session logs', async () => {
+  const logs = join(root, 'data/logs');
+  for (const bytes of [0, 500, 2048]) {
+    const result = await execute({
+      name: 'bash',
+      command: `python3 -c 'print("x" * ${bytes}, end="")'`,
+    });
+    expect(result.isError, result.output).toBe(false);
+    expect(result.output).toBe('x'.repeat(bytes));
+    expect(readdirSync(logs)).toEqual([]);
+  }
+  const boundary = await execute({
+    name: 'bash',
+    command: 'python3 -c \'print("b" * 2049, end="")\'',
+  });
+  const boundaryPath = boundary.output.match(/日志路径：([^\n]+)/)?.[1];
+  expect(boundaryPath).toBeTruthy();
+  expect(readFileSync(boundaryPath!, 'utf8')).toBe('b'.repeat(2049));
+  const id = randomUUID();
+  const streamed: string[] = [];
+  const result = await tools.execute(
+    context,
+    id,
+    {
+      name: 'bash',
+      command:
+        'python3 -c \'import sys,time; print("a" * 2047, end="", flush=True); time.sleep(.1); print("中文_END", end="", file=sys.stderr)\'',
+    },
+    {
+      output: (text) => streamed.push(text),
+      interaction: (value) => {
+        if (value) answer(value);
+      },
+    },
+  );
+  expect(result.isError, result.output).toBe(false);
+  const path = toolLogPath(logs, context.sessionId, context.runId, id);
+  const expected = 'a'.repeat(2047) + '中文_END';
+  expect(readFileSync(path, 'utf8')).toBe(expected);
+  expect(result.output).toContain('日志路径：' + path);
+  expect(result.output.split('\n')[0]).toBe('a'.repeat(2047));
+  expect(result.output).not.toContain('\ufffd');
+  expect(
+    streamed.every((value) => Buffer.byteLength(value) <= 2048 && !value.includes('\ufffd')),
+  ).toBe(true);
+  const read = await execute({ name: 'read', path });
+  expect(read.isError, read.output).toBe(false);
+  expect(read.output).toBe(expected);
+
+  // The hint remains usable on the next run; no in-memory grant or persisted manifest.
+  const previous = context.runId;
+  tools.releaseRun(previous);
+  context.runId = randomUUID();
+  expect((await execute({ name: 'read', path })).output).toBe(expected);
+  const denied = await tools.execute(
+    { ...context, sessionId: randomUUID() },
+    randomUUID(),
+    {
+      name: 'read',
+      path,
+    },
+    { output: () => {}, interaction: () => {} },
+  );
+  expect(denied.isError).toBe(true);
+  expect(denied.output).not.toContain('中文_END');
+  expect((await execute({ name: 'write', path, content: 'must not write' })).isError).toBe(true);
+  unlinkSync(path);
+  const secret = join(context.workspace, '.env');
+  writeFileSync(secret, 'SYNTHETIC_LOG_REDIRECTION_SECRET');
+  symlinkSync(secret, path);
+  const redirected = await execute({ name: 'read', path });
+  expect(redirected.isError).toBe(true);
+  expect(redirected.output).not.toContain('SYNTHETIC_LOG_REDIRECTION_SECRET');
+
+  // Redirect after the read exception is granted but before policy resolves the file.
+  unlinkSync(path);
+  writeFileSync(path, expected);
+  const otherPath = toolLogPath(logs, randomUUID(), randomUUID(), 'other-session');
+  mkdirSync(dirname(otherPath), { recursive: true });
+  writeFileSync(otherPath, 'OTHER_SESSION_LOG_SECRET');
+  const inspect = tools.policy.inspect.bind(tools.policy);
+  const swap = vi.spyOn(tools.policy, 'inspect').mockImplementationOnce(async (...args) => {
+    unlinkSync(path);
+    symlinkSync(otherPath, path);
+    return inspect(...args);
+  });
+  try {
+    const raced = await execute({ name: 'read', path });
+    expect(raced.isError).toBe(true);
+    expect(raced.output).not.toContain('OTHER_SESSION_LOG_SECRET');
+  } finally {
+    swap.mockRestore();
+  }
+
+  const failed = await execute({
+    name: 'bash',
+    command: 'python3 -c \'import sys; print("ERR" * 1000, file=sys.stderr); sys.exit(7)\'',
+  });
+  expect(failed.isError).toBe(true);
+  expect(failed.output).toContain('退出码：7');
+  const failedPath = failed.output.match(/日志路径：([^\n]+)/)?.[1];
+  expect(failedPath).toBeTruthy();
+  expect(readFileSync(failedPath!, 'utf8')).toBe('ERR'.repeat(1000) + '\n');
+
+  const blockedLogRoot = join(context.workspace, 'not-a-directory');
+  writeFileSync(blockedLogRoot, 'synthetic failure');
+  const failedLogger = new ToolService(resources, blockedLogRoot, new InteractionBroker());
+  try {
+    const delivered = await failedLogger.execute(
+      context,
+      randomUUID(),
+      {
+        name: 'bash',
+        command: 'python3 -c \'print("still succeeds" * 300)\'',
+      },
+      { output: () => {}, interaction: () => {} },
+    );
+    expect(delivered.isError, delivered.output).toBe(false);
+    expect(delivered.output).toContain('日志写入失败');
+    expect(delivered.output).not.toContain('日志路径：');
+  } finally {
+    failedLogger.stop();
+  }
+}, 20_000);
 
 it('tools.resource-release repeated settled runs release tool registries and process log budgets', async () => {
   for (let i = 0; i < 5; i++) {

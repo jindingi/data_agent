@@ -309,7 +309,7 @@ ECharts 6.1.0 锁定为构建依赖，resources/echarts-lock.json 固定浏览�
 
 不向模型注入剩余请求次数提示。内置 skill 仅提供通用分析与交付指导；50 次硬上限由请求入口阻断，错误状态不因模型声称完成而改变。
 
-工具单次 UI 文本有界，进程输出保留前 60 KiB 加截断提示（低于 64 KiB）；进程日志每 run 合计最多保留最早 10 MiB，超出部分不再写盘。`logs.list/page` 按 sessionId 与 Main 内存签发的 logId 读取，每页 32 KiB、保留 UTF-8 字符边界，不接受任意路径。会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；会话工作区文件总量上限 500 MiB（跨 run 累计）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
+bash 的 stdout/stderr 按 Main 接收顺序合计不超过 2 KiB 时完整返回，不创建日志文件或调用目录；超过后仅返回 UTF-8 字符边界内的前 2 KiB，加上截断提示与已实际写入的日志绝对路径供 Agent 按需 read。日志包含触发阈值前后的输出字节，每 run 所有 bash 合计最多保留最早 10 MiB，超出部分继续消费但不再写盘；额度不足或写入失败须明示不完整，完全未保存时不给出虚假路径。日志写入失败不改判进程退出状态。grep/find 保留原有 60 KiB 输出界限，不写进程日志。UI 只显示工具结果，不提供独立日志正文、入口或日志读取 IPC。会话初始加载最近 10 个完整用户轮次，每次向前加载 10 轮并保留滚动锚点，不在一轮的工具序列中间截断；回答正文连续渲染。Renderer 的 transcriptTurns 以用户消息为边界汇集后续 assistant 消息（包括多次模型/工具步骤）；分组使用稳定 inputId（旧记录回退消息 ID），工具行使用 toolCallId，避免 SDK 终态恢复原生 JSONL entry ID 时重建控件丢失焦点。ExecutionProcess 将 thinking/toolCall 按原顺序放进同一折叠区，toolResult 通过调用 ID 关联，正文消息保留在区外。活动轮默认展开，后续用户消息或运行终态使其自动收起；运行中手动收起不受流式更新覆盖，结束后手动展开不受后续快照覆盖。审批/补充问题继续由 RunControls 独立展示。思考和原始工具输出详情仍独立分页。执行过程分组不改写原生消息；用量统计另通过下述 custom entry 标记轮次边界；插话/后续提问按实际进入原生历史的用户消息划分。阅读历史时不自动追到最新，底部独立箭头返回末尾。预览可拖拽/键盘调宽或专注阅读，窄窗口采用覆盖层。JSONL 保留完整消息。单 PNG 最大 25 MiB/40 百万像素，超限不给 Renderer 解码。生成数据可超过输入体积但需按输出限额及时终止；会话工作区文件总量上限 500 MiB（跨 run 累计）。写入前做有界目录计量；执行 bash 时由监督器每约 250 ms 及退出时检查总量/条目，超限停止进程并返回明确工具错误，保留已有文件。该检查是尽力检测，不是 OS 磁盘配额，也不能承诺阻止两次采样间的瞬时超量。超限返回明确错误，保留已完成产物状态，不偷偷改用其他模型或无界重试。
 
 100 MB / 180 秒 / Python 进程树峰值 RSS 2 GiB 是代表数据的基准目标，不是任意 CSV 形态的保证。基准必须固定字段分布、任务、计时范围和采样方法；并发两个任务另记录总资源。CSV 输入大小不能限制 join 中间结果大小，运行时需监测并明确失败。正式 P6 基准由 `tests/features/performance/large-input-scenario.mjs` 固定生成两个各 50,000,000 bytes 的表（128-byte 定长行，三个月、四地区），通过实际文件选择、pi 工具和内置 Python 完成读取、合并、汇总、绘图和报告交付。计时从 UI 发送到 run 终态，排除生成 fixture/选择文件；每 100 ms 独立采样应用后代 RSS，并记录生产监督器的单工具进程树峰值。30 次 CDP 面板操作的耗时和执行时任务是否仍活跃均留证，程序不检查汇总数值正确性。实际数字见本地阶段结果。
 
@@ -399,6 +399,10 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 - Main 发现和 UtilityProcess 的探测/正式 SDK 请求使用 Electron `net.fetch`，遵循系统代理，禁用 Cookie 和 HTTP 缓存；生产不读取 shell key/proxy。SDK 的工具、上下文、请求序列化和原生会话格式不变。403 明确提示地区/权限受限，区别于 401 Key 鉴权失败。
 - API 依据：[DeepSeek List Models](https://api-docs.deepseek.com/api/list-models)、[OpenRouter Models](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties)、[Electron net](https://www.electronjs.org/docs/latest/api/net)。DeepSeek 的实际 `/models` 响应与 OpenRouter 文档/实测共同验证接口；这些协议资料不代表逐模型产品验收。
 
-## 完整工具日志
+## 超阈值工具日志
 
-日志直接保存在 logs/{sessionId}/{sha256(toolCallId)}/{runId}.log，不建立 SQLite 索引或 sidecar。查看前用活动工具或原生历史确认归属，再有界列举该工具目录（每页 100 条），正文分页 32 KiB；每次执行仍合计最多保存 10 MiB。Main 返回短期日志 ID，读取再次验证归属、根、普通文件和无重定向。没有新布局日志明确提示“未保存可读取的完整日志”；旧布局文件原样保留，不自动迁移或清理。资源峰值仍由执行监督使用，不为 UI 另存日志元数据。
+仅 bash 的累计 stdout/stderr 超过 2 KiB 后按需保存到 `logs/{sessionId}/{sha256(toolCallId)}/{runId}.log`，不建立 SQLite 索引或 sidecar。首次超过阈值时补写此前缓冲，随后按接收顺序追加两个流的原始字节；合计 10 MiB/run 上限继续生效。工具结果中的位置提示只在文件确已写入时给出；额度用尽、日志被截断或写失败时如实提示，不声称全量可用。
+
+Main 仅对 read 当前 session 下符合固定路径结构、canonical 路径未重定向的日志给予受保护路径读取例外；仍受 read 的有界文本读取与其他敏感路径规则约束。其他 session 日志、目录枚举和日志写入/删除继续受保护。该例外从可信 Main 路径派生，重启或下一 run 后可读取仍保留的日志，不持久化能力索引，也不改写旧上下文。禁止把整个 logs 根从 protectedRoots 移除。
+
+Renderer 不再获取日志清单或分页正文；旧 `logs.list/page` IPC、LogService 与 ToolLogViewer 已移除。历史日志原样保留，不主动迁移或清理；删除会话仍按固定 session 日志目录清理并保留 workspace。已发送的历史工具结果及 system/tools/skills 前缀保持原样，新的截断结果作为正常 toolResult 追加。

@@ -37,7 +37,7 @@
 
 Main 与 Agent 不直接导入彼此实现，通过 contracts/私有通道通信。IPC 必须验证参数、发送窗口、主 frame 与可信完整 URL；不能为了修复 dev 问题放宽成任意 localhost/任意 frame。优先查锁定依赖、本地源码和配置，不照抄最新框架模板。
 
-状态默认在 `~/.data_agent/`：`state.sqlite` 存元数据，`sessions/{sessionId}.jsonl` 复用 pi 原生 session tree，`workspace/{sessionId}/` 存本地产物；同一会话所有 run/steer/follow-up 共用该目录，不再分配 run/version 子目录；不维护 output_versions/artifacts 兼容；旧目录只是普通文件目录。删除会话始终保留 workspace。SQLite 仅保留 schema_migrations、app_metadata、sessions、agent_config_revisions、input_submissions、session_sources；完整日志直接读受控磁盘路径，不新增索引/manifest。测试不得使用真实业务目录。新增持久化须有迁移/恢复设计，不能假设数据库与 JSONL/文件系统天然原子提交。
+状态默认在 `~/.data_agent/`：`state.sqlite` 存元数据，`sessions/{sessionId}.jsonl` 复用 pi 原生 session tree，`workspace/{sessionId}/` 存本地产物；同一会话所有 run/steer/follow-up 共用该目录，不再分配 run/version 子目录；不维护 output_versions/artifacts 兼容；旧目录只是普通文件目录。删除会话始终保留 workspace。SQLite 仅保留 schema_migrations、app_metadata、sessions、agent_config_revisions、input_submissions、session_sources；bash 输出超过 2 KiB 才保存日志，同 run 合计最多 10 MiB；位置随工具结果提示 Agent，经受控 read 读取，不提供独立日志 UI/IPC，不新增索引/manifest。测试不得使用真实业务目录。新增持久化须有迁移/恢复设计，不能假设数据库与 JSONL/文件系统天然原子提交。
 
 ## Agent 开发强制规范：上下文只追加，缓存前缀必须稳定
 

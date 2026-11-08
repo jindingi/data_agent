@@ -28,7 +28,6 @@ export async function dispatchCommand(
     interactions,
     automationControl,
     workspaceFiles,
-    logs,
     deletion,
   }: HandlerDependencies,
 ) {
@@ -211,16 +210,6 @@ export async function dispatchCommand(
     case 'sessions.delete':
       reports.closeSession(command.sessionId);
       return success(command.type, await deletion.remove(command.sessionId));
-    case 'logs.list':
-      return success(
-        command.type,
-        await logs.list(command.sessionId, command.toolCallId, command.offset),
-      );
-    case 'logs.page':
-      return success(
-        command.type,
-        await logs.page(command.sessionId, command.logId, command.offset),
-      );
     case 'sessions.list':
       return success(command.type, sessions.list(command.search, command.archived));
     case 'sessions.create': {

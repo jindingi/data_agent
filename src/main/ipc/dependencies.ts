@@ -9,7 +9,6 @@ import type { FilePicker } from '../services/file-picker';
 import type { CredentialService } from '../services/credentials';
 import type { RuntimeService } from '../services/runtime';
 import type { DeletionService } from '../services/deletion';
-import type { LogService } from '../services/logs';
 import type { InteractionBroker } from '../services/interactions';
 export interface HandlerDependencies {
   reports: HtmlReportService;
@@ -30,6 +29,5 @@ export interface HandlerDependencies {
     sessionId?: string,
   ) => number | null;
   workspaceFiles: WorkspaceFileService;
-  logs: LogService;
   deletion: DeletionService;
 }

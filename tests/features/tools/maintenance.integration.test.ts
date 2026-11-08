@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm, symlink, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { getAppPaths, ensureAppPaths, type AppPaths } from '../../../src/node/app-paths';
 import { openDatabase } from '../../../src/main/storage/database';
 import { SessionService } from '../../../src/main/services/sessions';
-import { LogService } from '../../../src/main/services/logs';
-import { toolLogPath } from '../../../src/node/tool-log-path';
-import { dirname } from 'node:path';
 import { readText } from '../../../src/node/read-text';
 
 let root: string, paths: AppPaths, db: ReturnType<typeof openDatabase>, sessions: SessionService;
@@ -29,49 +25,6 @@ beforeEach(async () => {
 afterEach(async () => {
   db.close();
   await rm(root, { recursive: true, force: true });
-});
-
-it('tools.log-storage paginates UTF-8 without loss, enforces session scope, and rejects redirected paths', async () => {
-  const session = sessions.create(),
-    other = sessions.create(),
-    runId = randomUUID(),
-    logs = new LogService(paths.logs, async (id) => id === session.id);
-  const path = toolLogPath(paths.logs, session.id, runId, 'tool');
-  await mkdir(dirname(path), { recursive: true });
-  const content = 'a'.repeat(32767) + '中文\n'.repeat(18000) + 'END_MARKER';
-  await writeFile(path, content);
-  const { logs: rows } = await logs.list(session.id, 'tool');
-  expect(rows).toHaveLength(1);
-  await expect(logs.list(other.id, 'tool')).rejects.toThrow();
-  await expect(logs.page(other.id, rows[0].id, 0)).rejects.toThrow('不属于当前会话');
-  let offset = 0,
-    output = '',
-    pages = 0;
-  while (true) {
-    const page = await logs.page(session.id, rows[0].id, offset);
-    output += page.text;
-    pages++;
-    if (page.nextOffset === null) break;
-    expect(page.nextOffset).toBeGreaterThan(offset);
-    offset = page.nextOffset;
-  }
-  expect(pages).toBeGreaterThan(3);
-  expect(output).toBe(content);
-
-  for (let i = 0; i < 101; i++)
-    await writeFile(toolLogPath(paths.logs, session.id, randomUUID(), 'tool'), 'another');
-  const first = await logs.list(session.id, 'tool');
-  expect(first.logs).toHaveLength(100);
-  expect(first.nextOffset).toBe(100);
-  const second = await logs.list(session.id, 'tool', first.nextOffset!);
-  expect(second.logs).toHaveLength(2);
-  expect(second.nextOffset).toBeNull();
-  expect(new Set([...first.logs, ...second.logs].map((log) => log.runId)).size).toBe(102);
-  await unlink(path);
-  const secret = join(root, 'secret');
-  await writeFile(secret, 'must not expose');
-  await symlink(secret, path);
-  await expect(logs.page(session.id, rows[0].id, 0)).rejects.toThrow('已变更');
 });
 
 it('tools.read-encoding returns explicit tool errors for binary and invalid UTF-8 while allowing ordinary text', async () => {

@@ -16,7 +16,7 @@ tests/
     lifecycle/                  # 并发/FIFO、停止、窗口、崩溃
     models/                     # 设置/BYOK、模型前置检查、真实/重放协议链路
     agent-config/               # 配置修订/迁移、会话绑定、工具禁用、上下文前缀与设置 UI
-    tools/                      # 执行、取消、资源限制、完整日志
+    tools/                      # 执行、取消、资源限制、超阈值日志
     approvals/                  # 路径策略、联网、审批、澄清
     artifacts/                  # 文件交付/另存及跨轮工作区（保留原用例 ID）
     workspace/                  # 按层目录、受控文件操作与浏览 UI
@@ -172,3 +172,7 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 `DATA_AGENT_EVAL_REVIEW=1 pnpm test -- --case reports.live-interactive --live` 生成趋势叙事、分布比较和多图联动报告；使用合成 CSV、真实 DeepSeek 与既有预算，遇到审批写 pending-interactions.json，须逐条审核后通过真实 UI 作答，不自动批准未知命令。检查实际控件/数值变化、重置和离线重开；程序结果与分析准确性 Judge 分开。失败/超时不记通过，生成失败不由测试替写报告。
 
 promptVersion=2 与双 skill 改变了系统提示词，因此 read-tool.deepseek.json 已重新真实录制并审阅；REPORT_SKILL_ROOT 仅归一化第二个冻结资源根路径，完整 prompt/tools/history 匹配不变。录制包含历史 usage，不代表回放计费。Safari 尚无通过记录，不宣称已兼容。
+
+## bash 输出与日志
+
+`pnpm test -- --case tools.log-storage,tools.log-limit,tools.output-logs` 验证真实工具与隐藏 Electron：输出不超过 2048 bytes（含等于）不落盘；超阈值时补写此前内容与 stderr、保留 UTF-8 预览边界，工具结果携带实际日志路径；Agent 用通用 read 读取同会话日志，跨会话/链接重定向/写入拒绝，后续 run 仍可读取已有日志。10 MiB 是同 run 合计额度，部分保存与完全耗尽均如实提示。UI 不存在日志入口或正文，旧 logs IPC 不可用；实际提供方请求追加工具结果且已有前缀保持不变。旧 tools.log-viewer / P6-LOG-UI 别名指向新的 tools.output-logs，不能用历史分页验收宣称当前行为通过。

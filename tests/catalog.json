@@ -340,10 +340,10 @@
     "related": ["composer"]
   },
   {
-    "id": "tools.log-viewer",
+    "id": "tools.output-logs",
     "feature": "tools",
     "level": "e2e",
-    "file": "tests/features/tools/log-viewer.e2e.mjs",
+    "file": "tests/features/tools/output-logs.e2e.mjs",
     "model": "scripted",
     "environment": "built",
     "tags": [],
@@ -613,7 +613,7 @@
     "id": "tools.log-storage",
     "feature": "tools",
     "level": "integration",
-    "file": "tests/features/tools/maintenance.integration.test.ts",
+    "file": "tests/features/tools/tools.integration.test.ts",
     "model": "none",
     "environment": "electron-node",
     "tags": [],

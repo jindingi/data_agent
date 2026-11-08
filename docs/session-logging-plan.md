@@ -1,6 +1,8 @@
 # Session 追加日志设计
 
-状态：设计待实施。2026-11-07，日志行为依据已提交版本 `808adb8` 的实现和锁定的 pi 1.5.0 类型核对；身份约定已对齐 main 已完成的 run 统一改造（`927bf9a`）。本次仅修改文档，未实现或验收下述行为。当前工具日志布局见 [技术设计](technical-design.md)，当前持久化身份与恢复规则见 [SQLite 表设计与状态机](sqlite-design.md)；既有验收记录保留于 Git 与本地 test-results。
+状态：**历史候选设计，当前不实施。** 2026-11-08 用户已明确改为 bash 超过 2 KiB 才保存输出、保留 10 MiB/run 上限、仅向 Agent 提供路径且 UI 不展示日志。本文的 session 事件日志与 UI 分页方案未获本次实施范围采纳；当前行为以 [技术设计](technical-design.md) 为准。
+
+原方案状态：设计待实施。2026-11-07，日志行为依据已提交版本 `808adb8` 的实现和锁定的 pi 1.5.0 类型核对；身份约定已对齐 main 已完成的 run 统一改造（`927bf9a`）。本次仅修改文档，未实现或验收下述行为。当前工具日志布局见 [技术设计](technical-design.md)，当前持久化身份与恢复规则见 [SQLite 表设计与状态机](sqlite-design.md)；既有验收记录保留于 Git 与本地 test-results。
 
 ## 1. 决策与边界
 
@@ -21,7 +23,7 @@
 
 锁定依赖的 `AgentEvent` 中，`message_update` 同时携带当前消息和局部事件，`tool_execution_update` 携带 `partialResult`，并不承诺后者是增量。本项目 `ProcessRunner` 每次回调传累计输出，工具代理将其包装成 `partialResult`。因此直接保存 update 会重复写入越来越长的前缀，而不是线性保存新增字节。
 
-当前 ProcessRunner 提供给模型/UI 的输出上限为 60 KiB；只记录 pi 更新无法保留超过该上限的进程输出。`message_end`、`turn_end`、`agent_end` 又包含已有消息/结果，原样打印会重复原生历史。审批、Main/Host 崩溃和进程退出等信息也不全属于 pi 事件。
+设计时 ProcessRunner 提供给模型/UI 的输出上限为 60 KiB；只记录 pi 更新无法保留超过该上限的进程输出。`message_end`、`turn_end`、`agent_end` 又包含已有消息/结果，原样打印会重复原生历史。审批、Main/Host 崩溃和进程退出等信息也不全属于 pi 事件。
 
 所以日志使用统一封套，由三种来源写入：pi 的生命周期摘要、Main 的执行事件、监督器的输出增量。pi 升级只修改白名单适配器，不能自动扩大落盘字段。
 

@@ -2,17 +2,14 @@ import { Brain, ChevronDown, Terminal } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { MessageView, ToolView } from '../../../shared/runtime';
 import { PagedText } from './PagedText';
-import { ToolLogViewer } from './ToolLogViewer';
 
 export function ExecutionProcess({
-  sessionId,
   messages,
   tools,
   results,
   active,
   onInspect,
 }: {
-  sessionId: string;
   messages: MessageView[];
   tools: Map<string, ToolView>;
   results: Map<string | undefined, MessageView>;
@@ -124,9 +121,6 @@ export function ExecutionProcess({
                 >
                   {(part) => <pre>{part}</pre>}
                 </PagedText>
-                {['bash', 'grep', 'find'].includes(block.name) && (
-                  <ToolLogViewer sessionId={sessionId} toolCallId={block.id} />
-                )}
               </div>
             </details>
           );

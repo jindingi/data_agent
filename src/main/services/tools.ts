@@ -3,6 +3,8 @@ import { PolicyService, digest, type PolicyContext } from './policy';
 import { InteractionBroker } from './interactions';
 import { ProcessRunner } from '../../node/process-runner';
 import { requireRuntime, type RuntimePaths } from '../../node/runtime-paths';
+import { logReadAccess } from '../../node/tool-log-path';
+import { realpathSync } from 'node:fs';
 import type { ToolOperation, ToolResult, Interaction } from '../../shared/tools';
 
 export interface ToolContext extends PolicyContext {
@@ -24,6 +26,7 @@ export class ToolService {
   private tails = new Map<string, Promise<unknown>>();
   private closed = new Set<string>();
   private operations: ToolOperations;
+  private logScope: { root: string; canonicalRoot: string };
   readonly policy: PolicyService;
   readonly processes: ProcessRunner;
   constructor(
@@ -31,6 +34,7 @@ export class ToolService {
     logs: string,
     readonly broker: InteractionBroker,
   ) {
+    this.logScope = { root: logs, canonicalRoot: realpathSync(logs) };
     this.policy = new PolicyService(resources);
     this.processes = new ProcessRunner(resources, logs);
     this.operations = new ToolOperations(resources, this.processes);
@@ -71,7 +75,19 @@ export class ToolService {
               isError: answer.kind !== 'clarification' || answer.answer === null,
             };
           }
-          const decision = await this.policy.inspect(context, operation);
+          const logAccess =
+            operation.name === 'read'
+              ? await logReadAccess(
+                  { ...this.logScope, sessionId: context.sessionId },
+                  operation.path,
+                  context.workingDirectory ?? context.workspace,
+                  context.protectedRoots,
+                )
+              : undefined;
+          const executionContext = logAccess
+            ? { ...context, protectedRoots: logAccess.protectedRoots }
+            : context;
+          const decision = await this.policy.inspect(executionContext, operation);
           if (decision.decision === 'deny') throw new Error(decision.reasons.join('；'));
           const binding = digest({
             sessionId: context.sessionId,
@@ -111,11 +127,13 @@ export class ToolService {
               throw new Error('用户拒绝了这一次操作，未执行');
           }
           item.abort.signal.throwIfAborted();
-          const checked = await this.policy.inspect(context, operation);
+          const checked = await this.policy.inspect(executionContext, operation);
+          if (logAccess?.expectedPath && checked.paths[0]?.path !== logAccess.expectedPath)
+            throw new Error('日志路径已变化，请重新调用工具');
           if (checked.fingerprint !== decision.fingerprint || checked.decision === 'deny')
             throw new Error('操作路径、脚本或规则结果已变化，原批准已失效，请重新调用工具');
           return await this.operations.execute(
-            context,
+            executionContext,
             toolCallId,
             operation,
             item.abort.signal,

@@ -29,6 +29,7 @@ export class ToolOperations {
         context.protectedRoots,
         { ...operation, path: checkedPath! },
         signal,
+        checkedPath,
       );
       return { ...result, isError: false };
     }
@@ -46,6 +47,7 @@ export class ToolOperations {
         timeoutSeconds: operation.timeout,
         signal,
         onOutput: observers.output,
+        saveOverflowLog: true,
       });
       return {
         output:

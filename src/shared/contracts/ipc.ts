@@ -16,7 +16,7 @@ import {
 import { interactionAnswerSchema } from '../tools';
 import type { SessionRecord, SessionDetail, SelectedFile } from '../models';
 import type { ModelSettings } from '../runtime';
-import type { DeletionPreview, DeletionResult, ToolLogListing, LogPage } from '../maintenance';
+import type { DeletionPreview, DeletionResult } from '../maintenance';
 
 const base = { requestId: z.string().uuid() };
 export const commandSchema = z.discriminatedUnion('type', [
@@ -215,28 +215,6 @@ export const commandSchema = z.discriminatedUnion('type', [
       sessionId: z.string().uuid(),
     })
     .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('logs.list'),
-      offset: z.number().int().min(0).max(100000).optional(),
-      sessionId: z.string().uuid(),
-      toolCallId: z.string().min(1).max(4096),
-    })
-    .strict(),
-  z
-    .object({
-      ...base,
-      type: z.literal('logs.page'),
-      sessionId: z.string().uuid(),
-      logId: z.string().uuid(),
-      offset: z
-        .number()
-        .int()
-        .min(0)
-        .max(10 * 1024 * 1024),
-    })
-    .strict(),
   z.object({ ...base, type: z.literal('sessions.open'), sessionId: z.string().uuid() }).strict(),
   z
     .object({
@@ -329,8 +307,6 @@ export interface CommandResponses {
   'sessions.delete': DeletionResult;
   'workspace.open': null;
   'link.open': null;
-  'logs.list': ToolLogListing;
-  'logs.page': LogPage;
 }
 export type CommandResponse<C extends CommandInput> = CommandResponses[C['type']];
 export interface DesktopAPI {

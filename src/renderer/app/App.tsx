@@ -185,7 +185,6 @@ export function App() {
             {history.length ? (
               <Transcript
                 key={sessions.selected}
-                sessionId={sessions.selected!}
                 messages={history}
                 tools={runtime.snapshot?.tools ?? []}
                 turnUsage={runtime.snapshot?.turnUsage ?? []}

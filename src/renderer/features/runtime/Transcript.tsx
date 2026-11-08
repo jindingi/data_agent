@@ -52,13 +52,11 @@ export function Markdown({ text, pending = false }: { text: string; pending?: bo
   );
 }
 export function Transcript({
-  sessionId,
   messages,
   tools,
   active = false,
   turnUsage = [],
 }: {
-  sessionId: string;
   messages: MessageView[];
   tools: ToolView[];
   active?: boolean;
@@ -138,7 +136,6 @@ export function Transcript({
             <div className="transcript-turn" key={turn.id} data-turn-id={turn.id}>
               {turn.user && <MessageContent message={turn.user} />}
               <ExecutionProcess
-                sessionId={sessionId}
                 messages={turn.replies}
                 tools={toolMap}
                 results={results}
