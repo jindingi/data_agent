@@ -365,6 +365,8 @@ IPC 入口为 main/ipc/handlers.ts，仅负责来源/命令校验与错误映射
 
 Renderer 的 `features/composer` 拥有每个会话及首页的草稿，存于当前 Electron userData 的 localStorage（`composer-drafts-v1`，Zod 校验）；文本、路径元数据、工作区选择可恢复，不含 key、不复制 CSV、不创建正式 sessions。输入框只显示待提交附件。文本 revision 与附件 token 用于接收时精确清除，期间新增内容不丢失。删除会话成功后同时移除该会话的本地未提交草稿，首页及其他会话草稿保留。
 
+`features/sessions` 的 `selected-session` 仅是 Electron userData 中的界面恢复提示，不能视为 SQLite 中会话存在的证明。`sessions.open` 返回 `SESSION_NOT_FOUND` 时，只在请求票据和当前选择仍匹配时清除该缓存及详情，回到已有首页草稿；其他错误继续正常展示。运行状态和工作区查询使用成功打开后的会话 ID，避免恢复期间向已删除会话发起并行请求。不根据搜索或归档筛选后的侧栏列表判定会话失效；Main 保持缺失会话的结构化错误。`sessions.selection-recovery` 覆盖保留 userData、删除隔离业务目录后的重启、归档会话恢复及首页草稿保留。
+
 `files.choose/files.inspect/workspace.choose` 只选择/校验。`conversation.submit` 先校验模型、凭证、原路径和合计大小，再创建会话并进入现有 RuntimeService/pi 队列。原 `sessions.create` 保留给存储恢复与集成 fixture，产品“新会话”不再调用它。首次接收用首个 inputId 作为 session ID，标题取问题前 48 字。
 
 input_submissions 的 inputId + digest 保证提交幂等，相同请求返回接收结果、不同内容拒绝。sessions.creation_pending 替代创建意图表。首次创建失败或重启仅回收未接收的空目录（rmdir，不递归删除未知文件）；已有执行只清标记。投递身份、待确认正文/路径和来源保护在同一 SQL 事务写入；不把 SQLite 与文件系统/JSONL 伪装成同一事务。

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionDetail, SessionRecord } from '../../../shared/models';
+import { AppError } from '../../../shared/errors';
 import { request } from '../../lib/desktop';
 
 export function useSessions(search: string, archived: boolean, onError: (message: string) => void) {
@@ -31,8 +32,15 @@ export function useSessions(search: string, archived: boolean, onError: (message
         const value = await request({ type: 'sessions.open', sessionId: id });
         if (epoch === detailEpoch.current && selectedRef.current === id) setDetail(value);
       } catch (error) {
-        if (epoch === detailEpoch.current)
-          onError(error instanceof Error ? error.message : '无法打开会话');
+        if (epoch !== detailEpoch.current || selectedRef.current !== id) return;
+        if (error instanceof AppError && error.code === 'SESSION_NOT_FOUND') {
+          selectedRef.current = null;
+          setSelected(null);
+          setDetail(null);
+          localStorage.removeItem('selected-session');
+          return;
+        }
+        onError(error instanceof Error ? error.message : '无法打开会话');
       }
     },
     [onError],

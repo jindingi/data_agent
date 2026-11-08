@@ -61,9 +61,9 @@ export function App() {
   );
   const draft = composer.draft.text;
   const setDraft = composer.setText;
-  const runtime = useRuntime(sessions.selected, setError);
-  const active = runtime.snapshot ? isActive(runtime.snapshot.state) : false;
   const current = sessions.detail?.session;
+  const runtime = useRuntime(current?.id ?? null, setError);
+  const active = runtime.snapshot ? isActive(runtime.snapshot.state) : false;
   const canSend =
     Boolean(draft.trim()) &&
     !composer.sending &&
@@ -242,7 +242,7 @@ export function App() {
         <WorkspacePanel
           key={sessions.selected ?? 'home'}
           hidden={!panel}
-          sessionId={sessions.selected}
+          sessionId={current?.id ?? null}
           close={() => {
             setPanel(false);
             requestAnimationFrame(() =>

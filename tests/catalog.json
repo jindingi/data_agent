@@ -170,6 +170,16 @@
     "related": ["composer"]
   },
   {
+    "id": "sessions.selection-recovery",
+    "feature": "sessions",
+    "level": "e2e",
+    "file": "tests/features/sessions/selection-recovery.e2e.mjs",
+    "model": "none",
+    "environment": "built",
+    "tags": ["smoke"],
+    "related": ["composer"]
+  },
+  {
     "id": "composer.input-references",
     "feature": "composer",
     "level": "e2e",
