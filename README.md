@@ -6,7 +6,15 @@
 
 ## 安装与使用
 
-支持 macOS（Apple Silicon）。目前可从源码构建，步骤见下文。打开生成的 DMG，将 `Data Agent.app` 拖入“应用程序”即可，使用时无需安装 Node.js、Python 或分析库。
+支持 macOS（Apple Silicon）。从 [GitHub Releases](https://github.com/jindingi/data_agent/releases/latest) 下载 DMG，将 `Data Agent.app` 拖入“应用程序”即可，使用时无需安装 Node.js、Python 或分析库。也可按下文从源码构建。
+
+当前版本尚未签名和公证。如果首次打开提示“已损坏”，确认安装包来自本仓库且 SHA-256 与 Release 中一致后，可在终端执行，再重新打开应用：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Data Agent.app"
+```
+
+这仅移除该应用的下载隔离标记，不会修复签名或完成公证。
 
 首次打开即可预览两个由 DeepSeek Flash 实际生成的 Netflix 分析示例：一份 Markdown 报告和一份可筛选的交互式 HTML 报告，无需配置 AI。数据、分析脚本和对话历史随应用提供；示例可继续对话、重命名或删除。数据来自 [Shivam Bansal 的 Kaggle 数据集](https://www.kaggle.com/datasets/shivamb/netflix-shows/data)。
 
