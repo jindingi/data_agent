@@ -1,3 +1,4 @@
+import type { CompatibleModel } from '../../shared/compatible-models';
 import type { AgentConfigService } from './agent-config';
 import type { AgentBinding } from '../../shared/agent-config';
 import { skillResourcePath } from '../../node/skill-resource-path';
@@ -49,6 +50,7 @@ interface Task {
   snapshot: RuntimeSnapshot;
   input: RunInput;
   model: ModelChoice;
+  compatibleModel?: CompatibleModel;
   apiKey?: string;
   baseUrl?: string;
   host?: RuntimeHost;
@@ -289,6 +291,7 @@ export class RuntimeService {
     const apiKey = this.credentials.key(model.provider);
     const thinkingLevel = this.credentials.thinking(model);
     const baseUrl = this.credentials.endpoint(model.provider);
+    const compatibleModel = this.credentials.compatibleModel(model);
     this.sessions.reconcile(sessionId);
     const session = this.sessions.get(sessionId);
     if (session.archived || !['draft', 'persisted'].includes(session.state))
@@ -325,6 +328,7 @@ export class RuntimeService {
       model,
       apiKey,
       baseUrl,
+      compatibleModel,
       starting: false,
       snapshot: {
         schemaVersion: 1,
@@ -524,6 +528,7 @@ export class RuntimeService {
           workspace: session.workspace,
           piSessionId: session.piSessionId,
           model: task.model,
+          compatibleModel: task.compatibleModel,
           thinkingLevel: task.thinkingLevel,
           apiKey,
           skillsDirectory: this.skillsDirectory,

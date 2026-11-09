@@ -13,6 +13,7 @@ export async function selectModel(page, model) {
   await page.getByRole('button', { name: '选择模型', exact: true }).click();
   await page.getByRole('combobox', { name: '搜索模型', exact: true }).fill(model);
   await page
+    .locator('.model-picker-popover')
     .getByRole('option')
     .filter({ has: page.getByText(model, { exact: true }) })
     .click();

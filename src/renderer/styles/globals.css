@@ -653,6 +653,15 @@ summary:focus-visible {
   padding: 5px;
   margin-right: 8px;
 }
+.settings-section .compatible-model-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-section .compatible-model-toggle input {
+  width: auto;
+  margin: 0;
+}
 .model-picker {
   margin: 14px 0;
 }

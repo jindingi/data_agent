@@ -1378,5 +1378,75 @@
     "environment": "electron-node",
     "tags": [],
     "related": ["reports", "tools"]
+  },
+  {
+    "id": "models.compatible-protocols",
+    "feature": "models",
+    "level": "unit",
+    "file": "tests/features/models/compatible.unit.test.ts",
+    "model": "scripted",
+    "environment": "node",
+    "tags": [],
+    "related": ["conversation", "usage"]
+  },
+  {
+    "id": "models.compatible-store",
+    "feature": "models",
+    "level": "integration",
+    "file": "tests/features/models/compatible-store.integration.test.ts",
+    "model": "none",
+    "environment": "electron-node",
+    "tags": [],
+    "related": ["conversation"]
+  },
+  {
+    "id": "models.compatible-ui",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/compatible.e2e.mjs",
+    "model": "scripted",
+    "environment": "built",
+    "tags": [],
+    "related": ["conversation", "usage"]
+  },
+  {
+    "id": "models.live-compatible-chat-deepseek",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/compatible-live.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.live-compatible-responses-deepseek",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/compatible-live.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.live-compatible-chat-openrouter",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/compatible-live.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
+  },
+  {
+    "id": "models.live-compatible-responses-openrouter",
+    "feature": "models",
+    "level": "e2e",
+    "file": "tests/features/models/compatible-live.e2e.mjs",
+    "model": "live",
+    "environment": "built",
+    "tags": [],
+    "related": []
   }
 ]

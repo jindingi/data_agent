@@ -1,3 +1,4 @@
+import { compatibleModelSchema } from '../compatible-models';
 import { agentBindingSchema } from '../agent-config';
 import { z } from 'zod';
 import { turnUsageSchema } from '../usage';
@@ -19,6 +20,7 @@ const runtimeConfigSchema = z
     workspace: z.string().min(1),
     piSessionId: z.string().nullable(),
     model: modelChoiceSchema,
+    compatibleModel: compatibleModelSchema.optional(),
     thinkingLevel: thinkingLevelSchema.optional(),
     apiKey: z.string().min(1).max(4096),
     protectedRoots: z.array(z.string()),
@@ -63,6 +65,7 @@ export const hostRequestSchema = z.discriminatedUnion('type', [
       id,
       type: z.literal('models.test'),
       model: modelChoiceSchema,
+      compatibleModel: compatibleModelSchema.optional(),
       apiKey: z.string().min(1).max(4096),
       baseUrl: z.string().url().optional(),
     })
@@ -128,6 +131,8 @@ export const hostResponseSchema = z.discriminatedUnion('type', [
           thinkingLevels: z.array(thinkingLevelSchema),
           baseUrl: z.string().optional(),
           api: z.string().optional(),
+          contextWindow: z.number().optional(),
+          maxTokens: z.number().optional(),
         }),
       ),
     })

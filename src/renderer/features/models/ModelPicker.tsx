@@ -8,11 +8,13 @@ import { Button } from '../../components/ui/button';
 /** One model control: selection stays unchanged until an option is chosen. */
 export function ModelPicker({
   models,
+  label = '选择模型',
   selected,
   disabled,
   onSelect,
 }: {
   models: ModelOption[];
+  label?: string;
   selected?: ModelOption;
   disabled: boolean;
   onSelect: (model: ModelOption) => Promise<unknown>;
@@ -37,7 +39,7 @@ export function ModelPicker({
           <Button
             variant="outline"
             className="model-picker-trigger"
-            aria-label="选择模型"
+            aria-label={label}
             aria-description={selected ? `当前模型：${selected.name}` : '尚未选择模型'}
             disabled={disabled}
           >

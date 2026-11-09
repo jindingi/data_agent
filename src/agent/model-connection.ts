@@ -1,12 +1,14 @@
 import { AppError } from '../shared/errors';
 import type { ModelChoice } from '../shared/runtime';
-import { normalizeEndpoint } from '../shared/model-configuration';
+import { resolveRuntimeModel } from './compatible-models';
+import type { CompatibleModel } from '../shared/compatible-models';
 import { createModelRuntime } from './models';
 
 /** One bounded, isolated SDK request. No conversation, tools, files, or persisted response. */
 export async function testModelConnection(
   config: {
     model: ModelChoice;
+    compatibleModel?: CompatibleModel;
     apiKey: string;
     baseUrl?: string;
   },
@@ -19,12 +21,12 @@ export async function testModelConnection(
   let status: number | undefined;
   try {
     const runtime = await createModelRuntime();
-    if (config.baseUrl)
-      runtime.registerProvider(config.model.provider, {
-        baseUrl: normalizeEndpoint(config.baseUrl),
-      });
-    const model = runtime.getModel(config.model.provider, config.model.model);
-    if (!model) throw new AppError('UNKNOWN_MODEL', '所选模型不在内置模型列表中');
+    const model = resolveRuntimeModel(
+      runtime,
+      config.model,
+      config.baseUrl,
+      config.compatibleModel,
+    );
     await runtime.setRuntimeApiKey(model.provider, config.apiKey);
     const stream = runtime.streamSimple(
       model,

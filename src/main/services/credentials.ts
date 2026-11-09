@@ -1,3 +1,9 @@
+import {
+  compatibleConfigSchema,
+  compatibleModelOption,
+  type CompatibleModel,
+} from '../../shared/compatible-models';
+import { isCompatibleProvider } from '../../shared/providers';
 import { PROVIDERS, providerDefinition } from '../../shared/providers';
 import { discoverModelIds } from './model-discovery';
 import type Database from 'better-sqlite3';
@@ -65,7 +71,22 @@ export class CredentialService {
     }
   }
   settings(): ModelSettings {
+    const compatibleModels: Record<string, CompatibleModel[]> = {};
+    const compatibleErrors: Record<string, string> = {};
+    for (const { id } of PROVIDERS.filter((p) => isCompatibleProvider(p.id))) {
+      try {
+        compatibleModels[id] = this.compatibleDefinitions(id);
+      } catch {
+        compatibleErrors[id] = '兼容模型配置损坏或版本不受支持，请重新保存模型配置';
+      }
+    }
     return {
+      compatibleModels,
+      compatibleErrors,
+      discoveredIds: Object.fromEntries(
+        PROVIDERS.map(({ id }) => [id, this.catalog(id)?.ids ?? []]),
+      ),
+      modelTemplates: this.models,
       thinkingLevel: this.thinking(),
       endpoints: Object.fromEntries(PROVIDERS.map(({ id }) => [id, this.endpoint(id) ?? ''])),
       selected: this.selected(),
@@ -79,7 +100,9 @@ export class CredentialService {
                   id,
                   {
                     fetchedAt: cache.fetchedAt,
-                    count: this.availableModels().filter((m) => m.provider === id).length,
+                    count: isCompatibleProvider(id)
+                      ? cache.ids.length
+                      : this.availableModels().filter((m) => m.provider === id).length,
                   },
                 ],
               ]
@@ -93,9 +116,52 @@ export class CredentialService {
       encryptionAvailable: this.encryption.isEncryptionAvailable(),
     };
   }
+  compatibleDefinitions(provider: string): CompatibleModel[] {
+    if (!isCompatibleProvider(provider)) return [];
+    const raw = this.get(`compatibleConfig.${provider}`);
+    if (!raw) return [];
+    try {
+      return compatibleConfigSchema.parse(JSON.parse(raw)).models;
+    } catch {
+      throw new AppError(
+        'INVALID_MODEL_CONFIG',
+        '兼容模型配置损坏或版本不受支持，请重新保存模型配置',
+      );
+    }
+  }
+  compatibleModel(model: ModelChoice) {
+    return this.compatibleDefinitions(model.provider).find((item) => item.model === model.model);
+  }
+  saveCompatible(provider: string, models: CompatibleModel[]) {
+    if (!isCompatibleProvider(provider))
+      throw new AppError('UNKNOWN_PROVIDER', '仅兼容提供方支持自定义模型');
+    const config = compatibleConfigSchema.parse({ schemaVersion: 1, models });
+    this.db.transaction(() => {
+      this.set(`compatibleConfig.${provider}`, JSON.stringify(config));
+      this.set(
+        `connectionRevision.${provider}`,
+        String(Number(this.get(`connectionRevision.${provider}`) ?? 0) + 1),
+      );
+    })();
+    return this.settings();
+  }
+  private configuredModels(): ModelOption[] {
+    return PROVIDERS.flatMap(({ id }) => {
+      if (!isCompatibleProvider(id)) return this.models.filter((m) => m.provider === id);
+      try {
+        return this.compatibleDefinitions(id).map((m) => compatibleModelOption(id, m));
+      } catch {
+        return [];
+      }
+    });
+  }
   validate(model: ModelChoice) {
-    if (!this.models.some((item) => item.provider === model.provider && item.model === model.model))
-      throw new AppError('UNKNOWN_MODEL', '所选模型不受当前 SDK 支持');
+    if (
+      !this.configuredModels().some(
+        (item) => item.provider === model.provider && item.model === model.model,
+      )
+    )
+      throw new AppError('UNKNOWN_MODEL', '请先配置所选模型的能力');
     if (!this.get(`credential.${model.provider}`))
       throw new AppError('MISSING_KEY', '请在设置中配置所选模型提供方的 API key');
     if (
@@ -104,7 +170,7 @@ export class CredentialService {
       throw new AppError('MODEL_LIST_REQUIRED', '请先获取模型列表并选择可用模型');
   }
   thinking(model = this.selected()): ThinkingLevel {
-    const levels = this.models.find(
+    const levels = this.configuredModels().find(
       (item) => item.provider === model.provider && item.model === model.model,
     )?.thinkingLevels ?? ['off'];
     const saved = this.get(`thinking.${model.provider}/${model.model}`) as
@@ -112,7 +178,7 @@ export class CredentialService {
     return saved && levels.includes(saved)
       ? saved
       : recommendedThinking(
-          this.models.find(
+          this.configuredModels().find(
             (item) => item.provider === model.provider && item.model === model.model,
           ),
         );
@@ -121,7 +187,7 @@ export class CredentialService {
     const model = this.selected();
     this.validate(model);
     if (
-      !this.models
+      !this.configuredModels()
         .find((item) => item.provider === model.provider && item.model === model.model)!
         .thinkingLevels.includes(level)
     )
@@ -188,7 +254,11 @@ export class CredentialService {
   }
   private availableModels() {
     const ids = new Map(PROVIDERS.map((p) => [p.id as string, new Set(this.catalog(p.id)?.ids)]));
-    return this.models.filter((m) => ids.get(m.provider)?.has(m.model));
+    return this.configuredModels().filter((m) =>
+      isCompatibleProvider(m.provider)
+        ? !!this.get(`credential.${m.provider}`)
+        : ids.get(m.provider)?.has(m.model),
+    );
   }
   async discover(provider: string, testBaseUrl?: string, fetcher?: typeof fetch) {
     const definition = providerDefinition(provider);

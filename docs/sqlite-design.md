@@ -1,6 +1,6 @@
 # SQLite 表设计与状态机
 
-本文按当前迁移源码描述实现，更新于 2026-11-08，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)，表结构来源为 [database.ts](../src/main/storage/database.ts) 和 [simplify.ts](../src/main/storage/simplify.ts)。
+本文按当前迁移源码描述实现，更新于 2026-11-09，数据库 schema 版本为 **12**。架构入口见 [技术设计](technical-design.md)，表结构来源为 [database.ts](../src/main/storage/database.ts) 和 [simplify.ts](../src/main/storage/simplify.ts)。
 
 ## 1. 数据边界与身份
 
@@ -125,7 +125,11 @@ SQL 允许配置引用与遗留覆盖字段均为空；应用只通过 agent_con
 | connectionRevision.{provider} | 数字的字符串表示；连接变化时递增，拒绝过期模型发现结果                   |
 | catalog.{provider}            | `{ids, fetchedAt}` JSON，远端模型目录缓存；使用时再与 SDK 支持目录取交集 |
 
-当前 provider 仅 DeepSeek/OpenRouter。连接变化使目录缓存失效。Main 解密凭证，Renderer 只获取是否已配置等信息。此表不是全部 UI 偏好的统一存储，也不保存每个会话的永久模型历史。
+兼容 provider 为 `openai-chat-compatible` 和 `openai-responses-compatible`，与 DeepSeek/OpenRouter 共同使用上述 provider 级键。新增 `compatibleConfig.{provider}` 保存严格 `{schemaVersion:1, models:[...]}` 非秘密 JSON：模型 ID、显示名、上下文/输出限制、reasoning/vision 和受控服务 profile。固定协议由可信 provider 定义派生，不持久化用户任意 API 或请求头。每 provider 最多 100 个模型，ID 唯一。损坏/更高版本配置保留并在设置中报错，禁止使用；用户可显式重新保存恢复，不能静默忽略并套用默认模型。模型定义更新递增对应 connectionRevision，拒绝过期发现结果；手动模型与发现缓存分别保存，刷新目录不删除手动配置。
+
+以上只新增 app_metadata 键，不改变表结构或迁移版本；旧库缺键视为未配置，升级保留原有连接与历史。兼容模型配置单事务保存，连接/密钥仍使用已有事务；不将 SQLite 与 JSONL 视为原子提交。兼容会话另在 pi 原生 custom entry `data_agent.compatible_model` 保存首次模型定义绑定（不含 Key，不进入模型上下文）；新执行校验后继续，定义变化拒绝运行且不重写旧记录。
+
+当前 provider 包含上述四项。连接变化使目录缓存失效。Main 解密凭证，Renderer 只获取是否已配置等信息。此表不是全部 UI 偏好的统一存储，也不保存每个会话的永久模型历史。
 
 ### 2.6 schema_migrations
 

@@ -29,6 +29,8 @@ export function modelCatalog(runtime: ModelRuntime): ModelOption[] {
       thinkingLevels: getSupportedThinkingLevels(model),
       baseUrl: model.baseUrl,
       api: model.api,
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
       verified: model.provider === 'deepseek' && model.id === 'deepseek-flash',
     }))
     .sort((a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name));

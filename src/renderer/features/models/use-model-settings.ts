@@ -6,7 +6,12 @@ type Change = Extract<
   CommandInput,
   {
     type:
-      'models.select' | 'models.thinking' | 'models.key' | 'models.connection' | 'models.discover';
+      | 'models.select'
+      | 'models.thinking'
+      | 'models.key'
+      | 'models.connection'
+      | 'models.discover'
+      | 'models.compatible';
   }
 >;
 /** One owner for both the composer and settings dialog; changes are serialized. */

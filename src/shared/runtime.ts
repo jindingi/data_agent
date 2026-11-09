@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CompatibleModel } from './compatible-models';
 import { turnUsageSchema } from './usage';
 import { interactionSchema } from './tools';
 
@@ -24,6 +25,8 @@ export interface ModelOption extends ModelChoice {
   thinkingLevels: ThinkingLevel[];
   baseUrl?: string;
   api?: string;
+  contextWindow?: number;
+  maxTokens?: number;
 }
 export interface ModelSettings {
   thinkingLevel: ThinkingLevel;
@@ -33,6 +36,10 @@ export interface ModelSettings {
   catalogs: Record<string, { fetchedAt: string; count: number }>;
   endpoints: Record<string, string>;
   encryptionAvailable: boolean;
+  compatibleModels: Record<string, CompatibleModel[]>;
+  compatibleErrors: Record<string, string>;
+  modelTemplates: ModelOption[];
+  discoveredIds: Record<string, string[]>;
 }
 export const DEFAULT_MODEL: ModelChoice = { provider: 'deepseek', model: 'deepseek-flash' };
 export const inputSchema = z

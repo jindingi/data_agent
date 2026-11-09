@@ -48,7 +48,7 @@ export const cases = {
           .getByLabel('连接提供方', { exact: true })
           .locator('option')
           .evaluateAll((nodes) => nodes.map((n) => n.value)),
-        ['deepseek', 'openrouter'],
+        ['deepseek', 'openrouter', 'openai-chat-compatible', 'openai-responses-compatible'],
       );
       assert(!initial.models.some((m) => m.model === 'unknown-new-model'));
       fixture.setListingStatus(401);

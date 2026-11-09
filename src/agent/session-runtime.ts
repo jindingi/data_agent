@@ -1,3 +1,4 @@
+import { bindCompatibleHistory } from './compatible-history';
 import {
   composeAgentPrompt,
   defaultAgentConfig,
@@ -27,6 +28,8 @@ import { AppError } from '../shared/errors';
 import { inspectSessionFile } from '../node/session-integrity';
 import { createWorkbenchSession } from './workbench-session';
 import { createModelRuntime } from './models';
+import { resolveRuntimeModel } from './compatible-models';
+import type { CompatibleModel } from '../shared/compatible-models';
 import { InputIdentity, trustedExtension, inputId, messageText } from './input-identity';
 import { EventAdapter } from './event-adapter';
 import { readTool } from './tools/read';
@@ -44,6 +47,7 @@ export interface RuntimeConfig {
   workspace: string;
   piSessionId: string | null;
   model: ModelChoice;
+  compatibleModel?: CompatibleModel;
   thinkingLevel?: ThinkingLevel;
   apiKey: string;
   testBaseUrl?: string;
@@ -85,16 +89,17 @@ export class SessionRuntime {
   ) {
     if (!config.apiKey.trim()) throw new AppError('MISSING_KEY', '请先配置所选提供方的 API key');
     const runtime = dependencies?.runtime ?? (await createModelRuntime());
-    if (config.baseUrl)
-      runtime.registerProvider(config.model.provider, { baseUrl: config.baseUrl });
     if (config.testBaseUrl) {
       const url = new URL(config.testBaseUrl);
       if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password)
         throw new Error('Invalid test model endpoint');
-      runtime.registerProvider(config.model.provider, { baseUrl: config.testBaseUrl });
     }
-    const model = runtime.getModel(config.model.provider, config.model.model);
-    if (!model) throw new AppError('UNKNOWN_MODEL', '所选模型不在内置模型列表中');
+    const model = resolveRuntimeModel(
+      runtime,
+      config.model,
+      config.testBaseUrl ?? config.baseUrl,
+      config.compatibleModel,
+    );
     await runtime.setRuntimeApiKey(model.provider, config.apiKey);
     const integrity = inspectSessionFile(
       config.file,
@@ -106,6 +111,7 @@ export class SessionRuntime {
     const instance = new SessionRuntime(publish);
     instance.outputDirectory = config.workspace;
     instance.manager = SessionManager.open(config.file, dirname(config.file), config.workspace);
+    bindCompatibleHistory(instance.manager, model, config.compatibleModel);
     instance.identity = new InputIdentity(instance.manager);
     instance.turnUsage = new TurnUsageLedger(instance.manager);
     instance.adapter = new EventAdapter(config, instance.identity);

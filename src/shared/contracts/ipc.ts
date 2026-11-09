@@ -1,3 +1,5 @@
+import { compatibleModelSchema } from '../compatible-models';
+import { PROVIDERS, compatibleProviderSchema } from '../providers';
 import type { ExampleStatus } from '../examples';
 import type { HtmlReportState } from '../html-report';
 import type { WorkspaceEntry, WorkspaceListing, WorkspacePreview } from '../workspace';
@@ -140,7 +142,7 @@ export const commandSchema = z.discriminatedUnion('type', [
     .object({
       ...base,
       type: z.literal('models.discover'),
-      provider: z.enum(['deepseek', 'openrouter']),
+      provider: z.enum(PROVIDERS.map((p) => p.id)),
     })
     .strict(),
   z
@@ -150,6 +152,14 @@ export const commandSchema = z.discriminatedUnion('type', [
       provider: z.string().min(1).max(100),
       baseUrl: z.string().max(2048),
       key: z.string().trim().min(1).max(4096).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      type: z.literal('models.compatible'),
+      provider: compatibleProviderSchema,
+      models: z.array(compatibleModelSchema).max(100),
     })
     .strict(),
   z.object({ ...base, type: z.literal('models.test'), model: modelChoiceSchema }).strict(),
@@ -291,6 +301,7 @@ export interface CommandResponses {
   'system.info': SystemInfo;
   'system.ping': { type: 'pong'; id: string; text: string; pid: number };
   'models.settings': ModelSettings;
+  'models.compatible': ModelSettings;
   'models.discover': ModelSettings;
   'models.connection': ModelSettings;
   'models.test': { elapsedMs: number };

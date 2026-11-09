@@ -15,7 +15,7 @@
 - 产品是支持数据分析的通用 AI 工作台，保证外围流程与交互，不保证 Agent 的代码、方法或分析结论正确。
 - CSV 由选择器取得原文件路径；只校验路径、存在性、每文件和单次选用总量均不超过 100,000,000 bytes。不做 CSV 解析、编码转换、表格预览、内容复制或文件版本管理；允许对 workspace 内文件按临时条目 ID 有界读取 UTF-8 原始文本供只读预览。
 - 使用通用工具与内置 skills，不新增 inspect_csv 等产品专用解析工具。内置 Python 分析库与固定版本 ECharts 浏览器资源，不允许安装额外依赖。
-- pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。只开放 DeepSeek / OpenRouter 的 BYOK 与 Base URL 覆盖；先保存地址/凭证，再通过 `/models` 获取与锁定 SDK 聊天模型目录的交集。修改地址必须重新输入凭证，修改连接清除缓存列表。自定义提供方/未知模型与用户 skills 后置。
+- pi SDK 直接集成；不引入 ACP、另一套 Agent 调度或自建会话内容格式。开放 DeepSeek / OpenRouter，以及两个独立的 OpenAI Compatible provider（Chat Completions / Responses），仅 BYOK 与 Base URL，不提供 OAuth。两个兼容 provider 固定协议、独立凭证/模型配置；支持手动模型 ID、能力模板与可选 `/models`，未知能力不靠名称猜测。原有两 provider 仍使用 `/models` 与锁定 SDK 聊天模型目录的交集。修改地址必须重新输入凭证，修改连接清除对应缓存。兼容模型定义采用版本化非秘密配置并在准入时快照；兼容会话绑定模型定义，变化或跨 provider 续聊须恢复配置或新建会话，不改旧上下文。用户 skills 仍后置。
 - Agent 默认配置支持行为提示词、工具和内置 skill 开关，保存为不可变修订；首次创建会话时绑定，已有/排队会话不随默认值变化。版本详情、历史恢复和快照策略见技术设计。
 - 两个会话可同时运行，其余 FIFO；同会话 steer/follow-up 由 pi 队列处理。关闭窗口继续任务，Cmd+Q 停止全部并保存。
 

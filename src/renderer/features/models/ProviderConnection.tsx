@@ -1,3 +1,6 @@
+import { CompatibleModels } from './CompatibleModels';
+import type { CompatibleModel } from '../../../shared/compatible-models';
+import { isCompatibleProvider } from '../../../shared/providers';
 import { useId, useState, type Dispatch, type SetStateAction } from 'react';
 import type { ModelController } from './use-model-settings';
 import { normalizeEndpoint } from '../../../shared/model-configuration';
@@ -10,6 +13,7 @@ export interface ConnectionDraft {
   key: string;
   baseUrl: string;
   editing: boolean;
+  modelDraft?: CompatibleModel;
 }
 export type ConnectionDrafts = Record<string, ConnectionDraft>;
 export function ProviderConnection({
@@ -41,6 +45,14 @@ export function ProviderConnection({
   const locked = busy || testing || discovering;
   const providers = PROVIDERS.map((p) => p.id);
   const definition = providerDefinition(provider);
+  let requestUrl = '';
+  if ('api' in definition) {
+    try {
+      requestUrl = `${normalizeEndpoint(draft.baseUrl.trim() || definition.baseUrl)}/${definition.api === 'openai-responses' ? 'responses' : 'chat/completions'}`;
+    } catch {
+      /* Invalid drafts are reported when saved, never rendered as credential-bearing URLs. */
+    }
+  }
   async function discover() {
     setDiscovering(true);
     setNotice('');
@@ -114,7 +126,8 @@ export function ProviderConnection({
     <section className="settings-section model-settings" aria-labelledby="provider-heading">
       <h3 id="provider-heading">提供方连接</h3>
       <p>
-        先选择提供方，配置地址与 Key，再获取模型列表。选择模型后用于新任务，已运行或排队的任务不变。
+        先选择提供方，配置地址与
+        Key，再获取模型列表或配置兼容模型。选择模型后用于新任务，已运行或排队的任务不变。
       </p>
       <label>
         提供方
@@ -132,7 +145,7 @@ export function ProviderConnection({
         >
           {providers.map((p) => (
             <option key={p} value={p}>
-              {p}
+              {providerDefinition(p).name}
               {value?.configuredProviders.includes(p) ? ' · 已配置' : ''}
               {drafts[p]?.key || (drafts[p] && drafts[p].baseUrl !== (value?.endpoints[p] ?? ''))
                 ? ' · 未保存'
@@ -164,6 +177,12 @@ export function ProviderConnection({
           恢复默认地址
         </Button>
       </div>
+      {isCompatibleProvider(provider) && (
+        <p>
+          填写 API 前缀，不要填写完整 /chat/completions 或 /responses 路径。
+          {requestUrl && <span data-testid="compatible-endpoint">请求地址：{requestUrl}</span>}
+        </p>
+      )}
       {draft.baseUrl !== savedEndpoint && (
         <p>地址已变更，请重新输入此地址使用的 Key 后保存。凭证将发送到上方地址。</p>
       )}
@@ -273,7 +292,28 @@ export function ProviderConnection({
       >
         {discovering ? '正在获取模型列表…' : '获取模型列表'}
       </Button>
-      {value?.catalogs[provider] ? (
+      {isCompatibleProvider(provider) && configured && (
+        <CompatibleModels
+          key={`compatible-${provider}`}
+          provider={provider}
+          controller={controller}
+          draft={draft}
+          update={update}
+          disabled={locked || dirty}
+        />
+      )}
+      {isCompatibleProvider(provider) ? (
+        models.length ? (
+          <ModelSettings
+            key={`models-${provider}`}
+            controller={controller}
+            provider={provider}
+            disabled={locked || dirty}
+          />
+        ) : (
+          <p>保存兼容模型配置后，可选择模型。</p>
+        )
+      ) : value?.catalogs[provider] ? (
         <>
           <p>
             模型列表更新于 {new Date(value.catalogs[provider].fetchedAt).toLocaleString()}

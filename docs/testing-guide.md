@@ -1,6 +1,6 @@
 # 自动测试与模型录制/重放
 
-更新：2026-11-08。本文是持续维护测试的当前入口。P0–P7 是已经完成的开发阶段，不再用作测试组织方式；历史结果不改写，旧 ID 映射见 [legacy-aliases.json](../tests/legacy-aliases.json)。阶段 JSON 只作历史清单留档，`verify:phase -- Pn` 明确报错并提示新入口，不会静默执行缩水的旧门禁。
+更新：2026-11-09。本文是持续维护测试的当前入口。P0–P7 是已经完成的开发阶段，不再用作测试组织方式；历史结果不改写，旧 ID 映射见 [legacy-aliases.json](../tests/legacy-aliases.json)。阶段 JSON 只作历史清单留档，`verify:phase -- Pn` 明确报错并提示新入口，不会静默执行缩水的旧门禁。
 
 ## 目录与职责
 
@@ -208,3 +208,11 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 `examples.installation` 使用合成原生历史验证无新增业务表的首次初始化、崩溃恢复、默认修订保留、目标冲突与删除后不补回；普通 harness 默认禁用示例导入，显式 examples:true 才执行真实发行资源初始化，避免影响既有 fixture 的会话计数。此测试开关仅对 automation 启动有效。
 
 `agent-config.requests` 使用实际 SDK 最终 HTTP 请求比较跨目录迁移与重启、工具循环、steer/followup、新附件的历史前缀，并验证迁移说明仅追加一次及精确 skill 资源映射。示例真实制作使用 scripts/examples/generate.mjs 和隔离后台 Electron；凭证沿用 live-key，审批沿用评测审核机制，原始证据留在忽略目录。发行会话和普通 HTTP 合成录制分别管理。
+
+## OpenAI Compatible 双 Provider 回归
+
+`models.compatible-protocols` 使用真实 SDK 与本机合成 HTTP/SSE，验证两个固定协议的未知模型注册、工具结果回传、最终请求前缀、steer/follow-up、附件、usage、压缩重建边界、重启及定义变更/跨 provider 拒绝。`models.compatible-store` 在隔离 SQLite 验证同名模型/凭证/思考偏好隔离、配置更新快照、目录竞态、移除保留手动定义、损坏/未来版本恢复。`models.compatible-ui` 通过后台 Electron/CDP 实际填写两个连接，在目录 404 时手动配置、选择与探测，再完成工具循环，检查三尺寸/深浅主题和重启恢复。合成响应不代表线上兼容性。
+
+`pnpm test -- --case models.live-compatible-chat-deepseek,models.live-compatible-responses-deepseek,models.live-compatible-chat-openrouter,models.live-compatible-responses-openrouter --live` 对两个新 provider 分别使用两家真实服务；复用 `live-key.mjs` 的 DeepSeek/OpenRouter 凭证读取规则，不读取产品业务目录。模型固定 `deepseek-flash` / `deepseek/deepseek-v4.1-flash`，从真实设置保存自定义定义；每场景先做一次只读 read 工具往返，再重启追加一轮，检查实际工具、正文和 usage，不自动批准其他操作。正文工具轮最多 4 个已记录请求、每轮最多等待 180 秒，超出失败并停止隔离应用；未通过不算验收、不换模型无限重试。两家 Responses 均采用无远端会话状态方式，成功仅证明测试组合。
+
+模型协议、公共存储与 UI 变更仍须全部普通回归；四项 live 不替代 OpenAI 原生服务验证。程序流程、UX 截图检查与真实缓存 usage 分别报告，前缀稳定不保证服务端必然命中。

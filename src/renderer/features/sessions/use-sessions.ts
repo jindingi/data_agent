@@ -47,9 +47,10 @@ export function useSessions(search: string, archived: boolean, onError: (message
   );
   const select = useCallback(
     (id: string | null) => {
+      const changingSession = selectedRef.current !== id;
       selectedRef.current = id;
       setSelected(id);
-      setDetail(null);
+      if (changingSession) setDetail(null);
       if (id) localStorage.setItem('selected-session', id);
       else localStorage.removeItem('selected-session');
       void load(id);

@@ -89,6 +89,7 @@ export const cases = {
       assert((await process.innerText()).includes('missing.csv'));
       await page.getByRole('button', { name: '切换到浅色模式', exact: true }).click();
       await page.screenshot({ path: join(dir, 'process-expanded-light.png') });
+      const preservedProcess = await process.elementHandle();
       fixture.set({ tool: { name: 'ls', args: { path: '.' } } }, { text: 'SECOND_TURN_ANSWER' });
       await page.getByRole('textbox', { name: '分析需求' }).fill('Next question.');
       await page.getByRole('button', { name: '发送分析需求', exact: true }).click();
@@ -96,6 +97,10 @@ export const cases = {
         const value = await rpc(page, { type: 'runtime.snapshot', sessionId: id });
         return value.runId !== first.runId && value.state === 'completed';
       }, 'second turn completed');
+      assert(
+        await preservedProcess.evaluate((node) => node.isConnected),
+        'same-session submit must preserve the existing process DOM and focus state',
+      );
       assert.equal(await page.locator('.execution-process').count(), 2);
       assert.equal(
         await toggle.getAttribute('aria-expanded'),

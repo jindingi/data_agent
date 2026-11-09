@@ -75,9 +75,9 @@
 
 ## 5. 模型、工具与 Skills
 
-- 提供模型选择与 BYOK，仅开放 DeepSeek 和 OpenRouter。设置依次选择提供方、填写可选 Base URL、保存 API key、获取模型列表并选择模型；列表来自 `/models` 与锁定 SDK 支持范围的交集，排除非文本输出、明确不支持工具和 batch 模型。只有完成产品测试的组合标为已验证，其他组合标为未验证兼容性。
-- 本期真实集成验收固定 **DeepSeek-V41-Flash**。支持对这两个 provider 设置 API Base URL（沿用 SDK 协议，动态获取模型 ID）；新增自定义 provider/model、OAuth 订阅登录不纳入首版。
-- 同一会话的模型切换在两次执行之间生效，不改变正在运行的任务配置。
+- 提供模型选择与 BYOK：DeepSeek、OpenRouter、OpenAI Compatible · Chat Completions、OpenAI Compatible · Responses。后两个是独立连接，固定协议，分别保存地址、凭证、模型与思考偏好。原有两 provider 的列表来自 `/models` 与锁定 SDK 支持范围的交集，排除非文本输出、明确不支持工具和 batch 模型。兼容连接支持手动模型 ID、可选列表和能力模板；用户确认上下文窗口、输出上限、思考、视觉与服务兼容配置后保存，再选择模型。未知能力不根据名称猜测，兼容连接均标为未验证兼容性。
+- 本期真实集成验收固定 **DeepSeek-V41-Flash**。四个 provider 均支持 API Base URL，两个兼容入口复用 pi 的对应 OpenAI 协议；不开放任意协议、请求头或 OAuth 订阅登录。
+- 模型选择在两次执行之间生效，不改变运行或排队任务的快照。兼容会话固定首次执行的 provider 和模型能力定义；切换到其他 provider 或修改模型定义时须恢复原配置或新建会话，以保留历史请求前缀。
 - 展示模型实际返回的正文、thinking、tool call、tool result；不支持或未返回 thinking 时不伪造。
 - 工具保持通用：读取、写入、编辑、目录浏览、搜索、命令执行和用户澄清。分析方法放在内置 skills，不增加绑定 CSV/pandas 的专用 Agent 工具。
 - 设置提供一个 Agent 默认配置：编辑通用行为指令、启停八个通用工具、启停内置 skills，统一显式保存。真实变更生成 v1、v2 等配置版本；未保存修改不生效。模型连接配置与 Agent 配置分别管理。

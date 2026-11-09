@@ -1,3 +1,4 @@
+import { responsesSse } from '../../tests/support/model/responses.mjs';
 import { serveModelListing } from '../../tests/support/model/listing.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +42,10 @@ export async function modelFixture() {
     const id = randomUUID(),
       created = Math.floor(Date.now() / 1000);
     response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+    if (request.url === '/v1/responses') {
+      response.end(responsesSse(payload.model, reply, id));
+      return;
+    }
     const send = (delta, finish_reason = null) =>
       response.write(
         `data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created, model: payload.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`,

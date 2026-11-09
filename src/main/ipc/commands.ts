@@ -164,6 +164,9 @@ export async function dispatchCommand(
         command.type,
         credentials.saveConnection(command.provider, command.baseUrl, command.key),
       );
+    case 'models.compatible':
+      await catalogReady;
+      return success(command.type, credentials.saveCompatible(command.provider, command.models));
     case 'models.test': {
       await catalogReady;
       credentials.validate(command.model);
@@ -171,6 +174,7 @@ export async function dispatchCommand(
       const result = await host.request({
         type: 'models.test',
         model: command.model,
+        compatibleModel: credentials.compatibleModel(command.model),
         apiKey: credentials.key(command.model.provider),
         ...(baseUrl ? { baseUrl } : {}),
       });

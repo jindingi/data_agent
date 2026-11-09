@@ -1,6 +1,6 @@
 # Data Agent
 
-用自然语言分析本地 CSV，生成图表、Markdown 报告和交互式 HTML 报告的 AI 工作台。支持 DeepSeek 和 OpenRouter，使用自己的 API key。
+用自然语言分析本地 CSV，生成图表、Markdown 报告和交互式 HTML 报告的 AI 工作台。支持 DeepSeek、OpenRouter，以及独立的 OpenAI Compatible Chat Completions / Responses 连接，使用自己的 API key。
 
 ![Data Agent 工作台：Netflix 数据分析与报告预览](docs/images/workbench.png)
 
