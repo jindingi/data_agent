@@ -6,7 +6,7 @@
 
 ## 安装与使用
 
-支持 macOS（Apple Silicon）。目前可从源码构建，步骤见下文。打包后将 `Data Agent.app` 拖入“应用程序”即可，使用时无需安装 Node.js、Python 或分析库。
+支持 macOS（Apple Silicon）。目前可从源码构建，步骤见下文。打开生成的 DMG，将 `Data Agent.app` 拖入“应用程序”即可，使用时无需安装 Node.js、Python 或分析库。
 
 首次打开即可预览两个由 DeepSeek Flash 实际生成的 Netflix 分析示例：一份 Markdown 报告和一份可筛选的交互式 HTML 报告，无需配置 AI。数据、分析脚本和对话历史随应用提供；示例可继续对话、重命名或删除。数据来自 [Shivam Bansal 的 Kaggle 数据集](https://www.kaggle.com/datasets/shivamb/netflix-shows/data)。
 
@@ -25,11 +25,11 @@ pnpm dev
 
 前两步安装依赖并为 Electron 编译 SQLite 模块；`runtime:prepare` 首次下载并校验内置 Python、分析库和工具。
 
-| 命令               | 用途                                 |
-| ------------------ | ------------------------------------ |
-| `pnpm quality`     | 格式、Lint、类型、架构和文档链接检查 |
-| `pnpm test`        | 普通回归测试，不调用真实模型         |
-| `pnpm package:dir` | 构建 macOS 应用，输出实际应用路径    |
+| 命令               | 用途                                   |
+| ------------------ | -------------------------------------- |
+| `pnpm quality`     | 格式、Lint、类型、架构和文档链接检查   |
+| `pnpm test`        | 普通回归测试，不调用真实模型           |
+| `pnpm package:dmg` | 构建 macOS 安装镜像，输出实际 DMG 路径 |
 
 开发和打包使用独立产物目录，不覆盖已安装的应用。更多测试与发布验收说明见 [测试指南](docs/testing-guide.md)。
 

@@ -25,5 +25,7 @@ mac:
   identity: null
   target: dir
   category: public.app-category.productivity
+dmg:
+  artifactName: Data-Agent-${version}-mac-${arch}.${ext}
 npmRebuild: false
 electronDist: node_modules/electron/dist

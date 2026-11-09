@@ -15,6 +15,7 @@ export function prepare(plan, options, dir) {
     root: options['run-root'] ?? dir,
     build: plan.requirements.build,
     packaged: plan.requirements.packaged,
+    dmg: plan.requirements.dmg,
     reuseBuild: options['no-build'],
     reusePackage: options['no-package'],
   });

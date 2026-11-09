@@ -64,6 +64,7 @@ pnpm test:e2e                                     # 全部普通 E2E，不再只
 pnpm test -- --affected --base HEAD~1 --dry-run     # 查看提交差异 + 本地修改会选中什么、为什么
 pnpm test -- --affected --base HEAD~1              # 执行受影响的普通回归
 pnpm test -- --feature packaging                   # 全部非 live 打包用例
+pnpm test -- --case packaging.dmg                   # DMG 挂载、复制、推出后启动及示例预览
 pnpm test -- --feature performance                 # 固定 100 MB 基准
 pnpm test:live -- --case conversation.live-cache   # 显式真实模型调用
 pnpm test -- --case models.live-recording --live   # 生成候选录制，不自动覆盖正式 fixture
@@ -201,6 +202,8 @@ SDK、提示词、工具 schema 或实际工具输出变化导致 fixture 过期
 ## 内置示例验收
 
 `tooling.examples-publication` 验证发行副本归一化制作与临时路径、同步配置指纹、保留原始证据及非路径内容，并逐文件检查实际发行资源、清单和来源哈希。未知机器路径及疑似凭证必须拒绝导出。
+
+`packaging.dmg` 要求 runner 在同一产物上下文生成实际镜像，经 hdiutil 校验并后台只读挂载，检查 Applications 链接与包资源，复制到独立测试目录后推出镜像，再启动所复制的应用验证 SQLite、无 Key 示例与交互 HTML。镜像 SHA-256 随产物记录保存；普通 `.app` 用例不会单独触发 DMG 制作。
 
 `examples.installation` 使用合成原生历史验证无新增业务表的首次初始化、崩溃恢复、默认修订保留、目标冲突与删除后不补回；普通 harness 默认禁用示例导入，显式 examples:true 才执行真实发行资源初始化，避免影响既有 fixture 的会话计数。此测试开关仅对 automation 启动有效。
 

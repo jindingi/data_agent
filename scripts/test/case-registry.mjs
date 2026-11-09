@@ -43,6 +43,7 @@ export function requirementsFor(entries) {
   return {
     build: items.some((item) => ['built', 'packaged'].includes(item.environment)),
     packaged: items.some((item) => item.environment === 'packaged'),
+    dmg: items.some((item) => item.tags.includes('dmg')),
     live: items.some((item) => item.model === 'live'),
   };
 }

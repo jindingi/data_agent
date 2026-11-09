@@ -1,6 +1,6 @@
 # 本机使用
 
-当前构建目标为本机 macOS arm64。打开打包命令输出的 `bundlePath` 所指向的 `Data Agent.app`；可以把整个 `.app` 移到其他本机目录，必须保留包内资源。无需安装 Python、Node 或分析库。构建方式见 [README](../README.md)，验收入口与范围见 [测试指南](testing-guide.md)。
+当前构建目标为本机 macOS arm64。运行 `pnpm package:dmg` 后，打开输出的 `dmgPath` 安装镜像，把 `Data Agent.app` 拖入 Applications，再推出镜像并启动应用。`pnpm package:dir` 仍可单独生成 `.app`，输出 `bundlePath`；移动应用时须保留整个包内资源。无需安装 Python、Node 或分析库。构建方式见 [README](../README.md)，验收入口与范围见 [测试指南](testing-guide.md)。
 
 ## 第一次分析
 

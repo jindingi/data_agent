@@ -1,6 +1,6 @@
 # 面向数据分析的通用 AI 工作台：产品说明
 
-更新日期：2026-11-08。本文描述当前产品能力与范围；实现契约见 [技术设计](technical-design.md)，验收方式见 [测试指南](testing-guide.md)。当前构建目标为本机 macOS arm64 应用，不包含公开发布、签名公证或 Intel 验证。
+更新日期：2026-11-09。本文描述当前产品能力与范围；实现契约见 [技术设计](technical-design.md)，验收方式见 [测试指南](testing-guide.md)。当前构建目标为本机 macOS arm64 应用，提供 DMG 安装镜像，可挂载后拖入 Applications 安装；不包含公开发布、签名公证或 Intel 验证。
 
 ## 1. 产品目标
 

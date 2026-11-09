@@ -13,6 +13,7 @@
     "start": "node scripts/build/start.mjs",
     "build": "node scripts/build/build.mjs",
     "package:dir": "node scripts/build/package.mjs",
+    "package:dmg": "node scripts/build/package.mjs --dmg",
     "native:rebuild": "electron-rebuild -f -w better-sqlite3",
     "check": "tsc --noEmit && node scripts/test/check.mjs",
     "test:unit": "node scripts/test/verify.mjs --level unit",

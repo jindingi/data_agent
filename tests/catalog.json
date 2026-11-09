@@ -1280,6 +1280,16 @@
     "related": ["packaging"]
   },
   {
+    "id": "packaging.dmg",
+    "feature": "packaging",
+    "level": "e2e",
+    "file": "tests/features/packaging/dmg.e2e.mjs",
+    "model": "none",
+    "environment": "packaged",
+    "tags": ["dmg"],
+    "related": ["examples", "reports", "preview"]
+  },
+  {
     "id": "tooling.examples-publication",
     "feature": "tooling",
     "level": "tooling",

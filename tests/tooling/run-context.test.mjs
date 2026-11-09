@@ -30,6 +30,7 @@ import {
   testBundle,
 } from '../../scripts/test/run-context.mjs';
 import { verifyRelease } from '../../scripts/build/verify-release.mjs';
+import { diskImagePath } from '../../scripts/build/dmg.mjs';
 import { validateCatalog, requirementsFor } from '../../scripts/test/case-registry.mjs';
 
 function fixture(t) {
@@ -43,7 +44,7 @@ function fixture(t) {
   };
   put(
     join(sourceRoot, 'package.json'),
-    JSON.stringify({ name: 'fixture', main: 'out/main/index.js' }),
+    JSON.stringify({ name: 'fixture', version: '0.1.0', main: 'out/main/index.js' }),
   );
   put(join(sourceRoot, 'pnpm-lock.yaml'), 'lock fixture');
   put(join(sourceRoot, '.gitignore'), 'out/\nrelease/\nnode_modules/\nruntime/\n');
@@ -82,6 +83,11 @@ function fixture(t) {
         assert(args.includes(`--config.directories.output=${context.releaseDir}`));
         assert(args.includes(`--config.directories.app=${context.packageAppDir}`));
         put(join(context.bundlePath, 'Contents/Resources/app.asar'), 'package');
+        if (args[args.indexOf('--mac') + 1] === 'dmg') {
+          const bytes = Buffer.alloc(1024);
+          bytes.write('koly', bytes.length - 512);
+          put(diskImagePath(context), bytes);
+        }
       }
     },
     verifyPackage(bundle, buildDir) {
@@ -249,6 +255,31 @@ test('real dev output uses a fresh context and requirements remain explicit', (t
   assert.equal(requirementsFor(['P1-SCHEMA']).build, false);
   assert.equal(requirementsFor(['P0-PACKAGE']).packaged, true);
   assert.equal(requirementsFor(['P7-USABILITY']).packaged, false);
+  assert.equal(requirementsFor(['packaging.dmg']).dmg, true);
   assert.throws(() => validateCatalog([{ id: 'invalid' }]), /invalid/);
   assert.throws(() => requirementsFor(['missing.test']), /Unknown/);
+});
+
+test('DMG packaging preserves isolated outputs and rejects missing or changed distribution bytes', (t) => {
+  const f = fixture(t),
+    context = f.prepare('dmg', { packaged: true, dmg: true });
+  assert.equal(context.dmgPath, diskImagePath(context));
+  const command = f.commands.find((c) => c.label === 'package').args;
+  assert.equal(command[command.indexOf('--mac') + 1], 'dmg');
+  assert.equal(command[command.indexOf('--publish') + 1], 'never');
+  const reuse = () =>
+    f.prepare('dmg', { packaged: true, dmg: true, reuseBuild: true, reusePackage: true });
+  assert.equal(reuse().dmgPath, context.dmgPath);
+  const bytes = readFileSync(context.dmgPath);
+  bytes[0] = 1;
+  writeFileSync(context.dmgPath, bytes);
+  assert.throws(reuse, /Disk image does not match/);
+  assert.equal(readFileSync(join(f.sourceRoot, 'release/sentinel'), 'utf8'), 'shared package');
+  f.prepare('directory', { packaged: true });
+  assert.throws(
+    () =>
+      f.prepare('directory', { packaged: true, dmg: true, reuseBuild: true, reusePackage: true }),
+    /Missing verified DMG/,
+  );
+  assert.throws(() => f.prepare('invalid', { dmg: true }), /requires a packaged/);
 });

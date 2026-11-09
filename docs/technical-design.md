@@ -10,6 +10,8 @@
 
 electron-vite 构建 main/agent 两个 Node 入口，以及 preload/renderer；electron-builder 生成本机 `.app`。Python 可执行文件、标准库、扩展和字体放入真实资源目录，不塞进 ASAR。产品不要求用户安装 Node、Python、pip 或 Homebrew。
 
+`pnpm package:dmg` 在同一隔离产物上下文中生成 `.app` 与 `Data-Agent-{version}-mac-arm64.dmg`，镜像含应用及 Applications 快捷方式；打包显式禁用自动发布。产物记录同时锁定 DMG 文件名、大小和 SHA-256，复用或验证时拒绝缺失、重定向或字节变化的镜像。`package:dir` 保留只生成应用目录的入口，普通打包测试不额外制作镜像。DMG 不增加签名、公证或自动更新能力。
+
 构建产物由 `scripts/build/artifacts.mjs` 统一拥有来源、输出目录、准备、复用与验证。正式测试、build/package CLI、开发/CDP 和效果评测共用该入口；CLI 默认创建系统临时目录，可显式指定独立 run-root，禁止与源码及共享 out/release 重叠。源码指纹在仓库根计算，构建完成后核对来源未变并保存输出文件哈希；失败不生成成功记录。复用与启动检查同一上下文、指纹、完整产物和资源链接，缺失或过期即失败，不回退到进程环境或共享目录。
 
 内存执行上下文使用 AsyncLocalStorage，支持并发及嵌套隔离，不通过全局环境变量选择应用/构建/包。Vite 热更新使用新输出位置，不冒充可复用静态构建。打包先将已验证构建复制到独立 package-app，在其中离线准备生产依赖并保留匹配 Electron ABI 的 SQLite 字节；不替换 built 应用的依赖链接。electron-builder 仍以源码仓库为 projectDir，仅 app/output 指向产物目录；验证显式传入同一 buildDir/bundlePath。release 残留审计同时检查测试结果根与产物根。

@@ -19,6 +19,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { prepareReportRuntime } from './report-runtime.mjs';
 import { verifyRelease } from './verify-release.mjs';
+import { diskImagePath, inspectDiskImage } from './dmg.mjs';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -160,8 +161,14 @@ export function validateArtifacts(context, { packaged = false, packagedPath } = 
     );
     if (verified.asarSha256 !== value.packaged.asarSha256)
       throw new Error('Packaged application does not match its artifact receipt');
+    if (value.dmg && JSON.stringify(inspectDiskImage(context)) !== JSON.stringify(value.dmg))
+      throw new Error('Disk image does not match its artifact receipt');
   }
-  return { ...context, fingerprint: value.fingerprint };
+  return {
+    ...context,
+    ...(packaged && value.dmg ? { dmgPath: diskImagePath(context) } : {}),
+    fingerprint: value.fingerprint,
+  };
 }
 
 function save(context, value) {
@@ -187,12 +194,14 @@ export function prepareArtifacts(
     root,
     build = true,
     packaged = false,
+    dmg = false,
     reuseBuild = false,
     reusePackage = false,
     dev = false,
   } = {},
   adapter = {},
 ) {
+  if (dmg && !packaged) throw new Error('DMG packaging requires a packaged application');
   if ((reuseBuild || reusePackage) && !root) throw new Error('Artifact reuse requires --run-root');
   if (reusePackage && !packaged) throw new Error('--no-package requires a packaged artifact');
   if (dev && (build || packaged || reuseBuild || reusePackage))
@@ -265,8 +274,10 @@ export function prepareArtifacts(
           'exec',
           'electron-builder',
           '--mac',
-          'dir',
+          dmg ? 'dmg' : 'dir',
           '--arm64',
+          '--publish',
+          'never',
           `--config.directories.app=${context.packageAppDir}`,
           `--config.directories.output=${context.releaseDir}`,
         ],
@@ -276,12 +287,23 @@ export function prepareArtifacts(
     const verified = verify(context.bundlePath, context.buildDir, context.sourceRoot);
     if (reusePackage && verified.asarSha256 !== value.packaged.asarSha256)
       throw new Error('Packaged application does not match its artifact receipt');
+    if (dmg && reusePackage && !value.dmg) throw new Error('Missing verified DMG');
+    if (dmg || value.dmg) {
+      const image = inspectDiskImage(context);
+      if (reusePackage && JSON.stringify(image) !== JSON.stringify(value.dmg))
+        throw new Error('Disk image does not match its artifact receipt');
+      value.dmg = image;
+    }
     if (sourceFingerprint(context.sourceRoot) !== fingerprint)
       throw new Error('Source changed during artifact preparation');
     value.packaged = { asarSha256: verified.asarSha256 };
     save(context, value);
   }
-  return { ...context, fingerprint };
+  return {
+    ...context,
+    ...(packaged && value.dmg ? { dmgPath: diskImagePath(context) } : {}),
+    fingerprint,
+  };
 }
 
 export function loadArtifacts(root, { packaged = false } = {}) {

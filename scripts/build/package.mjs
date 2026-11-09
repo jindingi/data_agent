@@ -1,4 +1,9 @@
 import { prepareArtifacts, artifactOptions } from './artifacts.mjs';
 
-const context = prepareArtifacts({ ...artifactOptions(process.argv.slice(2)), packaged: true });
+const args = process.argv.slice(2);
+const context = prepareArtifacts({
+  ...artifactOptions(args.filter((arg) => arg !== '--dmg')),
+  packaged: true,
+  dmg: args.includes('--dmg'),
+});
 console.log(JSON.stringify({ status: 'ready', ...context }));
