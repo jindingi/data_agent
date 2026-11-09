@@ -43,7 +43,7 @@ it('freezes skill resources across recovery without prompt protocol versions', (
   rmSync(join(base, 'references/echarts.md'));
   materializeSkills(root, binding); // small text restores from snapshot, library from existing cache
   expect(readFileSync(join(base, 'references/echarts.md'), 'utf8')).toContain('ECharts');
-  expect(readFileSync(join(base, 'vendor/echarts.min.js'))).toEqual(library);
+  expect(readFileSync(join(base, 'vendor/echarts.min.js')).equals(library)).toBe(true);
   const missingInstallation = loadBundledSkills(
     root,
     resolve('resources/skills'),
@@ -55,7 +55,7 @@ it('freezes skill resources across recovery without prompt protocol versions', (
   rmSync(join(base, 'vendor/echarts.min.js'));
   expect(() => materializeSkills(root, binding)).toThrow('缺失');
   materializeSkills(root, binding, bundle.binarySources);
-  expect(readFileSync(join(base, 'vendor/echarts.min.js'))).toEqual(library);
+  expect(readFileSync(join(base, 'vendor/echarts.min.js')).equals(library)).toBe(true);
 });
 it('rejects mutated descriptors, bytes and symlinks without overwriting them', () => {
   const { root, bundle, binding } = fixture();
