@@ -12,7 +12,7 @@ import {
 } from '../../support/desktop.mjs';
 
 async function workbench({ dir }, packaged = false) {
-  const root = join(dir, 'examples-app'),
+  const root = join(dir, packaged ? 'examples-packaged-app' : 'examples-app'),
     fixture = await modelFixture();
   let app;
   try {
