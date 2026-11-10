@@ -248,27 +248,6 @@ export function App() {
                 </Button>
               </div>
             )}
-            {history.length === 0 && !current && examples.sessions.length > 0 && (
-              <div className="idea-grid" aria-label="打开真实分析示例">
-                {examples.sessions.map((example) => (
-                  <button
-                    className="idea-card"
-                    key={example.id}
-                    onClick={() => {
-                      setInitialReport(example.report);
-                      sessions.select(example.id);
-                      setPanel(true);
-                    }}
-                  >
-                    <div>
-                      <FileChartColumn size={17} />
-                      <strong>{example.title}</strong>
-                    </div>
-                    <p>查看真实分析过程和报告，无需配置 AI</p>
-                  </button>
-                ))}
-              </div>
-            )}
             {history.length === 0 && (
               <div className="idea-grid">
                 {ideas.map(({ icon: Icon, title, prompt }) => (
