@@ -43,7 +43,13 @@ pnpm dev
 
 ## 项目架构
 
-基于 Electron、TypeScript 和 React，使用 pi SDK 驱动 Agent。
+基于 Electron、TypeScript 和 React，使用 pi SDK 驱动 Agent。界面通过 preload 的受控 IPC 访问 Main；Main 管理会话、凭证和任务准入，每个活跃会话使用独立的 Agent Host 进程。
+
+![Data Agent 技术架构：界面、Main、Agent Host、模型服务及本地存储](docs/images/architecture.svg)
+
+[架构图源文件（draw.io）](docs/images/architecture.drawio)
+
+Agent Host 中的 pi SDK 运行 Agent Loop：请求模型 → 调用已注册工具 → 将工具结果追加到上下文 → 继续请求模型。工具通过 ToolClient 代理到 Main 的执行后端，经过策略检查与审批后执行文件操作或 Python/bash；结果回到 SDK 继续循环。Main 管理跨会话准入，最多两个会话同时运行，其余按 FIFO 排队。
 
 | 模块                          | 职责                                                     |
 | ----------------------------- | -------------------------------------------------------- |
@@ -53,6 +59,6 @@ pnpm dev
 | `src/shared`、`src/node`      | 跨进程契约与 Node 侧公共能力                             |
 | `resources`                   | 内置 skills、示例会话、运行时版本与许可配置              |
 
-Python 和常用分析库随应用打包；HTML 报告在隔离查看器中运行。会话元数据存入 SQLite，对话保留 pi 原生历史，报告和脚本保存为普通文件。
+Python 和常用分析库随应用打包；HTML 报告在独立受限、无 preload/IPC 的查看器中运行。会话元数据存入 SQLite，对话保留 pi 原生 JSONL 历史，报告和脚本保存为工作区中的普通文件。
 
 详细说明见 [使用指南](docs/usage.md)、[技术设计](docs/technical-design.md) 和 [文档索引](docs/README.md)。
