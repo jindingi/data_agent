@@ -417,7 +417,7 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 
 ### 动态模型目录与连接迁移
 
-- `src/shared/providers.ts` 是产品提供方允许清单和默认地址的唯一入口。Agent 的 `models.list` 返回 DeepSeek/OpenRouter 的 SDK 元数据（含能力模板限制）用于能力校验，不是对外 `/models` 结果。Main `models.discover` 用已保存的密钥请求 `${baseUrl}/models`；列表读取不消耗生成 token，但不保证该 Key 有权调用每个模型。OpenRouter 的地区、额度、账户偏好等限制仍以实际生成请求为准。
+- `src/shared/providers.ts` 是产品提供方允许清单和默认地址的唯一入口。Agent 的 `models.list` 返回 DeepSeek/OpenRouter 的 SDK 元数据（含模型能力与限制）用于能力校验，不是对外 `/models` 结果。Main `models.discover` 用已保存的密钥请求 `${baseUrl}/models`；列表读取不消耗生成 token，但不保证该 Key 有权调用每个模型。OpenRouter 的地区、额度、账户偏好等限制仍以实际生成请求为准。
 - `model-discovery.ts` 限定 20 秒、8 MB、10,000 条，禁止重定向和原始错误正文透传；对 DeepSeek/OpenRouter 只保留 SDK 认识的聊天模型，排除明确不支持 tools、非文本输出和 `:batch` 模型。不根据名字猜未知模型的能力，不悄悄退回全部静态列表。失败保留同一连接上次成功列表和更新时间；更换/移除 Key 或改变地址会立即失效旧列表。保存失败仍保留表单草稿；保存成功但发现失败可用“获取模型列表”重试。
 - SQLite `app_metadata` 的 `catalog.{provider}` 存 `{ids, fetchedAt}`，`connectionRevision.{provider}` 存配置修订号；不存凭证摘要或响应正文。无需改变表结构。DeepSeek/OpenRouter 重启用缓存 ID 与当前 SDK 重新求交集，损坏缓存要求重新获取；无旧缓存的升级用户需获取一次列表。发送/选择校验所选模型仍在当前提供方的可用配置中（兼容模型无需远端目录），失败不创建新运行。并发发现采用配置修订号和请求票据，过期结果不能覆盖新配置/新列表。
 - 启动时清理已退役提供方的 credential/endpoint/catalog/connectionRevision/thinking 元数据；退役的默认提供方回到 DeepSeek，要求配置后再使用。不删除 JSONL、会话、报告或工作区；历史模型名称仍可阅读。
@@ -428,7 +428,7 @@ pi 公开 message_end 早于原生 appendMessage，因此读取统计在 turn_en
 
 - `openai-chat-compatible` 与 `openai-responses-compatible` 是独立 provider，分别绑定 Chat Completions 和 Responses。共享连接管理和通用 Agent 循环；不共用凭证、列表、手动模型、思考偏好或修订号。不自动失败回退。
 - `shared/compatible-models.ts` 定义严格版本化模型 schema、能力投影与思考级别映射；`agent/compatible-models.ts` 是探测与正式会话的唯一注册入口，经 `registerProvider` 注册自定义 ID。使用 SDK 内存目录，不读用户 models.json。profile 仅允许 basic/openai/deepseek/openrouter；基础关闭可配置思考，DeepSeek 使用其思考格式/级别，Responses 使用自己的 compat 字段，Renderer 不能注入 api/headers/任意 compat。
-- SDK 目录提供能力模板；模板只填上下文、输出、reasoning/vision 与受控 profile，不复制模板原地址。`/models` 对兼容 provider 仅辅助填 ID；手动模型独立于缓存，即使列表获取失败仍能配置。上下文最小 32768，最大输出不得超过上下文减去 16384 压缩预留；执行输出仍取模型与产品限额的较小值。
+- 兼容模型由用户填写上下文、输出、reasoning/vision 与受控 profile，不从 SDK 模型模板预填能力。`/models` 对兼容 provider 仅辅助填 ID；手动模型独立于缓存，即使列表获取失败仍能配置。上下文最小 32768，最大输出不得超过上下文减去 16384 压缩预留；执行输出仍取模型与产品限额的较小值。
 - 准入时快照完整兼容定义，Host schema 再次校验；连接探测使用同一已保存定义。地址/Key/定义修改不影响运行和排队中的快照。持久化字段、版本与恢复见 SQLite 设计。
 - `agent/compatible-history.ts` 在原生 custom entry 追加一次兼容模型绑定，不进入模型上下文。历史绑定的 provider/定义必须一致；涉及兼容 provider 的跨 provider 续聊和定义变更须恢复原配置或新建会话。验证发生在上下文资源追加和模型请求之前，不覆写原历史。不对旧 SDK 会话补写系统消息或强制压缩。
 - 两种协议都验证最终 HTTP 中既有 messages/input、system 和 tools 的前缀；运行状态和预算不注入提示词。Responses 沿用 SDK 完整 input 与本地 JSONL，无自建远端 conversation 状态。usage 经 SDK 归一化后进入现有统计，缺失值不伪装为零消耗；价格占位零不作为免费声明。

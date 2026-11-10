@@ -31,13 +31,6 @@ export function CompatibleModels({
     vision: false,
   };
   const models = controller.value?.compatibleModels[provider] ?? [];
-  const templates =
-    controller.value?.modelTemplates.filter(
-      (m) =>
-        m.model === 'deepseek-flash' ||
-        m.model === 'deepseek/deepseek-v4.1-flash' ||
-        m.model === 'openai/gpt-4o-mini',
-    ) ?? [];
   function change(patch: Partial<CompatibleModel>) {
     update({ modelDraft: { ...value, ...patch } });
     setError('');
@@ -105,34 +98,6 @@ export function CompatibleModels({
           </select>
         </label>
       )}
-      <label>
-        能力模板
-        <select
-          aria-label="模型能力模板"
-          disabled={disabled}
-          value=""
-          onChange={(e) => {
-            const template = templates[Number(e.target.value)];
-            if (!template?.contextWindow) return;
-            change({
-              model: value.model || template.model,
-              name: value.name || template.name,
-              contextWindow: template.contextWindow,
-              maxTokens: Math.min(template.maxTokens ?? 16384, 16384),
-              reasoning: template.reasoning,
-              vision: template.vision,
-              profile: template.provider === 'deepseek' ? 'deepseek' : 'openrouter',
-            });
-          }}
-        >
-          <option value="">手动配置，或选择模板填入能力…</option>
-          {templates.map((m, i) => (
-            <option key={`${m.provider}/${m.model}`} value={i}>
-              {m.provider} / {m.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <label>
         模型 ID
         <input

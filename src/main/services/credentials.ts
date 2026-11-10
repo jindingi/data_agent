@@ -86,7 +86,6 @@ export class CredentialService {
       discoveredIds: Object.fromEntries(
         PROVIDERS.map(({ id }) => [id, this.catalog(id)?.ids ?? []]),
       ),
-      modelTemplates: this.models,
       thinkingLevel: this.thinking(),
       endpoints: Object.fromEntries(PROVIDERS.map(({ id }) => [id, this.endpoint(id) ?? ''])),
       selected: this.selected(),

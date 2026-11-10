@@ -38,7 +38,6 @@ export interface ModelSettings {
   encryptionAvailable: boolean;
   compatibleModels: Record<string, CompatibleModel[]>;
   compatibleErrors: Record<string, string>;
-  modelTemplates: ModelOption[];
   discoveredIds: Record<string, string[]>;
 }
 export const DEFAULT_MODEL: ModelChoice = { provider: 'deepseek', model: 'deepseek-flash' };
